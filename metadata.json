@@ -1,0 +1,5 @@
+{
+  "name": "Banco PMVs DOT",
+  "description": "A modern, searchable portfolio website displaying pmv_projects in a card-based grid layout. The interface is styled with a dark theme and vibrant green accents, inspired by dotgroup.com.br, and allows for easy filtering of pmv_projects.",
+  "requestFramePermissions": []
+}
