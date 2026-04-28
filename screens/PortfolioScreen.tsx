@@ -13,7 +13,6 @@ import { collection, query, onSnapshot, doc, updateDoc, increment } from 'fireba
 import { logAudit } from '../services/auditService';
 import { toggleFavorite, subscribeToFavorites } from '../services/favoriteService';
 import { toggleLike, subscribeToLikes } from '../services/likeService';
-import { handleFirestoreError, OperationType } from '../services/firestoreErrorHandler';
 import { User } from 'firebase/auth';
 import { Bookmark, BookmarkCheck } from 'lucide-react';
 import type { Favorite, Like } from '../types';
@@ -93,8 +92,8 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
         return;
     }
 
-    const path = 'projects';
-    const projectsCollection = collection(db, path);
+    setLoading(true);
+    const projectsCollection = collection(db, 'projects');
     const q = query(projectsCollection);
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -114,7 +113,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
         setPortfolioItems(sortedList);
         setLoading(false);
     }, (error) => {
-        handleFirestoreError(error, OperationType.LIST, path);
+        console.error("Error fetching portfolio items: ", error);
         setLoading(false);
     });
 
@@ -153,14 +152,13 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
     
     // Increment views
     if (item.id) {
-      const path = 'projects';
       try {
-        const docRef = doc(db, path, item.id);
+        const docRef = doc(db, 'projects', item.id);
         await updateDoc(docRef, {
           views: increment(1)
         });
       } catch (error) {
-        handleFirestoreError(error, OperationType.UPDATE, path);
+        console.error("Error updating views:", error);
       }
     }
   };

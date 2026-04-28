@@ -6,7 +6,57 @@ import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, writeBatc
 import { User } from 'firebase/auth';
 import type { PortfolioItem } from '../types';
 import { logAudit, APP_VERSION } from '../services/auditService';
-import { handleFirestoreError, OperationType } from '../services/firestoreErrorHandler';
+
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId: string | undefined;
+    email: string | null | undefined;
+    emailVerified: boolean | undefined;
+    isAnonymous: boolean | undefined;
+    tenantId: string | null | undefined;
+    providerInfo: {
+      providerId: string;
+      displayName: string | null;
+      email: string | null;
+      photoUrl: string | null;
+    }[];
+  }
+}
+
+const handleFirestoreError = (error: unknown, operationType: OperationType, path: string | null) => {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData.map(provider => ({
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoUrl: provider.photoURL
+      })) || []
+    },
+    operationType,
+    path
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+};
 
 // PapaParse and XLSX are loaded from a CDN script in index.html
 declare const Papa: any;
@@ -152,7 +202,8 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
         const uniqueUsers = new Set(logList.map(l => l.userEmail)).size;
         setStats(prev => ({ ...prev, activeUsers: uniqueUsers }));
       }, (error) => {
-        handleFirestoreError(error, OperationType.LIST, path);
+        console.error("Error in audit logs snapshot:", error);
+        // Don't set logsError here if we already have data
       });
       
       return unsubscribe;
@@ -321,7 +372,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
         setUploadLogs(logList);
         setLogsError(null);
       }, (error) => {
-        handleFirestoreError(error, OperationType.LIST, path);
+        console.error("Error in upload logs snapshot:", error);
       });
       
       return unsubscribe;

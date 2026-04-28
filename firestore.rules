@@ -3,56 +3,6 @@ service cloud.firestore {
   match /databases/{database}/documents {
     
     // ===============================================================
-    // Assumed Data Model
-    // ===============================================================
-    //
-    // Collection: projects
-    // Document ID: auto-generated
-    // Fields:
-    //   - Imagem_capa: string (optional)
-    //   - Time: string (optional)
-    //   - Cliente: string (required)
-    //   - Data: string (optional)
-    //   - Projeto: string (required)
-    //   - DI: string (optional)
-    //   - DM: string (optional)
-    //   - Link_PMV: string (required)
-    //   - Assunto_geral: string (optional)
-    //   - Assunto_especifico: string (optional)
-    //   - Publico_alvo: string (optional)
-    //   - Metodologias: string (optional)
-    //   - Mídias: string (optional)
-    //   - Outros_recursos: string (optional)
-    //   - tags: list of strings (optional)
-    //   - likes: number (optional, default 0)
-    //   - views: number (optional, default 0)
-    //
-    // Collection: auditLogs
-    // Document ID: auto-generated
-    // Fields:
-    //   - userEmail: string (required)
-    //   - action: string (required)
-    //   - details: string (required)
-    //   - version: string (required)
-    //   - timestamp: timestamp (required)
-    //
-    // Collection: favorites
-    // Document ID: auto-generated
-    // Fields:
-    //   - userId: string (required)
-    //   - projectId: string (required)
-    //   - timestamp: string (required, ISO 8601)
-    //
-    // Collection: likes
-    // Document ID: {userId}_{projectId}
-    // Fields:
-    //   - userId: string (required)
-    //   - projectId: string (required)
-    //   - timestamp: timestamp (required)
-    //
-    // ===============================================================
-
-    // ===============================================================
     // Helper Functions
     // ===============================================================
     function isAuthenticated() {
@@ -67,6 +17,7 @@ service cloud.firestore {
     
     function isAdmin() {
       return isAuthenticated() && 
+             request.auth.token.email != null &&
              (
                (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
                 get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
@@ -80,20 +31,6 @@ service cloud.firestore {
              data.action is string && data.action.size() < 50 &&
              data.details is string && data.details.size() < 1000 &&
              data.version is string && data.version.size() < 20 &&
-             data.timestamp is timestamp;
-    }
-
-    function isValidFavorite(data) {
-      return data.keys().hasAll(['userId', 'projectId', 'timestamp']) &&
-             data.userId == request.auth.uid &&
-             data.projectId is string && data.projectId.size() < 100 &&
-             data.timestamp is string && data.timestamp.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
-    }
-
-    function isValidLike(data) {
-      return data.keys().hasAll(['userId', 'projectId', 'timestamp']) &&
-             data.userId == request.auth.uid &&
-             data.projectId is string && data.projectId.size() < 100 &&
              data.timestamp is timestamp;
     }
 
@@ -161,7 +98,7 @@ service cloud.firestore {
     // Favorites collection
     match /favorites/{favoriteId} {
       allow read: if isDotGroupUser() && (request.auth.uid == resource.data.userId || isAdmin());
-      allow create: if isDotGroupUser() && isValidFavorite(request.resource.data);
+      allow create: if isDotGroupUser() && request.resource.data.userId == request.auth.uid;
       allow delete: if isDotGroupUser() && resource.data.userId == request.auth.uid;
     }
 
@@ -169,7 +106,7 @@ service cloud.firestore {
     match /likes/{likeId} {
       allow read: if isDotGroupUser();
       allow create: if isDotGroupUser() && 
-                      isValidLike(request.resource.data) &&
+                      request.resource.data.userId == request.auth.uid &&
                       likeId == request.auth.uid + "_" + request.resource.data.projectId;
       allow delete: if isDotGroupUser() && resource.data.userId == request.auth.uid;
     }

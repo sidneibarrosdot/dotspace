@@ -2,14 +2,12 @@
 import { db } from '../firebase';
 import { collection, query, where, getDocs, writeBatch, doc, onSnapshot, serverTimestamp, increment } from 'firebase/firestore';
 import type { Like } from '../types';
-import { handleFirestoreError, OperationType } from './firestoreErrorHandler';
 
 export const toggleLike = async (userId: string, projectId: string): Promise<boolean> => {
-  const path = 'likes';
   try {
-    const likesRef = collection(db, path);
+    const likesRef = collection(db, 'likes');
     const likeId = `${userId}_${projectId}`;
-    const likeDocRef = doc(db, path, likeId);
+    const likeDocRef = doc(db, 'likes', likeId);
     const projectDocRef = doc(db, 'projects', projectId);
     
     const q = query(likesRef, where('userId', '==', userId), where('projectId', '==', projectId));
@@ -39,14 +37,13 @@ export const toggleLike = async (userId: string, projectId: string): Promise<boo
       return true; // Liked now
     }
   } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, path);
-    return false; // Should not reach here
+    console.error('Error toggling like:', error);
+    throw error;
   }
 };
 
 export const subscribeToLikes = (userId: string, callback: (likes: Like[]) => void) => {
-  const path = 'likes';
-  const likesRef = collection(db, path);
+  const likesRef = collection(db, 'likes');
   const q = query(likesRef, where('userId', '==', userId));
 
   return onSnapshot(q, (snapshot) => {
@@ -55,7 +52,5 @@ export const subscribeToLikes = (userId: string, callback: (likes: Like[]) => vo
       ...doc.data()
     } as Like));
     callback(likes);
-  }, (error) => {
-    handleFirestoreError(error, OperationType.LIST, path);
   });
 };

@@ -62,17 +62,6 @@
         "timestamp": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "projectId"]
-    },
-    "Like": {
-      "title": "Like",
-      "description": "A project liked by a user",
-      "type": "object",
-      "properties": {
-        "userId": { "type": "string" },
-        "projectId": { "type": "string" },
-        "timestamp": { "type": "string", "format": "date-time" }
-      },
-      "required": ["userId", "projectId"]
     }
   },
   "firestore": {
@@ -95,10 +84,6 @@
     "/favorites": {
       "schema": "Favorite",
       "description": "User favorited projects"
-    },
-    "/likes": {
-      "schema": "Like",
-      "description": "User liked projects"
     }
   }
 }

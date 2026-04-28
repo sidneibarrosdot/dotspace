@@ -1,7 +1,6 @@
 
 import { db, auth } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { handleFirestoreError, OperationType } from './firestoreErrorHandler';
 
 import { User } from 'firebase/auth';
 
@@ -11,9 +10,8 @@ export const logAudit = async (action: string, details: string, userOverride?: U
     const user = userOverride !== undefined ? userOverride : auth.currentUser;
     if (!user) return;
 
-    const path = 'auditLogs';
     try {
-        await addDoc(collection(db, path), {
+        await addDoc(collection(db, 'auditLogs'), {
             userEmail: user.email,
             action,
             details,
@@ -21,6 +19,10 @@ export const logAudit = async (action: string, details: string, userOverride?: U
             timestamp: serverTimestamp(),
         });
     } catch (error) {
-        handleFirestoreError(error, OperationType.CREATE, path);
+        console.error("Error logging audit:", error);
+        if (user) {
+            console.error("User UID:", user.uid);
+            console.error("User Email:", user.email);
+        }
     }
 };

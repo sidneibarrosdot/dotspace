@@ -6,7 +6,57 @@ import DotLogo from './DotLogo';
 import { logAudit } from '../services/auditService';
 import { User } from 'firebase/auth';
 import { HeartIcon, EyeIcon, Bookmark } from 'lucide-react';
-import { handleFirestoreError, OperationType } from '../services/firestoreErrorHandler';
+
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId: string | undefined;
+    email: string | null | undefined;
+    emailVerified: boolean | undefined;
+    isAnonymous: boolean | undefined;
+    tenantId: string | null | undefined;
+    providerInfo: {
+      providerId: string;
+      displayName: string | null;
+      email: string | null;
+      photoUrl: string | null;
+    }[];
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData.map(provider => ({
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoUrl: provider.photoURL
+      })) || []
+    },
+    operationType,
+    path
+  }
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
 
 interface PortfolioModalProps {
   item: PortfolioItem;
@@ -210,44 +260,27 @@ const PortfolioModal: React.FC<PortfolioModalProps> = ({ item, onClose, isCreati
             
             const { id, ...dataToSave } = cleanedItem;
             
-            // Auto-generate cover image from Google Slides link if no image is provided (for new projects)
-            // OR if it's already a Google Slides link (to keep it updated/normalized).
-            // For existing projects, if the user clears the field, we respect that.
-            const isGoogleSlidesLink = cleanedItem.Imagem_capa && cleanedItem.Imagem_capa.includes('docs.google.com/presentation/d/');
-            const shouldAutoGenerate = (!id && !cleanedItem.Imagem_capa) || isGoogleSlidesLink;
+            // Auto-generate cover image from Google Slides link if no image is provided
+            const shouldAutoGenerate = !cleanedItem.Imagem_capa;
 
             if (shouldAutoGenerate && cleanedItem.Link_PMV) {
                 const previewUrl = getGoogleSlidesPreviewUrl(cleanedItem.Link_PMV);
                 if (previewUrl) {
                     cleanedItem.Imagem_capa = previewUrl;
                     (dataToSave as any).Imagem_capa = previewUrl; // Update dataToSave as well
-                } else if (isGoogleSlidesLink) {
-                    // If the link is no longer a valid slides link, remove the old auto-generated image URL.
-                    cleanedItem.Imagem_capa = '';
-                    (dataToSave as any).Imagem_capa = '';
                 }
             }
 
             if (id) { // UPDATE existing project
-                const path = `projects/${id}`;
-                try {
-                    const projectRef = doc(db, 'projects', id);
-                    await updateDoc(projectRef, dataToSave);
-                    await logAudit('UPDATE', `Editou projeto: ${cleanedItem.Projeto}`, user);
-                    if (onUpdate) onUpdate(cleanedItem);
-                } catch (error) {
-                    handleFirestoreError(error, OperationType.UPDATE, path);
-                }
+                const projectRef = doc(db, 'projects', id);
+                await updateDoc(projectRef, dataToSave);
+                await logAudit('UPDATE', `Editou projeto: ${cleanedItem.Projeto}`, user);
+                if (onUpdate) onUpdate(cleanedItem);
             } else { // CREATE new project
-                const path = 'projects';
-                try {
-                    const docRef = await addDoc(collection(db, path), dataToSave);
-                    const newProject = { ...cleanedItem, id: docRef.id };
-                    await logAudit('CREATE', `Criou projeto: ${cleanedItem.Projeto}`, user);
-                    if (onAdd) onAdd(newProject);
-                } catch (error) {
-                    handleFirestoreError(error, OperationType.CREATE, path);
-                }
+                const docRef = await addDoc(collection(db, 'projects'), dataToSave);
+                const newProject = { ...cleanedItem, id: docRef.id };
+                await logAudit('CREATE', `Criou projeto: ${cleanedItem.Projeto}`, user);
+                if (onAdd) onAdd(newProject);
             }
             setIsEditing(false);
             onClose();
@@ -322,7 +355,7 @@ const PortfolioModal: React.FC<PortfolioModalProps> = ({ item, onClose, isCreati
                         {editableItem.Imagem_capa && editableItem.Imagem_capa.includes('docs.google.com/presentation/d/') ? (
                             <div className="w-full h-full relative">
                                 <iframe 
-                                    src={editableItem.Imagem_capa} 
+                                    src={editableItem.Imagem_capa.replace(/\/pub(\?|$)/, '/embed$1')} 
                                     title={editableItem.Projeto} 
                                     className="w-full h-full rounded-t-lg" 
                                     frameBorder="0" 

@@ -77,7 +77,10 @@ const PortfolioCard: React.FC<PortfolioCardProps> = ({ item, onClick, onLike, on
             <div className="w-full h-full relative overflow-hidden flex items-center justify-center">
               <iframe
                 className="w-full h-full absolute top-0 left-0 pointer-events-none scale-[1.15]"
-                src={item.Imagem_capa.includes('?') ? `${item.Imagem_capa}&rm=minimal` : `${item.Imagem_capa}?rm=minimal`}
+                src={(() => {
+                  let embedUrl = item.Imagem_capa.replace(/\/pub(\?|$)/, '/embed$1');
+                  return embedUrl.includes('?') ? `${embedUrl}&rm=minimal` : `${embedUrl}?rm=minimal`;
+                })()}
                 frameBorder="0"
                 title={item.Projeto}
               />
