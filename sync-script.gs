@@ -1,6 +1,6 @@
 /**
  * Script para sincronizar automaticamente uma planilha do Google Sheets com o Banco de PMVs DOT.
- * 
+ *
  * Instruções:
  * 1. No Google Sheets, vá em Extensões > Apps Script.
  * 2. Substitua o conteúdo pelo código abaixo.
@@ -10,12 +10,19 @@
  */
 
 const APP_URL = 'https://bancopmvs.dotgroup.com.br'; // URL do seu app
-const SYNC_API_KEY = 'AIzaSyAt-zzcYFTdgcNOpY86tHawAQ0WGqEe2E4'; // Mesma chave configurada no .env do app
+
+function getSyncApiKey() {
+  const key = PropertiesService.getScriptProperties().getProperty('SYNC_API_KEY');
+  if (!key) {
+    throw new Error('Configure SYNC_API_KEY em Propriedades do script antes de sincronizar.');
+  }
+  return key;
+}
 
 function syncPortfolio() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
   const data = sheet.getDataRange().getValues();
-  
+
   if (data.length < 2) {
     Logger.log('Planilha vazia ou sem dados.');
     return;
@@ -37,7 +44,7 @@ function syncPortfolio() {
       }
     });
 
-    if (hasData && project.projeto && project.cliente) {
+    if (hasData && project.Projeto && project.Cliente) {
       projects.push(project);
     }
   }
@@ -48,11 +55,12 @@ function syncPortfolio() {
   }
 
   const payload = JSON.stringify({ projects: projects });
+  const syncApiKey = getSyncApiKey();
   const options = {
     method: 'post',
     contentType: 'application/json',
     headers: {
-      'x-sync-api-key': SYNC_API_KEY
+      'x-sync-api-key': syncApiKey
     },
     payload: payload,
     muteHttpExceptions: true
@@ -61,7 +69,7 @@ function syncPortfolio() {
   try {
     const response = UrlFetchApp.fetch(`${APP_URL}/api/sync`, options);
     const result = JSON.parse(response.getContentText());
-    
+
     if (response.getResponseCode() === 200) {
       Logger.log(`Sincronização concluída com sucesso! ${result.count} projetos sincronizados.`);
       SpreadsheetApp.getUi().alert(`Sincronização concluída: ${result.count} projetos.`);

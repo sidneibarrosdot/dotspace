@@ -25,3 +25,7 @@ dist-ssr
 
 # Environment variables
 .env
+
+# Local migration helpers / generated one-off scripts
+fix_script.js
+sync-script-direct-fixed.gs

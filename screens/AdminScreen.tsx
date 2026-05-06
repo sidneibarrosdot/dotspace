@@ -62,14 +62,14 @@ const handleFirestoreError = (error: unknown, operationType: OperationType, path
 declare const Papa: any;
 declare const XLSX: any;
 
-import { 
-    BarChart, 
-    Bar, 
-    XAxis, 
-    YAxis, 
-    CartesianGrid, 
-    Tooltip, 
-    ResponsiveContainer, 
+import {
+    BarChart,
+    Bar,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+    ResponsiveContainer,
     Cell,
     PieChart,
     Pie
@@ -109,14 +109,83 @@ interface PortfolioStats {
     activeUsers: number;
 }
 
+const PT_BR_MONTHS = [
+    'janeiro',
+    'fevereiro',
+    'marco',
+    'abril',
+    'maio',
+    'junho',
+    'julho',
+    'agosto',
+    'setembro',
+    'outubro',
+    'novembro',
+    'dezembro'
+];
+
+const parseProjectPeriod = (value: unknown): { year: number; month: number; key: string; label: string } | null => {
+    if (value === null || value === undefined) return null;
+    const raw = String(value).trim().toLowerCase();
+    if (!raw) return null;
+
+    const isoMatch = raw.match(/^(\d{4})-(\d{1,2})(?:-\d{1,2})?/);
+    if (isoMatch) {
+        const year = Number(isoMatch[1]);
+        const month = Number(isoMatch[2]);
+        if (month >= 1 && month <= 12) {
+            return {
+                year,
+                month,
+                key: `${year}-${String(month).padStart(2, '0')}`,
+                label: `${PT_BR_MONTHS[month - 1]}/${year}`
+            };
+        }
+    }
+
+    const slashMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$|^(\d{1,2})\/(\d{4})$/);
+    if (slashMatch) {
+        const month = Number(slashMatch[2] || slashMatch[4]);
+        const year = Number(slashMatch[3] || slashMatch[5]);
+        if (month >= 1 && month <= 12) {
+            return {
+                year,
+                month,
+                key: `${year}-${String(month).padStart(2, '0')}`,
+                label: `${PT_BR_MONTHS[month - 1]}/${year}`
+            };
+        }
+    }
+
+    const monthNameMatch = raw
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .match(/^([a-z]+)\/?(\d{4})$/);
+    if (monthNameMatch) {
+        const monthIndex = PT_BR_MONTHS.findIndex(month => month.startsWith(monthNameMatch[1]));
+        const year = Number(monthNameMatch[2]);
+        if (monthIndex >= 0) {
+            const month = monthIndex + 1;
+            return {
+                year,
+                month,
+                key: `${year}-${String(month).padStart(2, '0')}`,
+                label: `${PT_BR_MONTHS[monthIndex]}/${year}`
+            };
+        }
+    }
+
+    return null;
+};
+
 const getGoogleSlidesPreviewUrl = (url: string): string | null => {
     if (typeof url !== 'string' || !url.includes('docs.google.com/presentation/d/')) {
         return null;
     }
-    
+
     // Extract the base URL without parameters
     const baseUrl = url.split('?')[0];
-    
+
     // If it's already a published/embed link, convert to pubembed format
     if (baseUrl.endsWith('/pub') || baseUrl.endsWith('/embed') || baseUrl.endsWith('/pubembed')) {
         const cleanBase = baseUrl.replace(/\/(pub|embed|pubembed)$/, '');
@@ -180,18 +249,18 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
     try {
       const logsCollection = collection(db, path);
       const q = query(logsCollection, orderBy('timestamp', 'desc'));
-      
+
       const snapshot = await getDocs(q);
-      const allowedActions = ['CREATE', 'UPDATE', 'DELETE', 'UPLOAD', 'LOGIN', 'CLEAR_ALL'];
+      const allowedActions = ['CREATE', 'UPDATE', 'DELETE', 'UPLOAD', 'LOGIN', 'CLEAR_ALL', 'SYNC_SHEETS_SMART', 'SYNC_API_SMART'];
       const logList = snapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data() } as AccessLog))
         .filter(log => allowedActions.includes(log.action));
       setAccessLogs(logList);
       setLogsError(null);
-      
+
       const uniqueUsers = new Set(logList.map(l => l.userEmail)).size;
       setStats(prev => ({ ...prev, activeUsers: uniqueUsers }));
-      
+
       // Setup real-time listener after initial fetch
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const logList = snapshot.docs
@@ -205,7 +274,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
         console.error("Error in audit logs snapshot:", error);
         // Don't set logsError here if we already have data
       });
-      
+
       return unsubscribe;
     } catch (error) {
       console.error("Error fetching audit logs:", error);
@@ -223,13 +292,14 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
     setStatsLoading(true);
     const path = 'projects';
     const projectsCollection = collection(db, path);
-    
+
     try {
         const unsubscribe = onSnapshot(projectsCollection, (projectSnapshot) => {
             try {
-                let projects = projectSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PortfolioItem));
-                
-                console.log(`Stats: Found ${projects.length} projects in total`);
+                const allProjects = projectSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PortfolioItem));
+                let projects = [...allProjects];
+
+                console.log(`Stats: Found ${allProjects.length} projects in total`);
 
                 // Apply period filter
                 if (startDate) {
@@ -239,28 +309,20 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                     projects = projects.filter(p => p.Data && p.Data <= endDate);
                 }
 
-                const totalProjects = projects.length;
+                const totalProjects = allProjects.length;
 
                 let lastUpdatedStr: string | null = null;
-                if (projects.length > 0) {
-                    const dates = projects
-                        .map(p => p.Data)
-                        .filter(d => typeof d === 'string' && d.trim() !== '');
-                    if (dates.length > 0) {
-                        const maxDateStr = dates.reduce((max, d) => {
-                            return d > max ? d : max;
-                        }, dates[0]);
-                        
-                        // Format YYYY-MM-DD to DD/MM/YYYY
-                        const parts = maxDateStr.split('-');
-                        if (parts.length === 3) {
-                            lastUpdatedStr = `${parts[2]}/${parts[1]}/${parts[0]}`;
-                        } else {
-                            lastUpdatedStr = maxDateStr;
-                        }
+                if (allProjects.length > 0) {
+                    const latestPeriod = allProjects
+                        .map(p => parseProjectPeriod(p.Data))
+                        .filter((period): period is NonNullable<typeof period> => Boolean(period))
+                        .sort((a, b) => b.key.localeCompare(a.key))[0];
+
+                    if (latestPeriod) {
+                        lastUpdatedStr = latestPeriod.label;
                     }
                 }
-                
+
                 setStats(prev => ({
                     ...prev,
                     totalProjects,
@@ -276,7 +338,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                         const key = p.Time || 'Sem Time';
                         acc[key] = (acc[key] || 0) + 1;
                     } else if (chartFilter === 'methodology') {
-                        const methods = typeof p.Metodologias === 'string' 
+                        const methods = typeof p.Metodologias === 'string'
                             ? p.Metodologias.split(/[;,]/).map(s => s.trim()).filter(Boolean)
                             : (Array.isArray(p.Metodologias) ? p.Metodologias : []);
                         methods.forEach(m => {
@@ -302,12 +364,9 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
 
                 // Process period chart data
                 const monthCounts = projects.reduce<Record<string, number>>((acc, p) => {
-                    if (p.Data) {
-                        const date = new Date(p.Data);
-                        if (!isNaN(date.getTime())) {
-                            const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-                            acc[monthKey] = (acc[monthKey] || 0) + 1;
-                        }
+                    const period = parseProjectPeriod(p.Data);
+                    if (period) {
+                        acc[period.key] = (acc[period.key] || 0) + 1;
                     }
                     return acc;
                 }, {});
@@ -316,8 +375,8 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                     .map(([name, value]) => {
                         const [year, month] = name.split('-');
                         const monthName = new Date(parseInt(year), parseInt(month) - 1).toLocaleString('pt-BR', { month: 'short' });
-                        return { 
-                            name: `${monthName}/${year.slice(2)}`, 
+                        return {
+                            name: `${monthName}/${year.slice(2)}`,
                             value,
                             originalDate: name
                         };
@@ -360,7 +419,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
     try {
       const logsCollection = collection(db, path);
       const q = query(logsCollection, orderBy('timestamp', 'desc'));
-      
+
       const snapshot = await getDocs(q);
       const logList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UploadLog));
       setUploadLogs(logList);
@@ -374,7 +433,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
       }, (error) => {
         console.error("Error in upload logs snapshot:", error);
       });
-      
+
       return unsubscribe;
     } catch (error) {
       console.error("Error fetching upload logs:", error);
@@ -400,7 +459,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
     };
 
     setupListeners();
-    
+
     return () => {
         if (unsubscribeAudit) unsubscribeAudit();
         if (unsubscribeUpload) unsubscribeUpload();
@@ -414,7 +473,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
         const projectsCollection = collection(db, path);
         const snapshot = await getDocs(projectsCollection);
         const projects = snapshot.docs.map(doc => doc.data());
-        
+
         if (projects.length === 0) {
             alert('Nenhum dado para baixar.');
             return;
@@ -480,7 +539,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
       'DM',
       'Link_PMV'
     ];
-    
+
     const sampleData = [
       'https://picsum.photos/seed/pmv1/800/600',
       'Exemplo de Projeto PMV',
@@ -588,7 +647,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
             for (const fileHeader in columnMapping) {
                 const modelKey = columnMapping[fileHeader];
                 const value = normalizedRow[fileHeader];
-                
+
                 if (value !== undefined && value !== null && String(value).trim() !== '') {
                     fieldsWithDataCount++;
                     if (modelKey === 'Data' && value instanceof Date) {
@@ -598,7 +657,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                     }
                 }
             }
-            
+
             // Skip rows that are missing essential information (Project Name and Client)
             // OR have too little information (less than 3 fields with data)
             if (!projectData.Projeto || !projectData.Cliente || fieldsWithDataCount < 3) return;
@@ -624,13 +683,13 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
         setMessage('Deletando portfólio antigo...');
         const projectsCollectionRef = collection(db, 'projects');
         const existingProjectsSnapshot = await getDocs(projectsCollectionRef);
-        
+
         const batch = writeBatch(db);
 
         existingProjectsSnapshot.forEach(document => {
             batch.delete(document.ref);
         });
-        
+
         setMessage(`Carregando ${projectsToUpload.length} novos projetos...`);
         projectsToUpload.forEach(projectData => {
             const newProjectRef = doc(collection(db, 'projects'));
@@ -643,9 +702,9 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
             fileName: selectedFile.name,
             timestamp: serverTimestamp(),
         });
-        
+
         await logAudit('UPLOAD', `Substituiu portfólio via arquivo: ${selectedFile.name}`, user);
-        
+
         await fetchLogs();
         await fetchStats();
 
@@ -699,9 +758,9 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
             try {
                 const data = event.target?.result;
                 const workbook = XLSX.read(data, { type: 'array', cellDates: true });
-                
+
                 let allData: any[] = [];
-                
+
                 // Process all sheets in the workbook
                 workbook.SheetNames.forEach(sheetName => {
                     const worksheet = workbook.Sheets[sheetName];
@@ -710,13 +769,13 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                         allData = [...allData, ...json];
                     }
                 });
-                
+
                 if (allData.length === 0) {
                     setUploadStatus('error');
                     setMessage('Nenhum dado encontrado nas abas do arquivo Excel.');
                     return;
                 }
-                
+
                 updateDatabase(allData);
             } catch (err) {
                 console.error("Excel parsing error:", err);
@@ -734,13 +793,13 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
         setMessage('Formato de arquivo não suportado. Por favor, use CSV, XLSX ou XLS.');
     }
   };
-  
+
   const formatTimestamp = (timestamp: any) => {
     if (!timestamp) return 'Data indisponível';
     const date = new Date(timestamp.seconds * 1000);
     return date.toLocaleString('pt-BR');
   };
-  
+
   const handleClearAllProjects = async () => {
     setIsClearing(true);
     setUploadStatus('processing');
@@ -749,7 +808,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
     try {
         const projectsCollectionRef = collection(db, path);
         const querySnapshot = await getDocs(projectsCollectionRef);
-        
+
         if (querySnapshot.empty) {
             setMessage('Nenhum projeto para excluir.');
             setUploadStatus('idle');
@@ -768,7 +827,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
         setMessage(`${querySnapshot.size} projetos foram excluídos com sucesso.`);
         setUploadStatus('success');
         await fetchStats(); // Refresh stats
-        
+
     } catch (error) {
         console.error("Error clearing all projects: ", error);
         setMessage('Falha ao excluir os projetos. Tente novamente.');
@@ -781,11 +840,26 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
   };
 
   const renderStat = (label: string, value: string | number | null) => (
-    <div className="p-4 bg-gray-50 dark:bg-zinc-700/50 rounded-lg">
+    <div className="min-w-0 p-4 bg-gray-50 dark:bg-zinc-700/50 rounded-lg">
       <p className="text-sm text-gray-500 dark:text-gray-400">{label}</p>
-      <p className="text-2xl font-bold text-zinc-900 dark:text-white">{value}</p>
+      <p className="mt-1 text-xl font-bold leading-tight text-zinc-900 dark:text-white break-words">{value}</p>
     </div>
   );
+
+  const getAuditActionLabel = (action?: string) => {
+    const labels: Record<string, string> = {
+      CREATE: 'CRIAÇÃO',
+      UPDATE: 'EDIÇÃO',
+      DELETE: 'EXCLUSÃO',
+      UPLOAD: 'UPLOAD',
+      LOGIN: 'LOGIN',
+      CLEAR_ALL: 'LIMPEZA',
+      SYNC_SHEETS_SMART: 'SYNC PLANILHA',
+      SYNC_API_SMART: 'SYNC API'
+    };
+
+    return labels[action || ''] || action || 'ACCESS';
+  };
 
   const downloadAuditLogs = async () => {
     const headers = ['Usuário', 'Data/Hora', 'Ação', 'Detalhes', 'Versão'];
@@ -811,7 +885,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
             <div className="container mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-16">
                     <div className="flex items-center gap-4">
-                        <button 
+                        <button
                             onClick={onNavigate}
                             className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors text-zinc-600 dark:text-gray-400"
                             title="Voltar para o Portfólio"
@@ -834,7 +908,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                 </div>
             </div>
         </header>
-        
+
         <main className="container mx-auto p-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-7xl mx-auto">
             {/* Column 1: Management and History */}
@@ -876,9 +950,9 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                 <p className="text-gray-600 dark:text-gray-400 mb-4">
                   O banco de dados está conectado e sendo atualizado em tempo real através da planilha oficial no Google Sheets. Qualquer alteração feita na planilha será refletida aqui automaticamente.
                 </p>
-                <a 
-                  href="https://docs.google.com/spreadsheets/d/1CBjAmCleku5d1pi3ALpxGGfSWbI_fm9f/edit?usp=sharing" 
-                  target="_blank" 
+                <a
+                  href="https://docs.google.com/spreadsheets/d/1CBjAmCleku5d1pi3ALpxGGfSWbI_fm9f/edit?usp=sharing"
+                  target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 text-sm font-bold text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 transition-colors bg-green-50 dark:bg-green-900/20 px-4 py-2 rounded-md"
                 >
@@ -892,9 +966,9 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
               <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-8 border border-gray-200 dark:border-zinc-700/50">
                 <h1 className="text-2xl font-bold mb-2 text-zinc-900 dark:text-white">Atualização Manual (Backup)</h1>
                 <p className="text-gray-600 dark:text-gray-400 mb-4">Em caso de falha na sincronização, faça o upload de um arquivo para <span className="font-bold">substituir completamente</span> todos os projetos.</p>
-                
+
                 <div className="mb-6">
-                  <button 
+                  <button
                     onClick={downloadTemplate}
                     className="flex items-center gap-2 text-sm font-bold text-accent hover:text-accent-dark transition-colors"
                   >
@@ -904,7 +978,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                     Baixar Modelo de Planilha
                   </button>
                 </div>
-                
+
                 <div className="space-y-4">
                   <div>
                     <label htmlFor="file-upload" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -927,7 +1001,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                     </label>
                     {selectedFile && <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Arquivo selecionado: {selectedFile.name}</p>}
                   </div>
-                  
+
                   <button
                     onClick={handleProcessFile}
                     disabled={!selectedFile || uploadStatus === 'processing'}
@@ -935,11 +1009,11 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                   >
                     {uploadStatus === 'processing' ? 'Processando...' : 'Substituir Portfólio'}
                   </button>
-                  
+
                   {message && (
                     <div className={`text-sm text-center p-3 rounded-md ${
-                      uploadStatus === 'success' ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300' : 
-                      uploadStatus === 'error' ? 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-300' : 
+                      uploadStatus === 'success' ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300' :
+                      uploadStatus === 'error' ? 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-300' :
                       'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300'
                     }`}>
                       {message}
@@ -972,26 +1046,26 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                 <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-8 border border-red-500/30 dark:border-red-500/50">
                     <h2 className="text-2xl font-bold mb-2 text-red-600 dark:text-red-400">Zona de Perigo</h2>
                     <p className="text-gray-600 dark:text-gray-400 mb-6">Esta ação não pode ser desfeita. Tenha certeza absoluta antes de prosseguir.</p>
-                    
+
                     {isConfirmingClearAll ? (
                         <div className="flex flex-col gap-4">
                             <p className="text-sm font-semibold text-red-600 dark:text-red-400">Tem certeza que deseja excluir todos os projetos? Esta ação é irreversível.</p>
-                            <input 
-                                type="text" 
-                                placeholder="Digite EXCLUIR para confirmar" 
+                            <input
+                                type="text"
+                                placeholder="Digite EXCLUIR para confirmar"
                                 value={confirmText}
                                 onChange={(e) => setConfirmText(e.target.value)}
                                 className="w-full text-sm bg-gray-50 dark:bg-zinc-700 border border-red-300 dark:border-red-900/50 rounded-md p-2 focus:ring-red-500 focus:border-red-500"
                             />
                             <div className="flex justify-end gap-3">
-                                <button 
-                                    onClick={() => { setIsConfirmingClearAll(false); setConfirmText(''); }} 
+                                <button
+                                    onClick={() => { setIsConfirmingClearAll(false); setConfirmText(''); }}
                                     disabled={isClearing}
                                     className="text-sm font-bold bg-gray-200 dark:bg-zinc-700 px-4 py-2 rounded-md hover:bg-gray-300 dark:hover:bg-zinc-600 transition-colors"
                                 >
                                     Cancelar
                                 </button>
-                                <button 
+                                <button
                                     onClick={handleClearAllProjects}
                                     disabled={isClearing || confirmText !== 'EXCLUIR'}
                                     className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-300 disabled:opacity-50"
@@ -1016,7 +1090,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
               <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-8 border border-gray-200 dark:border-zinc-700/50">
                 <div className="flex items-center justify-between mb-4">
                     <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">Filtros de Período</h1>
-                    <button 
+                    <button
                         onClick={downloadAllData}
                         className="flex items-center gap-2 text-xs font-bold bg-accent/10 text-accent px-3 py-1.5 rounded-md hover:bg-accent/20 transition-colors"
                         title="Download de todos os dados"
@@ -1028,8 +1102,8 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Data Inicial</label>
-                        <input 
-                            type="date" 
+                        <input
+                            type="date"
                             value={startDate}
                             onChange={(e) => setStartDate(e.target.value)}
                             className="w-full text-sm bg-gray-50 dark:bg-zinc-700 border border-gray-300 dark:border-zinc-600 rounded-md p-2 focus:ring-accent focus:border-accent"
@@ -1037,8 +1111,8 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                     </div>
                     <div>
                         <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Data Final</label>
-                        <input 
-                            type="date" 
+                        <input
+                            type="date"
                             value={endDate}
                             onChange={(e) => setEndDate(e.target.value)}
                             className="w-full text-sm bg-gray-50 dark:bg-zinc-700 border border-gray-300 dark:border-zinc-600 rounded-md p-2 focus:ring-accent focus:border-accent"
@@ -1046,7 +1120,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                     </div>
                 </div>
                 {(startDate || endDate) && (
-                    <button 
+                    <button
                         onClick={() => { setStartDate(''); setEndDate(''); }}
                         className="mt-4 text-xs font-bold text-red-500 hover:text-red-600 transition-colors"
                     >
@@ -1058,7 +1132,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                 <div className="flex items-center justify-between mb-6">
                     <h2 className="text-2xl font-bold text-zinc-900 dark:text-white">Distribuição de Projetos</h2>
                     <div className="flex items-center gap-2">
-                        <button 
+                        <button
                             onClick={() => downloadChartData(chartData, 'Distribuicao_Projetos')}
                             className="flex items-center gap-2 text-xs font-bold bg-gray-100 dark:bg-zinc-700 text-gray-700 dark:text-gray-300 px-3 py-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-zinc-600 transition-colors"
                             title="Download"
@@ -1066,8 +1140,8 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                             <UploadIcon className="w-4 h-4 transform rotate-180" />
                             Download Dados
                         </button>
-                        <select 
-                            value={chartFilter} 
+                        <select
+                            value={chartFilter}
                             onChange={(e) => setChartFilter(e.target.value as any)}
                             className="text-sm bg-gray-50 dark:bg-zinc-700 border border-gray-300 dark:border-zinc-600 rounded-md p-1 focus:ring-accent focus:border-accent"
                         >
@@ -1082,8 +1156,8 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                     <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={chartData} margin={{ bottom: 40 }}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme === 'dark' ? '#3f3f46' : '#e5e7eb'} />
-                            <XAxis 
-                                dataKey="name" 
+                            <XAxis
+                                dataKey="name"
                                 tick={{ fontSize: 10, fill: theme === 'dark' ? '#a1a1aa' : '#71717a' }}
                                 axisLine={false}
                                 tickLine={false}
@@ -1091,13 +1165,13 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                                 textAnchor="end"
                                 interval={0}
                             />
-                            <YAxis 
+                            <YAxis
                                 tick={{ fontSize: 10, fill: theme === 'dark' ? '#a1a1aa' : '#71717a' }}
                                 axisLine={false}
                                 tickLine={false}
                             />
-                            <Tooltip 
-                                contentStyle={{ 
+                            <Tooltip
+                                contentStyle={{
                                     backgroundColor: theme === 'dark' ? '#18181b' : '#ffffff',
                                     borderColor: theme === 'dark' ? '#3f3f46' : '#e5e7eb',
                                     color: theme === 'dark' ? '#ffffff' : '#000000'
@@ -1118,7 +1192,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                 <div className="flex items-center justify-between mb-6">
                     <h2 className="text-2xl font-bold text-zinc-900 dark:text-white">Projetos por Período</h2>
                     <div className="flex items-center gap-2">
-                        <button 
+                        <button
                             onClick={() => downloadChartData(periodChartData, 'Projetos_por_Periodo')}
                             className="flex items-center gap-2 text-xs font-bold bg-gray-100 dark:bg-zinc-700 text-gray-700 dark:text-gray-300 px-3 py-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-zinc-600 transition-colors"
                             title="Download"
@@ -1133,19 +1207,19 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                     <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={periodChartData}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme === 'dark' ? '#3f3f46' : '#e5e7eb'} />
-                            <XAxis 
-                                dataKey="name" 
+                            <XAxis
+                                dataKey="name"
                                 tick={{ fontSize: 10, fill: theme === 'dark' ? '#a1a1aa' : '#71717a' }}
                                 axisLine={false}
                                 tickLine={false}
                             />
-                            <YAxis 
+                            <YAxis
                                 tick={{ fontSize: 10, fill: theme === 'dark' ? '#a1a1aa' : '#71717a' }}
                                 axisLine={false}
                                 tickLine={false}
                             />
-                            <Tooltip 
-                                contentStyle={{ 
+                            <Tooltip
+                                contentStyle={{
                                     backgroundColor: theme === 'dark' ? '#18181b' : '#ffffff',
                                     borderColor: theme === 'dark' ? '#3f3f46' : '#e5e7eb',
                                     color: theme === 'dark' ? '#ffffff' : '#000000'
@@ -1161,7 +1235,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
               <div id="audit-logs-section" className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-8 border border-gray-200 dark:border-zinc-700/50 hover:border-accent/30 transition-all duration-300">
                 <div className="flex items-center justify-between mb-4">
                     <h2 className="text-2xl font-bold text-zinc-900 dark:text-white">Auditoria de Ações</h2>
-                    <button 
+                    <button
                         onClick={downloadAuditLogs}
                         className="flex items-center gap-2 text-xs font-bold bg-accent/10 text-accent px-3 py-1.5 rounded-md hover:bg-accent/20 transition-colors"
                         title="Download Auditoria"
@@ -1170,8 +1244,8 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                         Download Auditoria
                     </button>
                 </div>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Monitoramento de quem realizou ações no painel e quando.</p>
-                
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Monitoramento de ações feitas no painel e das sincronizações automáticas vindas da planilha.</p>
+
                 {logsError && (
                     <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-xs rounded-md border border-red-200 dark:border-red-800">
                         {logsError}
@@ -1186,7 +1260,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                                     <div>
                                         <p className="font-bold text-sm text-zinc-800 dark:text-gray-200">{log.userEmail}</p>
                                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                            <span className="font-semibold text-accent">{log.action || 'ACCESS'}:</span> {log.details || 'Visualizou Painel Admin'}
+                                            <span className="font-semibold text-accent">{getAuditActionLabel(log.action)}:</span> {log.details || 'Visualizou Painel Admin'}
                                         </p>
                                         {log.version && (
                                             <p className="text-[9px] text-gray-400 mt-0.5">Versão: {log.version}</p>
