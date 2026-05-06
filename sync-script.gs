@@ -37,7 +37,7 @@ function syncPortfolio() {
       }
     });
 
-    if (hasData && project.projeto && project.cliente) {
+    if (hasData && project.Projeto && project.Cliente) {
       projects.push(project);
     }
   }
