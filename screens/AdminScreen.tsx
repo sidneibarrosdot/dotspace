@@ -865,9 +865,33 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                 </ul>
               </div>
 
+              <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-8 border border-green-500/30 dark:border-green-500/50 mb-8">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="relative flex h-4 w-4">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-4 w-4 bg-green-500"></span>
+                  </div>
+                  <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">Sincronização Automática Ativa</h1>
+                </div>
+                <p className="text-gray-600 dark:text-gray-400 mb-4">
+                  O banco de dados está conectado e sendo atualizado em tempo real através da planilha oficial no Google Sheets. Qualquer alteração feita na planilha será refletida aqui automaticamente.
+                </p>
+                <a 
+                  href="https://docs.google.com/spreadsheets/d/1CBjAmCleku5d1pi3ALpxGGfSWbI_fm9f/edit?usp=sharing" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-sm font-bold text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 transition-colors bg-green-50 dark:bg-green-900/20 px-4 py-2 rounded-md"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                  </svg>
+                  Acessar Planilha de Origem
+                </a>
+              </div>
+
               <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-8 border border-gray-200 dark:border-zinc-700/50">
-                <h1 className="text-2xl font-bold mb-2 text-zinc-900 dark:text-white">Atualização em Massa</h1>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">Faça o upload de um arquivo para <span className="font-bold">substituir completamente</span> todos os projetos na biblioteca.</p>
+                <h1 className="text-2xl font-bold mb-2 text-zinc-900 dark:text-white">Atualização Manual (Backup)</h1>
+                <p className="text-gray-600 dark:text-gray-400 mb-4">Em caso de falha na sincronização, faça o upload de um arquivo para <span className="font-bold">substituir completamente</span> todos os projetos.</p>
                 
                 <div className="mb-6">
                   <button 
