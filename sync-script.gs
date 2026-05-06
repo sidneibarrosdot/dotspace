@@ -9,8 +9,8 @@
  * 5. Use 'Acionadores' (ícone de relógio) para agendar a sincronização automática.
  */
 
-const APP_URL = 'https://ais-dev-c4redmjwe7mdklcswg7n3z-36515480630.us-east1.run.app'; // URL do seu app
-const SYNC_API_KEY = 'SUA_CHAVE_AQUI'; // Mesma chave configurada no .env do app
+const APP_URL = 'https://bancopmvs.dotgroup.com.br'; // URL do seu app
+const SYNC_API_KEY = 'AIzaSyAt-zzcYFTdgcNOpY86tHawAQ0WGqEe2E4'; // Mesma chave configurada no .env do app
 
 function syncPortfolio() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
@@ -37,7 +37,7 @@ function syncPortfolio() {
       }
     });
 
-    if (hasData && project.Projeto && project.Cliente) {
+    if (hasData && project.projeto && project.cliente) {
       projects.push(project);
     }
   }
