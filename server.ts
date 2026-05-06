@@ -53,7 +53,8 @@ async function startServer() {
   // API Sync Endpoint
   app.post("/api/sync", async (req, res) => {
     const apiKey = req.headers['x-sync-api-key'];
-    const expectedKey = process.env.SYNC_API_KEY;
+    // Fallback inserido caso a variável não possa ser configurada na AWS
+    const expectedKey = process.env.SYNC_API_KEY || "AIzaSyAt-zzcYFTdgcNOpY86tHawAQ0WGqEe2E4";
 
     if (!expectedKey || apiKey !== expectedKey) {
       return res.status(401).json({ error: "Unauthorized: Invalid or missing API Key" });
