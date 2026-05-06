@@ -37,11 +37,67 @@ const getDb = () => {
     throw new Error("Firebase Admin is not initialized");
   }
   if (process.env.FIREBASE_DATABASE_ID) {
-    return admin.firestore().databaseId === process.env.FIREBASE_DATABASE_ID 
-      ? admin.firestore() 
+    return admin.firestore().databaseId === process.env.FIREBASE_DATABASE_ID
+      ? admin.firestore()
       : (admin as any).firestore(process.env.FIREBASE_DATABASE_ID);
   }
   return admin.firestore();
+};
+
+const makeMatchKey = (value: unknown) => {
+  return String(value ?? "")
+    .toLowerCase()
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "");
+};
+
+const getProjectMatchKey = (project: Record<string, unknown>) => {
+  return `${makeMatchKey(project.Projeto)}___${makeMatchKey(project.Cliente)}`;
+};
+
+const normalizeProjectForSync = (project: Record<string, any>) => {
+  const normalized = { ...project };
+
+  if (typeof normalized.tags === "string") {
+    normalized.tags = normalized.tags
+      .split(";")
+      .map((tag: string) => tag.trim())
+      .filter(Boolean);
+  }
+
+  return normalized;
+};
+
+const collectProjectReferenceCounts = async (
+  firestore: admin.firestore.Firestore,
+) => {
+  const counts = new Map<string, number>();
+  const collections = ["favorites", "likes"];
+
+  for (const collectionName of collections) {
+    const snapshot = await firestore.collection(collectionName).get();
+    snapshot.docs.forEach((doc) => {
+      const projectId = doc.get("projectId");
+      if (typeof projectId === "string" && projectId) {
+        counts.set(projectId, (counts.get(projectId) ?? 0) + 1);
+      }
+    });
+  }
+
+  return counts;
+};
+
+const commitInChunks = async (
+  firestore: admin.firestore.Firestore,
+  operations: ((batch: admin.firestore.WriteBatch) => void)[],
+) => {
+  for (let index = 0; index < operations.length; index += 500) {
+    const batch = firestore.batch();
+    operations.slice(index, index + 500).forEach((operation) => operation(batch));
+    await batch.commit();
+  }
 };
 
 async function startServer() {
@@ -53,8 +109,7 @@ async function startServer() {
   // API Sync Endpoint
   app.post("/api/sync", async (req, res) => {
     const apiKey = req.headers['x-sync-api-key'];
-    // Fallback inserido caso a variável não possa ser configurada na AWS
-    const expectedKey = process.env.SYNC_API_KEY || "AIzaSyAt-zzcYFTdgcNOpY86tHawAQ0WGqEe2E4";
+    const expectedKey = process.env.SYNC_API_KEY;
 
     if (!expectedKey || apiKey !== expectedKey) {
       return res.status(401).json({ error: "Unauthorized: Invalid or missing API Key" });
@@ -68,43 +123,94 @@ async function startServer() {
 
     try {
       const firestore = getDb();
-      console.log(`Starting sync of ${projects.length} projects...`);
-      
+      console.log(`Starting smart sync of ${projects.length} rows...`);
+
       const collectionRef = firestore.collection('projects');
-      
-      // Clear existing projects
       const snapshot = await collectionRef.get();
-      const batch = firestore.batch();
-      snapshot.docs.forEach(doc => batch.delete(doc.ref));
-      
-      // Add new projects
-      projects.forEach(project => {
-        const newDocRef = collectionRef.doc();
-        // Ensure tags is an array if present
-        if (project.tags && typeof project.tags === 'string') {
-          project.tags = project.tags.split(';').map((s: string) => s.trim()).filter(Boolean);
-        }
-        batch.set(newDocRef, project);
+
+      const referenceCounts = await collectProjectReferenceCounts(firestore);
+      const existingByKey = new Map<string, admin.firestore.QueryDocumentSnapshot[]>();
+
+      snapshot.docs.forEach((doc) => {
+        const data = doc.data();
+        const key = getProjectMatchKey(data);
+        if (!key || key === "___") return;
+
+        const existing = existingByKey.get(key) ?? [];
+        existing.push(doc);
+        existingByKey.set(key, existing);
       });
 
-      await batch.commit();
+      existingByKey.forEach((docs, key) => {
+        docs.sort((a, b) => {
+          const referenceDelta = (referenceCounts.get(b.id) ?? 0) - (referenceCounts.get(a.id) ?? 0);
+          if (referenceDelta !== 0) return referenceDelta;
+          return a.createTime.toMillis() - b.createTime.toMillis();
+        });
+        existingByKey.set(key, docs);
+      });
+
+      const incomingByKey = new Map<string, Record<string, any>>();
+      let skippedRows = 0;
+
+      projects.forEach((project) => {
+        const normalized = normalizeProjectForSync(project);
+        const key = getProjectMatchKey(normalized);
+
+        if (!normalized.Projeto || !normalized.Cliente || !key || key === "___") {
+          skippedRows++;
+          return;
+        }
+
+        if (incomingByKey.has(key)) skippedRows++;
+        incomingByKey.set(key, normalized);
+      });
+
+      const operations: ((batch: admin.firestore.WriteBatch) => void)[] = [];
+      let updatedCount = 0;
+      let deletedCount = 0;
+
+      incomingByKey.forEach((project, key) => {
+        const existingDocs = existingByKey.get(key) ?? [];
+        const docToKeep = existingDocs.shift();
+        const docRef = docToKeep ? docToKeep.ref : collectionRef.doc();
+
+        operations.push((batch) => batch.set(docRef, project));
+        updatedCount++;
+
+        existingDocs.forEach((duplicateDoc) => {
+          operations.push((batch) => batch.delete(duplicateDoc.ref));
+          deletedCount++;
+        });
+
+        existingByKey.delete(key);
+      });
+
+      existingByKey.forEach((orphanDocs) => {
+        orphanDocs.forEach((orphanDoc) => {
+          operations.push((batch) => batch.delete(orphanDoc.ref));
+          deletedCount++;
+        });
+      });
+
+      await commitInChunks(firestore, operations);
 
       // Log the sync
       await firestore.collection('uploadLogs').add({
-        fileName: 'Automatic Sync (API)',
+        fileName: 'Automatic Smart Sync (API)',
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
       });
 
       await firestore.collection('auditLogs').add({
         userEmail: 'api-sync@dotgroup.com.br',
-        action: 'SYNC_API',
-        details: `Sincronização automática via API: ${projects.length} projetos carregados`,
-        version: '1.0.6',
+        action: 'SYNC_API_SMART',
+        details: `Sincronização automática via API: ${updatedCount} atualizados/criados, ${deletedCount} removidos, ${skippedRows} linhas ignoradas/deduplicadas`,
+        version: '1.0.7',
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      console.log(`Sync completed successfully: ${projects.length} projects.`);
-      res.json({ success: true, count: projects.length });
+      console.log(`Smart sync completed successfully: ${updatedCount} upserted, ${deletedCount} deleted, ${skippedRows} skipped.`);
+      res.json({ success: true, count: updatedCount, deleted: deletedCount, skipped: skippedRows });
     } catch (error: any) {
       console.error("Error during sync:", error);
       res.status(500).json({ error: "Internal Server Error during sync", details: error.message });
