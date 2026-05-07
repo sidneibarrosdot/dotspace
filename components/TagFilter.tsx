@@ -12,15 +12,18 @@ const XIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
     </svg>
 );
 
+const normalizeKey = (value: string) => String(value || '').toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "");
+
 interface TagFilterProps {
   tags: string[]; // e.g., ['Time', 'Cliente']
   options: Record<string, string[]>; // e.g., { 'Time': ['Phoenix', 'Orion'], 'Cliente': [...] }
+  optionCounts?: Record<string, Record<string, number>>;
   activeFilters: Record<string, string[]>; // e.g., { 'Time': ['Phoenix'], 'Cliente': [] }
   onFilterChange: (category: string, value: string | null) => void;
   onClearAll: () => void;
 }
 
-const TagFilter: React.FC<TagFilterProps> = ({ tags, options, activeFilters, onFilterChange, onClearAll }) => {
+const TagFilter: React.FC<TagFilterProps> = ({ tags, options, optionCounts, activeFilters, onFilterChange, onClearAll }) => {
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const dropdownsRef = useRef<Record<string, HTMLDivElement | null>>({});
 
@@ -46,6 +49,11 @@ const TagFilter: React.FC<TagFilterProps> = ({ tags, options, activeFilters, onF
 
   const hasActiveFilters = Object.values(activeFilters).some(v => Array.isArray(v) && v.length > 0);
 
+  const getOptionCount = (tag: string, value: string) => {
+    const counts = optionCounts?.[tag] || {};
+    return counts[value] ?? counts[normalizeKey(value)] ?? 0;
+  };
+
   return (
     <div className="flex flex-wrap justify-center items-center gap-3 mb-12">
       <span className="text-gray-600 dark:text-gray-400 font-medium mr-2">Filtrar por:</span>
@@ -70,7 +78,7 @@ const TagFilter: React.FC<TagFilterProps> = ({ tags, options, activeFilters, onF
         const buttonText = activeValues.length === 0 
           ? tag 
           : activeValues.length === 1 
-            ? `${tag}: ${activeValues[0]}` 
+            ? `${tag}: ${activeValues[0]}${getOptionCount(tag, activeValues[0]) ? ` (${getOptionCount(tag, activeValues[0])})` : ''}` 
             : `${tag} (${activeValues.length})`;
 
         return (
@@ -116,7 +124,7 @@ const TagFilter: React.FC<TagFilterProps> = ({ tags, options, activeFilters, onF
                           onClick={(e) => { e.preventDefault(); handleOptionClick(tag, option); }}
                           className={`flex items-center justify-between px-6 sm:px-4 py-3 sm:py-2 text-base sm:text-sm ${isSelected ? 'font-bold text-accent bg-accent/5' : 'text-gray-700 dark:text-gray-300'} hover:bg-gray-100 dark:hover:bg-zinc-700`}
                         >
-                          <span className="whitespace-normal mr-2">{option}</span>
+                          <span className="whitespace-normal mr-2">{option}{getOptionCount(tag, option) ? <span className="ml-2 text-xs font-medium text-gray-500 dark:text-gray-400">({getOptionCount(tag, option)})</span> : null}</span>
                           {isSelected && (
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-5 h-5 sm:w-4 sm:h-4">
                               <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />

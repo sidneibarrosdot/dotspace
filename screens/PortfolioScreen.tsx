@@ -5,17 +5,24 @@ import PortfolioCard from '../components/PortfolioCard';
 import SearchBar from '../components/SearchBar';
 import PortfolioModal from '../components/PortfolioModal';
 import TagFilter from '../components/TagFilter';
-import { Check, Copy, Plus, Share2 } from 'lucide-react';
+import { Check, ChevronDown, Copy, PencilLine, Plus, Share2, Trash2, X } from 'lucide-react';
 import type { PortfolioItem } from '../types';
 import DotLogo from '../components/DotLogo';
 import { db } from '../firebase';
 import { addDoc, collection, query, onSnapshot, doc, updateDoc, increment, getDoc, Timestamp } from 'firebase/firestore';
 import { logAudit } from '../services/auditService';
-import { toggleFavorite, subscribeToFavorites } from '../services/favoriteService';
+import {
+  createFavoriteList,
+  deleteFavoriteList,
+  ensureFavoriteListsReady,
+  renameFavoriteList,
+  subscribeToFavoriteLists,
+  toggleProjectInFavoriteList,
+} from '../services/favoriteService';
 import { toggleLike, subscribeToLikes } from '../services/likeService';
 import { User } from 'firebase/auth';
 import { Bookmark, BookmarkCheck } from 'lucide-react';
-import type { Favorite, Like } from '../types';
+import type { FavoriteList, Like } from '../types';
 
 type Theme = 'light' | 'dark';
 
@@ -48,6 +55,21 @@ const CATEGORY_BY_FILTER_PARAM = Object.entries(FILTER_PARAM_BY_CATEGORY).reduce
   return acc;
 }, {});
 
+const DATE_MONTHS = [
+  'janeiro',
+  'fevereiro',
+  'março',
+  'abril',
+  'maio',
+  'junho',
+  'julho',
+  'agosto',
+  'setembro',
+  'outubro',
+  'novembro',
+  'dezembro'
+];
+
 const slugify = (value: string) => {
   return value
     .toLowerCase()
@@ -56,6 +78,11 @@ const slugify = (value: string) => {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+};
+
+const getFilterCountLookupKeys = (value: string) => {
+  const trimmed = String(value || '').trim();
+  return [trimmed, slugify(trimmed)].filter(Boolean);
 };
 
 const getProjectSlug = (item: PortfolioItem) => {
@@ -90,20 +117,6 @@ const parseFilterDate = (value: string) => {
     .trim()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
-  const months = [
-    'janeiro',
-    'fevereiro',
-    'marco',
-    'abril',
-    'maio',
-    'junho',
-    'julho',
-    'agosto',
-    'setembro',
-    'outubro',
-    'novembro',
-    'dezembro'
-  ];
 
   const isoMatch = normalized.match(/^(\d{4})-(\d{1,2})(?:-(\d{1,2}))?$/);
   if (isoMatch) {
@@ -116,7 +129,7 @@ const parseFilterDate = (value: string) => {
 
   const monthYearMatch = normalized.match(/^([a-z]+)\s*\/\s*(\d{4})$/);
   if (monthYearMatch) {
-    const monthIndex = months.findIndex(month => month.startsWith(monthYearMatch[1]));
+    const monthIndex = DATE_MONTHS.findIndex(month => month.normalize("NFD").replace(/[\u0300-\u036f]/g, "").startsWith(monthYearMatch[1]));
     return {
       year: Number(monthYearMatch[2]),
       month: monthIndex >= 0 ? monthIndex + 1 : 0,
@@ -149,23 +162,8 @@ const formatFilterDate = (value: string) => {
   const parsed = parseFilterDate(value);
   if (!parsed) return value.trim();
 
-  const months = [
-    'janeiro',
-    'fevereiro',
-    'marco',
-    'abril',
-    'maio',
-    'junho',
-    'julho',
-    'agosto',
-    'setembro',
-    'outubro',
-    'novembro',
-    'dezembro'
-  ];
-
   if (parsed.month >= 1 && parsed.month <= 12) {
-    return `${months[parsed.month - 1]}/${parsed.year}`;
+    return `${DATE_MONTHS[parsed.month - 1]}/${parsed.year}`;
   }
 
   return String(parsed.year);
@@ -183,7 +181,18 @@ const decodeFilterValueFromUrl = (value: string) => {
 
 const matchesFilterValue = (itemValue: unknown, filterValue: string, fieldKey?: keyof PortfolioItem) => {
   if (fieldKey === 'Data') {
-    return formatFilterDate(String(itemValue || '')) === filterValue;
+    const itemDate = parseFilterDate(String(itemValue || ''));
+    const filterDate = parseFilterDate(filterValue);
+
+    if (!itemDate || !filterDate) {
+      return formatFilterDate(String(itemValue || '')) === filterValue;
+    }
+
+    if (filterDate.month <= 0) {
+      return itemDate.year === filterDate.year;
+    }
+
+    return itemDate.year === filterDate.year && itemDate.month === filterDate.month;
   }
 
   if (Array.isArray(itemValue)) {
@@ -193,21 +202,46 @@ const matchesFilterValue = (itemValue: unknown, filterValue: string, fieldKey?: 
   return slugify(String(itemValue || '')) === slugify(filterValue);
 };
 
-const compareFilterDatesDesc = (a: string, b: string) => {
-  const parsedA = parseFilterDate(a);
-  const parsedB = parseFilterDate(b);
+const buildDateFilterOptions = (values: string[]) => {
+  const options = new Map<string, { value: string; year: number; month: number; rank: number }>();
+  const counts: Record<string, number> = {};
 
-  if (parsedA && parsedB) {
-    return (
-      parsedB.year - parsedA.year ||
-      parsedB.month - parsedA.month ||
-      parsedB.day - parsedA.day
-    );
-  }
+  values.forEach(value => {
+    const parsed = parseFilterDate(value);
+    if (!parsed) return;
 
-  if (parsedA) return -1;
-  if (parsedB) return 1;
-  return b.localeCompare(a, 'pt-BR');
+    counts[String(parsed.year)] = (counts[String(parsed.year)] || 0) + 1;
+
+    const yearKey = String(parsed.year);
+    if (!options.has(yearKey)) {
+      options.set(yearKey, {
+        value: yearKey,
+        year: parsed.year,
+        month: 13,
+        rank: 0
+      });
+    }
+
+    if (parsed.month >= 1 && parsed.month <= 12) {
+      const monthKey = `${DATE_MONTHS[parsed.month - 1]}/${parsed.year}`;
+      counts[monthKey] = (counts[monthKey] || 0) + 1;
+      if (!options.has(monthKey)) {
+        options.set(monthKey, {
+          value: monthKey,
+          year: parsed.year,
+          month: parsed.month,
+          rank: 1
+        });
+      }
+    }
+  });
+
+  return {
+    options: [...options.values()]
+    .sort((a, b) => b.year - a.year || a.rank - b.rank || b.month - a.month)
+    .map(option => option.value),
+    counts,
+  };
 };
 
 interface PortfolioScreenProps {
@@ -247,7 +281,9 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
   const [isCreatingNewItem, setIsCreatingNewItem] = useState(false);
   const [randomPhrase, setRandomPhrase] = useState('');
   const [visibleCount, setVisibleCount] = useState(ITEMS_TO_LOAD);
-  const [favorites, setFavorites] = useState<Favorite[]>([]);
+  const [favoriteLists, setFavoriteLists] = useState<FavoriteList[]>([]);
+  const [activeFavoriteListId, setActiveFavoriteListId] = useState('');
+  const [newFavoriteListName, setNewFavoriteListName] = useState('');
   const [likes, setLikes] = useState<Like[]>([]);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [sharedProjectIds, setSharedProjectIds] = useState<string[]>([]);
@@ -255,7 +291,15 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
   const [shareIdToLoad, setShareIdToLoad] = useState('');
   const [shareFeedback, setShareFeedback] = useState('');
   const [isShareMenuOpen, setIsShareMenuOpen] = useState(false);
+  const [isFavoriteMenuOpen, setIsFavoriteMenuOpen] = useState(false);
+  const [favoriteListFeedback, setFavoriteListFeedback] = useState('');
+  const [favoriteListModal, setFavoriteListModal] = useState<{
+    mode: 'rename' | 'delete';
+    list: FavoriteList;
+    value?: string;
+  } | null>(null);
   const shareMenuRef = useRef<HTMLDivElement | null>(null);
+  const favoriteMenuRef = useRef<HTMLDivElement | null>(null);
 
   const phrases = [
     'Explore as melhores soluções em EdTech do DOT Digital Group. 🚀',
@@ -277,6 +321,9 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
     const handleClickOutside = (event: MouseEvent) => {
       if (shareMenuRef.current && !shareMenuRef.current.contains(event.target as Node)) {
         setIsShareMenuOpen(false);
+      }
+      if (favoriteMenuRef.current && !favoriteMenuRef.current.contains(event.target as Node)) {
+        setIsFavoriteMenuOpen(false);
       }
     };
 
@@ -416,16 +463,60 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
 
   useEffect(() => {
     if (!isLoggedIn || !user) {
-      setFavorites([]);
+      setFavoriteLists([]);
+      setActiveFavoriteListId('');
+      setNewFavoriteListName('');
+      setFavoriteListFeedback('');
       return;
     }
 
-    const unsubscribe = subscribeToFavorites(user.uid, (favs) => {
-      setFavorites(favs);
-    });
+    const storageKey = `bpmvs.activeFavoriteList.${user.uid}`;
+    let cancelled = false;
+    let unsubscribe = () => {};
 
-    return () => unsubscribe();
+    const setupFavoriteLists = async () => {
+      try {
+        await ensureFavoriteListsReady(user.uid);
+        if (cancelled) return;
+
+        unsubscribe = subscribeToFavoriteLists(user.uid, (lists) => {
+          setFavoriteLists(lists);
+          setActiveFavoriteListId(prevActiveId => {
+            const savedActiveId = window.localStorage.getItem(storageKey);
+            const validSavedId = savedActiveId && lists.some(list => list.id === savedActiveId) ? savedActiveId : '';
+            const validPrevId = prevActiveId && lists.some(list => list.id === prevActiveId) ? prevActiveId : '';
+            const nextActiveId = validSavedId || validPrevId || lists[0]?.id || '';
+
+            if (nextActiveId) {
+              window.localStorage.setItem(storageKey, nextActiveId);
+            } else {
+              window.localStorage.removeItem(storageKey);
+            }
+
+            return nextActiveId;
+          });
+        });
+      } catch (error) {
+        console.error('Error loading favorite lists:', error);
+      }
+    };
+
+    setupFavoriteLists();
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, [isLoggedIn, user]);
+
+  const activeFavoriteList = useMemo(() => {
+    if (favoriteLists.length === 0) return null;
+    const byId = favoriteLists.find(list => list.id === activeFavoriteListId);
+    return byId || favoriteLists[0] || null;
+  }, [favoriteLists, activeFavoriteListId]);
+
+  const activeFavoriteProjectIds = activeFavoriteList?.projectIds || [];
+  const activeFavoriteListName = activeFavoriteList?.name || 'Favoritos';
 
   useEffect(() => {
     if (!isLoggedIn || !user) {
@@ -467,11 +558,111 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
   };
 
   const handleToggleFavorite = async (item: PortfolioItem) => {
-    if (!isLoggedIn || !user || !item.id) return;
+    if (!isLoggedIn || !user || !item.id || !activeFavoriteList?.id) return;
     try {
-      await toggleFavorite(user.uid, item.id);
+      await toggleProjectInFavoriteList(user.uid, activeFavoriteList.id, item.id);
     } catch (error) {
       console.error("Error toggling favorite:", error);
+    }
+  };
+
+  const handleCreateFavoriteList = async () => {
+    if (!isLoggedIn || !user) return;
+
+    const trimmedName = newFavoriteListName.trim();
+    if (!trimmedName) {
+      setFavoriteListFeedback('Digite um nome para a lista.');
+      window.setTimeout(() => setFavoriteListFeedback(''), 2500);
+      return;
+    }
+
+    try {
+      const docRef = await createFavoriteList(user.uid, trimmedName);
+      setNewFavoriteListName('');
+      setIsFavoriteMenuOpen(false);
+      setActiveFavoriteListId(docRef.id);
+      window.localStorage.setItem(`bpmvs.activeFavoriteList.${user.uid}`, docRef.id);
+      setFavoriteListFeedback('Lista criada');
+      window.setTimeout(() => setFavoriteListFeedback(''), 2500);
+    } catch (error) {
+      console.error('Error creating favorite list:', error);
+      setFavoriteListFeedback('Não foi possível criar a lista');
+      window.setTimeout(() => setFavoriteListFeedback(''), 3000);
+    }
+  };
+
+  const handleRenameFavoriteList = async (list: FavoriteList) => {
+    if (!isLoggedIn || !user) return;
+
+    if (list.isDefault) {
+      setFavoriteListFeedback('A lista padrão não pode ser renomeada.');
+      window.setTimeout(() => setFavoriteListFeedback(''), 3000);
+      return;
+    }
+
+    setFavoriteListModal({ mode: 'rename', list, value: list.name });
+    setIsFavoriteMenuOpen(false);
+  };
+
+  const handleDeleteFavoriteList = async (list: FavoriteList) => {
+    if (!isLoggedIn || !user) return;
+
+    if (list.isDefault) {
+      setFavoriteListFeedback('A lista padrão não pode ser excluída.');
+      window.setTimeout(() => setFavoriteListFeedback(''), 3000);
+      return;
+    }
+
+    setFavoriteListModal({ mode: 'delete', list });
+    setIsFavoriteMenuOpen(false);
+  };
+
+  const handleSelectFavoriteList = (listId: string) => {
+    setActiveFavoriteListId(listId);
+    if (user?.uid) {
+      window.localStorage.setItem(`bpmvs.activeFavoriteList.${user.uid}`, listId);
+    }
+    setIsFavoriteMenuOpen(false);
+  };
+
+  const handleFavoriteListModalClose = () => {
+    setFavoriteListModal(null);
+  };
+
+  const handleFavoriteListModalConfirm = async () => {
+    if (!isLoggedIn || !user || !favoriteListModal) return;
+
+    try {
+      if (favoriteListModal.mode === 'rename') {
+        const nextName = (favoriteListModal.value || '').trim();
+        if (!nextName) {
+          setFavoriteListFeedback('Digite um nome para a lista.');
+          window.setTimeout(() => setFavoriteListFeedback(''), 2500);
+          return;
+        }
+
+        if (nextName === favoriteListModal.list.name.trim()) {
+          handleFavoriteListModalClose();
+          return;
+        }
+
+        await renameFavoriteList(user.uid, favoriteListModal.list.id, nextName);
+        setFavoriteListFeedback('Lista renomeada');
+      } else {
+        await deleteFavoriteList(favoriteListModal.list.id);
+        if (activeFavoriteListId === favoriteListModal.list.id) {
+          setActiveFavoriteListId('');
+          window.localStorage.removeItem(`bpmvs.activeFavoriteList.${user.uid}`);
+        }
+        setFavoriteListFeedback('Lista excluída');
+      }
+
+      handleFavoriteListModalClose();
+      window.setTimeout(() => setFavoriteListFeedback(''), 2500);
+    } catch (error) {
+      console.error('Error updating favorite list:', error);
+      setFavoriteListFeedback(error instanceof Error ? error.message : 'Não foi possível atualizar a lista');
+      window.setTimeout(() => setFavoriteListFeedback(''), 3000);
     }
   };
 
@@ -526,6 +717,41 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
   // and uniqueValues elements are recognized as strings for methods like .split().
   const filterOptions = useMemo(() => {
     const options: Record<string, string[]> = {};
+    const optionCounts: Record<string, Record<string, number>> = {};
+
+    const buildGenericFilterOptions = (values: string[]) => {
+      const counts: Record<string, number> = {};
+      const labelsByKey: Record<string, string> = {};
+
+      values.forEach(value => {
+        const trimmedValue = String(value).trim();
+        if (!trimmedValue) return;
+
+        const key = slugify(trimmedValue);
+        counts[key] = (counts[key] || 0) + 1;
+        if (!labelsByKey[key]) {
+          labelsByKey[key] = trimmedValue;
+        }
+      });
+
+      const entries = Object.entries(labelsByKey).map(([key, label]) => ({
+        key,
+        label,
+        count: counts[key] || 0,
+      }));
+
+      return {
+        options: entries
+          .sort((a, b) => b.label.localeCompare(a.label, 'pt-BR'))
+          .map(entry => entry.label),
+        counts: entries.reduce<Record<string, number>>((acc, entry) => {
+          acc[entry.label] = entry.count;
+          acc[entry.key] = entry.count;
+          return acc;
+        }, {}),
+      };
+    };
+
     filterTags.forEach(tag => {
         const field = tagToFieldMap[tag];
         if (field) {
@@ -544,17 +770,19 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
             });
             
             if (tag === 'Data' && values.length > 0) {
-                const uniqueDateValues = [...new Set(values.map(formatFilterDate).filter(Boolean))];
-                options[tag] = uniqueDateValues.sort(compareFilterDatesDesc);
+                const dateData = buildDateFilterOptions(values);
+                options[tag] = dateData.options;
+                optionCounts[tag] = dateData.counts;
             } else {
-              const uniqueValues: string[] = [...new Set(values.map(value => value.trim()).filter(Boolean))].sort((a, b) => b.localeCompare(a, 'pt-BR'));
-              if (uniqueValues.length > 0) {
-                options[tag] = uniqueValues;
+              const genericData = buildGenericFilterOptions(values);
+              if (genericData.options.length > 0) {
+                options[tag] = genericData.options;
+                optionCounts[tag] = genericData.counts;
               }
             }
         }
     });
-    return options;
+    return { options, optionCounts };
   }, [portfolioItems]);
 
   const handleFilterChange = (category: string, value: string | null) => {
@@ -587,6 +815,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
       setSharedProjectIds([]);
       setProjectSlugToOpen('');
       setShareIdToLoad('');
+      setIsFavoriteMenuOpen(false);
       window.history.replaceState({}, '', window.location.pathname);
   };
 
@@ -594,6 +823,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
     setSharedProjectIds([]);
     setProjectSlugToOpen('');
     setShareIdToLoad('');
+    setIsFavoriteMenuOpen(false);
     setShowFavoritesOnly(!showFavoritesOnly);
   };
 
@@ -670,9 +900,10 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
   };
 
   const getShareUrl = async () => {
-    if (showFavoritesOnly) {
-      const favoriteProjects = favorites
-        .map(favorite => portfolioItems.find(item => item.id === favorite.projectId))
+    const hasFavoriteSelection = activeFavoriteProjectIds.length > 0;
+    if (hasFavoriteSelection) {
+      const favoriteProjects = activeFavoriteProjectIds
+        .map(projectId => portfolioItems.find(item => item.id === projectId))
         .filter((item): item is PortfolioItem => Boolean(item));
       return createProjectCollectionShareUrl(favoriteProjects);
     }
@@ -700,7 +931,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
   };
 
   const hasShareableSelection = () => {
-    const hasFavoriteSelection = showFavoritesOnly && favorites.length > 0;
+    const hasFavoriteSelection = activeFavoriteProjectIds.length > 0;
     const hasSharedSelection = sharedProjectIds.length > 0 && Boolean(projectSlugToOpen);
     const hasSharedCollection = sharedProjectIds.length > 0 && !projectSlugToOpen;
     const hasSearchOrFilters = Boolean(searchTerm.trim()) || Object.values(activeFilters).some(values => Array.isArray(values) && values.length > 0);
@@ -830,8 +1061,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
 
     // 0. Filter by favorites if requested
     if (showFavoritesOnly && sharedProjectIds.length === 0) {
-      const favoriteProjectIds = favorites.map(f => f.projectId);
-      items = items.filter(item => favoriteProjectIds.includes(item.id));
+      items = items.filter(item => activeFavoriteProjectIds.includes(item.id));
     }
 
     // 1. Apply active dropdown filters
@@ -874,7 +1104,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
         (item.Mídias || '').toLowerCase().includes(term) ||
         (item.Outros_recursos || '').toLowerCase().includes(term)
     );
-  }, [searchTerm, portfolioItems, activeFilters, showFavoritesOnly, favorites, sharedProjectIds]);
+  }, [searchTerm, portfolioItems, activeFilters, showFavoritesOnly, activeFavoriteProjectIds, sharedProjectIds]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -921,17 +1151,118 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
           </div>
           
           {isLoggedIn && (
-            <button
-              onClick={handleToggleFavoritesOnly}
-              className={`flex items-center justify-center gap-2 px-6 py-3 rounded-full font-bold transition-all duration-300 shadow-md whitespace-nowrap h-[52px] w-full sm:w-auto ${
-                showFavoritesOnly 
-                  ? 'bg-accent text-white dark:text-zinc-900' 
-                  : 'bg-white dark:bg-zinc-800 text-zinc-800 dark:text-gray-200 border border-gray-200 dark:border-zinc-700'
-              }`}
-            >
-              {showFavoritesOnly ? <BookmarkCheck className="w-5 h-5" /> : <Bookmark className="w-5 h-5" />}
-              {showFavoritesOnly ? 'Ver Todos' : 'Meus Favoritos'}
-            </button>
+            <div className="relative flex w-full sm:w-auto items-center gap-2" ref={favoriteMenuRef}>
+              <button
+                onClick={handleToggleFavoritesOnly}
+                className={`flex items-center justify-center gap-2 px-6 py-3 rounded-full font-bold transition-all duration-300 shadow-md whitespace-nowrap h-[52px] w-full sm:w-auto ${
+                  showFavoritesOnly 
+                    ? 'bg-accent text-white dark:text-zinc-900' 
+                    : 'bg-white dark:bg-zinc-800 text-zinc-800 dark:text-gray-200 border border-gray-200 dark:border-zinc-700'
+                }`}
+              >
+                {showFavoritesOnly ? <BookmarkCheck className="w-5 h-5" /> : <Bookmark className="w-5 h-5" />}
+                {showFavoritesOnly ? 'Ver Todos' : `${activeFavoriteListName}${activeFavoriteProjectIds.length > 0 ? ` (${activeFavoriteProjectIds.length})` : ''}`}
+              </button>
+              <button
+                onClick={() => setIsFavoriteMenuOpen(open => !open)}
+                className="flex h-[52px] w-[52px] items-center justify-center rounded-full border border-gray-200 bg-white text-zinc-700 shadow-md transition-colors hover:bg-gray-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-gray-200 dark:hover:bg-zinc-700"
+                title="Gerenciar listas de favoritos"
+              >
+                <ChevronDown className={`w-5 h-5 transition-transform ${isFavoriteMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {isFavoriteMenuOpen && (
+                <div className="absolute left-0 top-full z-50 mt-2 w-full min-w-80 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl dark:border-zinc-700 dark:bg-zinc-800 sm:w-96">
+                  <div className="border-b border-gray-100 px-4 py-3 dark:border-zinc-700">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Listas de favoritos</p>
+                  </div>
+                  <div className="max-h-60 overflow-y-auto">
+                    {favoriteLists.length > 0 ? (
+                      favoriteLists.map((list) => (
+                        <div
+                          key={list.id}
+                          className={`flex items-stretch gap-1 px-2 py-1 transition-colors hover:bg-gray-100 dark:hover:bg-zinc-700 ${
+                            list.id === activeFavoriteListId ? 'bg-accent/10 text-accent' : 'text-zinc-800 dark:text-gray-200'
+                          }`}
+                        >
+                          <button
+                            onClick={() => handleSelectFavoriteList(list.id)}
+                            className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-md px-2 py-2 text-left text-sm font-semibold"
+                          >
+                            <span className="truncate">
+                              {list.name}
+                              {list.isDefault ? <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-gray-400">Padrão</span> : null}
+                            </span>
+                            <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{list.projectIds.length}</span>
+                          </button>
+                          {!list.isDefault && (
+                            <div className="flex items-center gap-1 pr-1">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  void handleRenameFavoriteList(list);
+                                }}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-white hover:text-accent dark:text-gray-400 dark:hover:bg-zinc-900"
+                                aria-label={`Renomear lista ${list.name}`}
+                                title="Renomear lista"
+                              >
+                                <PencilLine className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  void handleDeleteFavoriteList(list);
+                                }}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-white hover:text-red-500 dark:text-gray-400 dark:hover:bg-zinc-900"
+                                aria-label={`Excluir lista ${list.name}`}
+                                title="Excluir lista"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">Nenhuma lista criada.</div>
+                    )}
+                  </div>
+                  <div className="border-t border-gray-100 px-4 py-4 dark:border-zinc-700">
+                    <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      Nova lista
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        value={newFavoriteListName}
+                        onChange={(e) => setNewFavoriteListName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleCreateFavoriteList();
+                          }
+                        }}
+                        placeholder="Ex.: Cursos do agro"
+                        className="h-11 flex-1 rounded-md border border-gray-200 bg-white px-3 text-sm text-zinc-800 outline-none ring-0 placeholder:text-gray-400 focus:border-accent dark:border-zinc-700 dark:bg-zinc-900 dark:text-gray-100"
+                      />
+                      <button
+                        onClick={handleCreateFavoriteList}
+                        className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-accent px-4 text-sm font-bold text-white dark:text-zinc-900"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Criar
+                      </button>
+                    </div>
+                    {favoriteListFeedback && (
+                      <p className="mt-2 text-xs font-medium text-gray-500 dark:text-gray-400">{favoriteListFeedback}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           <div className="relative w-full sm:w-auto" ref={shareMenuRef}>
@@ -983,7 +1314,8 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
         
         <TagFilter 
             tags={filterTags}
-            options={filterOptions}
+            options={filterOptions.options}
+            optionCounts={filterOptions.optionCounts}
             activeFilters={activeFilters}
             onFilterChange={handleFilterChange}
             onClearAll={handleClearAllFilters}
@@ -1005,7 +1337,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
                       onLike={handleLike} 
                       onToggleFavorite={handleToggleFavorite}
                       onShare={handleShareProject}
-                      isFavorited={favorites.some(f => f.projectId === item.id)}
+                      isFavorited={activeFavoriteProjectIds.includes(item.id)}
                       isLiked={likes.some(l => l.projectId === item.id)}
                       theme={theme} 
                     />
@@ -1052,10 +1384,85 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
           onAdd={handleProjectAdded}
           onDelete={handleDeleteProject}
           onToggleFavorite={handleToggleFavorite}
-          isFavorited={favorites.some(f => f.projectId === selectedItem.id)}
+          isFavorited={activeFavoriteProjectIds.includes(selectedItem.id)}
           onLike={handleLike}
           isLiked={likes.some(l => l.projectId === selectedItem.id)}
         />
+      )}
+
+      {favoriteListModal && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 px-4 py-6 backdrop-blur-sm"
+          onClick={handleFavoriteListModalClose}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-zinc-700 bg-zinc-900 p-5 text-gray-100 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                  {favoriteListModal.mode === 'rename' ? 'Renomear lista' : 'Excluir lista'}
+                </p>
+                <h3 className="mt-1 text-lg font-bold">{favoriteListModal.list.name}</h3>
+              </div>
+              <button
+                type="button"
+                onClick={handleFavoriteListModalClose}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-zinc-700 text-gray-300 transition-colors hover:bg-zinc-800 hover:text-white"
+                aria-label="Fechar"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {favoriteListModal.mode === 'rename' ? (
+              <div className="mt-5">
+                <label className="mb-2 block text-sm font-semibold text-gray-300">Novo nome da lista</label>
+                <input
+                  autoFocus
+                  value={favoriteListModal.value || ''}
+                  onChange={(e) =>
+                    setFavoriteListModal(prev => (prev ? { ...prev, value: e.target.value } : prev))
+                  }
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      void handleFavoriteListModalConfirm();
+                    }
+                  }}
+                  className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm text-gray-100 outline-none placeholder:text-gray-500 focus:border-accent"
+                  placeholder="Digite o novo nome"
+                />
+              </div>
+            ) : (
+              <p className="mt-5 text-sm leading-6 text-gray-300">
+                Excluir esta lista não remove os projetos do sistema. Eles continuam no portfólio, apenas saem desta organização.
+              </p>
+            )}
+
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={handleFavoriteListModalClose}
+                className="rounded-full border border-zinc-700 px-4 py-2 text-sm font-semibold text-gray-300 transition-colors hover:bg-zinc-800 hover:text-white"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleFavoriteListModalConfirm()}
+                className={`rounded-full px-4 py-2 text-sm font-bold transition-colors ${
+                  favoriteListModal.mode === 'delete'
+                    ? 'bg-red-500 text-white hover:bg-red-600'
+                    : 'bg-accent text-zinc-900 hover:brightness-95'
+                }`}
+              >
+                {favoriteListModal.mode === 'delete' ? 'Excluir' : 'Salvar'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

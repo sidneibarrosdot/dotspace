@@ -54,7 +54,7 @@ const makeMatchKey = (value: unknown) => {
 };
 
 const getProjectMatchKey = (project: Record<string, unknown>) => {
-  return `${makeMatchKey(project.Projeto)}___${makeMatchKey(project.Cliente)}`;
+  return `${makeMatchKey(project.Projeto)}___${makeMatchKey(project.Cliente)}___${makeMatchKey(project.Time)}`;
 };
 
 const normalizeProjectForSync = (project: Record<string, any>) => {
@@ -134,7 +134,7 @@ async function startServer() {
       snapshot.docs.forEach((doc) => {
         const data = doc.data();
         const key = getProjectMatchKey(data);
-        if (!key || key === "___") return;
+        if (!data.Projeto || !data.Cliente) return;
 
         const existing = existingByKey.get(key) ?? [];
         existing.push(doc);
@@ -157,7 +157,7 @@ async function startServer() {
         const normalized = normalizeProjectForSync(project);
         const key = getProjectMatchKey(normalized);
 
-        if (!normalized.Projeto || !normalized.Cliente || !key || key === "___") {
+        if (!normalized.Projeto || !normalized.Cliente || !key) {
           skippedRows++;
           return;
         }

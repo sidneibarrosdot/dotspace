@@ -27,6 +27,16 @@ export interface Favorite {
   timestamp: string;
 }
 
+export interface FavoriteList {
+  id: string;
+  userId: string;
+  name: string;
+  projectIds: string[];
+  isDefault?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface Like {
   id: string;
   userId: string;

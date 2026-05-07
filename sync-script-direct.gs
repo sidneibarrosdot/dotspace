@@ -21,7 +21,7 @@ function makeMatchKey(str) {
 }
 
 function getProjectMatchKey(project) {
-  return makeMatchKey(project.Projeto) + "___" + makeMatchKey(project.Cliente);
+  return makeMatchKey(project.Projeto) + "___" + makeMatchKey(project.Cliente) + "___" + makeMatchKey(project.Time);
 }
 
 function installAutoSyncTrigger() {
@@ -176,12 +176,14 @@ function saveToFirestore(projects, token) {
         data.documents.forEach(function(doc) {
           let pName = "";
           let cName = "";
+          let tName = "";
           if (doc.fields) {
             if (doc.fields.Projeto && doc.fields.Projeto.stringValue) pName = doc.fields.Projeto.stringValue;
             if (doc.fields.Cliente && doc.fields.Cliente.stringValue) cName = doc.fields.Cliente.stringValue;
+            if (doc.fields.Time && doc.fields.Time.stringValue) tName = doc.fields.Time.stringValue;
           }
-          const key = makeMatchKey(pName) + "___" + makeMatchKey(cName);
-          if (key === "___") return;
+          if (!pName || !cName) return;
+          const key = makeMatchKey(pName) + "___" + makeMatchKey(cName) + "___" + makeMatchKey(tName);
 
           if (!existingDocsMap[key]) {
             existingDocsMap[key] = [];
