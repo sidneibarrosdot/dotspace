@@ -1,21 +1,23 @@
 import React from 'react';
 import type { PortfolioItem } from '../types';
 import DotLogo from './DotLogo';
-import { HeartIcon, EyeIcon, Bookmark } from 'lucide-react';
+import { HeartIcon, EyeIcon, Bookmark, Share2 } from 'lucide-react';
 
 interface PortfolioCardProps {
   item: PortfolioItem;
   onClick: (item: PortfolioItem) => void;
   onLike?: (item: PortfolioItem) => void;
   onToggleFavorite?: (item: PortfolioItem) => void;
+  onShare?: (item: PortfolioItem) => Promise<void> | void;
   isFavorited?: boolean;
   isLiked?: boolean;
   theme: 'light' | 'dark';
 }
 
-const PortfolioCard: React.FC<PortfolioCardProps> = ({ item, onClick, onLike, onToggleFavorite, isFavorited, isLiked, theme }) => {
+const PortfolioCard: React.FC<PortfolioCardProps> = ({ item, onClick, onLike, onToggleFavorite, onShare, isFavorited, isLiked, theme }) => {
   const [imgError, setImgError] = React.useState(false);
   const [isVerifying, setIsVerifying] = React.useState(!!item.Imagem_capa);
+  const [shareMessage, setShareMessage] = React.useState('');
   
   // Check if it's a Google Slides link
   const isGoogleSlides = item.Imagem_capa && item.Imagem_capa.includes('docs.google.com/presentation/d/');
@@ -168,6 +170,31 @@ const PortfolioCard: React.FC<PortfolioCardProps> = ({ item, onClick, onLike, on
               >
                 <Bookmark className={`w-4 h-4 ${isFavorited ? 'fill-current' : ''}`} />
                 <span className="font-medium">{isFavorited ? 'Salvo' : 'Salvar'}</span>
+              </button>
+            )}
+
+            {onShare && (
+              <button
+                onClick={async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  try {
+                    await onShare(item);
+                    setShareMessage('Link copiado');
+                  } catch {
+                    setShareMessage('Erro ao copiar');
+                  }
+                  window.setTimeout(() => setShareMessage(''), 2500);
+                }}
+                className="flex items-center gap-1.5 transition-colors relative z-30 cursor-pointer hover:text-accent"
+                title="Copiar link deste projeto"
+              >
+                <Share2 className="w-4 h-4" />
+                {shareMessage && (
+                  <span className="absolute bottom-full left-1/2 mb-2 -translate-x-1/2 rounded-md bg-zinc-900 px-3 py-2 text-xs font-semibold text-white shadow-lg whitespace-nowrap dark:bg-zinc-700">
+                    {shareMessage}
+                  </span>
+                )}
               </button>
             )}
           </div>

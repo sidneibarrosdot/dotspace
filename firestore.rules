@@ -110,5 +110,12 @@ service cloud.firestore {
                       likeId == request.auth.uid + "_" + request.resource.data.projectId;
       allow delete: if isDotGroupUser() && resource.data.userId == request.auth.uid;
     }
+
+    // Shared project selections
+    match /shares/{shareId} {
+      allow read: if isDotGroupUser();
+      allow create: if isDotGroupUser();
+      allow update, delete: if false;
+    }
   }
 }

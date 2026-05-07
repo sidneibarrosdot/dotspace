@@ -3,6 +3,9 @@ const CLIENT_EMAIL = 'firebase-adminsdk-fbsvc@bancopmvs-492018.iam.gserviceaccou
 
 const PROJECT_ID = 'bancopmvs-492018';
 const DATABASE_ID = 'ai-studio-246517dd-309c-4b97-8325-3c8821906926';
+const AUTO_SYNC_DELAY_MS = 5 * 60 * 1000;
+const AUTO_SYNC_TRIGGER_FUNCTION = 'runScheduledSync';
+const EDIT_TRIGGER_FUNCTION = 'schedulePortfolioSyncOnEdit';
 
 function getPrivateKey() {
   const key = PropertiesService.getScriptProperties().getProperty('FIREBASE_PRIVATE_KEY');
@@ -21,7 +24,49 @@ function getProjectMatchKey(project) {
   return makeMatchKey(project.Projeto) + "___" + makeMatchKey(project.Cliente);
 }
 
-function syncPortfolio() {
+function installAutoSyncTrigger() {
+  deleteTriggersByFunction(EDIT_TRIGGER_FUNCTION);
+  ScriptApp.newTrigger(EDIT_TRIGGER_FUNCTION)
+    .forSpreadsheet(SpreadsheetApp.getActive())
+    .onEdit()
+    .create();
+  SpreadsheetApp.getUi().alert('Sincronização automática instalada. As edições agora agendam uma sync em alguns minutos, sem popup bloqueante.');
+}
+
+function schedulePortfolioSyncOnEdit(e) {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(3000)) return;
+
+  try {
+    deleteTriggersByFunction(AUTO_SYNC_TRIGGER_FUNCTION);
+    PropertiesService.getScriptProperties().setProperty('LAST_EDIT_AT', new Date().toISOString());
+
+    ScriptApp.newTrigger(AUTO_SYNC_TRIGGER_FUNCTION)
+      .timeBased()
+      .after(AUTO_SYNC_DELAY_MS)
+      .create();
+
+    SpreadsheetApp.getActiveSpreadsheet().toast('Alteração registrada. Sincronização agendada.', 'DOT Sync', 3);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function runScheduledSync() {
+  deleteTriggersByFunction(AUTO_SYNC_TRIGGER_FUNCTION);
+  syncPortfolio({ silent: true });
+}
+
+function deleteTriggersByFunction(functionName) {
+  ScriptApp.getProjectTriggers().forEach(function(trigger) {
+    if (trigger.getHandlerFunction() === functionName) {
+      ScriptApp.deleteTrigger(trigger);
+    }
+  });
+}
+
+function syncPortfolio(options) {
+  const silent = options && options.silent === true;
   const sheets = SpreadsheetApp.getActiveSpreadsheet().getSheets();
   const projects = [];
 
@@ -51,22 +96,40 @@ function syncPortfolio() {
   });
 
   if (projects.length === 0) {
-    SpreadsheetApp.getUi().alert('Aviso: Nenhum projeto válido encontrado.');
+    notifySync('Aviso: Nenhum projeto válido encontrado.', silent, true);
     return;
   }
 
   try {
-    SpreadsheetApp.getActiveSpreadsheet().toast('Autenticando no Firebase...', 'Sincronização', 3);
+    notifyProgress('Autenticando no Firebase...', silent, 3);
     const token = getOAuthToken();
 
-    SpreadsheetApp.getActiveSpreadsheet().toast('Verificando projetos existentes e processando...', 'Sincronização', 5);
+    notifyProgress('Verificando projetos existentes e processando...', silent, 5);
     const result = saveToFirestore(projects, token);
 
-    SpreadsheetApp.getUi().alert("Sucesso! O banco foi sincronizado:\n- Atualizados/Criados: " + result.updated + "\n- Removidos (órfãos/duplicados): " + result.deleted + "\n- Linhas duplicadas/ignoradas: " + result.skipped);
+    notifySync("Sucesso! O banco foi sincronizado:\n- Atualizados/Criados: " + result.updated + "\n- Removidos (órfãos/duplicados): " + result.deleted + "\n- Linhas duplicadas/ignoradas: " + result.skipped, silent, false);
   } catch (e) {
     Logger.log(e);
-    SpreadsheetApp.getUi().alert("Erro na sincronização: " + e.message);
+    notifySync("Erro na sincronização: " + e.message, silent, true);
   }
+}
+
+function notifyProgress(message, silent, seconds) {
+  if (!silent) {
+    SpreadsheetApp.getActiveSpreadsheet().toast(message, 'Sincronização', seconds);
+  }
+}
+
+function notifySync(message, silent, isError) {
+  if (silent) {
+    Logger.log(message);
+    if (isError) {
+      SpreadsheetApp.getActiveSpreadsheet().toast(message, 'DOT Sync', 5);
+    }
+    return;
+  }
+
+  SpreadsheetApp.getUi().alert(message);
 }
 
 function saveToFirestore(projects, token) {
@@ -354,5 +417,9 @@ function normalizeKey(key) {
 }
 
 function onOpen() {
-  SpreadsheetApp.getUi().createMenu('DOT Sync').addItem('Sincronizar Portfólio', 'syncPortfolio').addToUi();
+  SpreadsheetApp.getUi()
+    .createMenu('DOT Sync')
+    .addItem('Sincronizar agora', 'syncPortfolio')
+    .addItem('Instalar sincronização automática', 'installAutoSyncTrigger')
+    .addToUi();
 }
