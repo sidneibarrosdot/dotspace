@@ -171,25 +171,43 @@ export const deleteFavoriteList = async (listId: string) => {
 };
 
 export const toggleProjectInFavoriteList = async (userId: string, listId: string, projectId: string) => {
-  const listRef = doc(db, FAVORITE_LISTS_COLLECTION, listId);
   const listSnapshot = await getDocs(query(collection(db, FAVORITE_LISTS_COLLECTION), where('userId', '==', userId)));
   const listDoc = listSnapshot.docs.find(doc => doc.id === listId);
 
-  if (!listDoc) {
+  const resolvedListDoc =
+    listDoc ||
+    listSnapshot.docs.find(doc => (doc.data() as FavoriteList).isDefault) ||
+    listSnapshot.docs.find(doc => normalizeName(String(doc.data().name || '')) === normalizeName(DEFAULT_FAVORITE_LIST_NAME));
+
+  if (!resolvedListDoc) {
     throw new Error('Favorite list not found');
   }
 
-  const currentIds = Array.isArray(listDoc.data().projectIds) ? listDoc.data().projectIds.map(String) : [];
+  const currentList = resolvedListDoc.data() as FavoriteList;
+  const targetName = normalizeName(String(currentList.name || DEFAULT_FAVORITE_LIST_NAME));
+  const matchingDocs = listSnapshot.docs.filter(doc => {
+    const data = doc.data() as FavoriteList;
+    return doc.id === resolvedListDoc.id || normalizeName(String(data.name || '')) === targetName;
+  });
+  const currentIds = dedupe(
+    matchingDocs.flatMap((matchedDoc) => {
+      const data = matchedDoc.data() as FavoriteList;
+      return Array.isArray(data.projectIds) ? data.projectIds.map(String) : [];
+    })
+  );
   const normalizedProjectId = String(projectId).trim();
   const nextProjectIds = currentIds.includes(normalizedProjectId)
     ? currentIds.filter(id => id !== normalizedProjectId)
     : [...currentIds, normalizedProjectId];
 
-  await updateDoc(listRef, {
-    userId,
-    projectIds: nextProjectIds,
-    updatedAt: Timestamp.now(),
+  const batch = writeBatch(db);
+  matchingDocs.forEach((matchedDoc) => {
+    batch.update(doc(db, FAVORITE_LISTS_COLLECTION, matchedDoc.id), {
+      projectIds: nextProjectIds,
+      updatedAt: Timestamp.now(),
+    });
   });
+  await batch.commit();
 
   return nextProjectIds.includes(normalizedProjectId);
 };

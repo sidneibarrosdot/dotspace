@@ -576,25 +576,35 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
     const likesQuery = query(likesCollection);
 
     const unsubscribe = onSnapshot(likesQuery, (snapshot) => {
-      const nextCounts = snapshot.docs.reduce<Record<string, number>>((acc, likeDoc) => {
-        const projectId = String(likeDoc.data()?.projectId || '').trim();
-        if (!projectId) return acc;
-        acc[projectId] = (acc[projectId] || 0) + 1;
+      const nextCounts = snapshot.docs.reduce<Record<string, Set<string>>>((acc, likeDoc) => {
+        const data = likeDoc.data() as { projectId?: string; userId?: string };
+        const projectId = String(data.projectId || '').trim();
+        const userId = String(data.userId || '').trim();
+        if (!projectId || !userId) return acc;
+
+        if (!acc[projectId]) {
+          acc[projectId] = new Set();
+        }
+        acc[projectId].add(userId);
         return acc;
       }, {});
 
-      likeCountsRef.current = nextCounts;
+      const normalizedCounts = Object.fromEntries(
+        Object.entries(nextCounts).map(([projectId, users]) => [projectId, users.size])
+      ) as Record<string, number>;
+
+      likeCountsRef.current = normalizedCounts;
 
       setPortfolioItems(prevItems =>
         prevItems.map(item => ({
           ...item,
-          likes: nextCounts[item.id] ?? normalizeCount(item.likes),
+          likes: normalizedCounts[item.id] ?? normalizeCount(item.likes),
         }))
       );
 
       setSelectedItem(prev =>
         prev
-          ? { ...prev, likes: nextCounts[prev.id] ?? normalizeCount(prev.likes) }
+          ? { ...prev, likes: normalizedCounts[prev.id] ?? normalizeCount(prev.likes) }
           : prev
       );
     }, (error) => {
@@ -624,22 +634,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
   const handleLike = async (item: PortfolioItem) => {
     if (!isLoggedIn || !user || !item.id) return;
     try {
-      const likedNow = await toggleLike(user.uid, item.id);
-      const delta = likedNow ? 1 : -1;
-
-      setPortfolioItems(prevItems =>
-        prevItems.map(current =>
-          current.id === item.id
-            ? { ...current, likes: Math.max(0, (current.likes || 0) + delta) }
-            : current
-        )
-      );
-
-      setSelectedItem(prev =>
-        prev && prev.id === item.id
-          ? { ...prev, likes: Math.max(0, (prev.likes || 0) + delta) }
-          : prev
-      );
+      await toggleLike(user.uid, item.id);
     } catch (error) {
       console.error("Error toggling like:", error);
     }
@@ -648,7 +643,24 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
   const handleToggleFavorite = async (item: PortfolioItem) => {
     if (!isLoggedIn || !user || !item.id || !activeFavoriteList?.id) return;
     try {
-      await toggleProjectInFavoriteList(user.uid, activeFavoriteList.id, item.id);
+      const isNowFavorited = await toggleProjectInFavoriteList(user.uid, activeFavoriteList.id, item.id);
+
+      setFavoriteLists(prevLists =>
+        prevLists.map(list => {
+          if (list.id !== activeFavoriteList.id) return list;
+
+          const currentIds = Array.isArray(list.projectIds) ? list.projectIds.map(String) : [];
+          const normalizedProjectId = String(item.id).trim();
+          const nextProjectIds = isNowFavorited
+            ? Array.from(new Set([...currentIds, normalizedProjectId]))
+            : currentIds.filter(id => id !== normalizedProjectId);
+
+          return {
+            ...list,
+            projectIds: nextProjectIds,
+          };
+        })
+      );
     } catch (error) {
       console.error("Error toggling favorite:", error);
     }

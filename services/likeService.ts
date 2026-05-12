@@ -16,10 +16,10 @@ export const toggleLike = async (userId: string, projectId: string): Promise<boo
     const batch = writeBatch(db);
 
     if (!snapshot.empty) {
-      // Already liked, remove it
-      batch.delete(likeDocRef);
+      const matchingDocs = snapshot.docs;
+      matchingDocs.forEach((likeDoc) => batch.delete(likeDoc.ref));
       batch.update(projectDocRef, {
-        likes: increment(-1)
+        likes: increment(-matchingDocs.length)
       });
       await batch.commit();
       return false; // Not liked anymore
@@ -47,10 +47,21 @@ export const subscribeToLikes = (userId: string, callback: (likes: Like[]) => vo
   const q = query(likesRef, where('userId', '==', userId));
 
   return onSnapshot(q, (snapshot) => {
-    const likes = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as Like));
+    const likes = snapshot.docs.reduce<Like[]>((acc, likeDoc) => {
+      const data = likeDoc.data() as Like;
+      const projectId = String(data.projectId || '').trim();
+      if (!projectId) return acc;
+
+      const existing = acc.find(item => item.projectId === projectId);
+      if (existing) return acc;
+
+      acc.push({
+        id: likeDoc.id,
+        ...data,
+        projectId,
+      });
+      return acc;
+    }, []);
     callback(likes);
   });
 };
