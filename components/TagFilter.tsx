@@ -55,12 +55,12 @@ const TagFilter: React.FC<TagFilterProps> = ({ tags, options, optionCounts, acti
   };
 
   return (
-    <div className="flex flex-wrap justify-center items-center gap-3 mb-12">
-      <span className="text-gray-600 dark:text-gray-400 font-medium mr-2">Filtrar por:</span>
+    <div className="flex flex-nowrap overflow-x-auto sm:flex-wrap sm:overflow-visible justify-start sm:justify-center items-center gap-2 sm:gap-3 mb-6 sm:mb-12 pb-2 sm:pb-0 -mx-4 px-4 sm:mx-0 sm:px-0">
+      <span className="text-gray-600 dark:text-gray-400 font-medium mr-1 sm:mr-2 shrink-0">Filtrar por:</span>
       
       <button
         onClick={onClearAll}
-        className={`px-4 py-1.5 text-sm font-semibold border rounded-full transition-all duration-200 ease-in-out ${
+        className={`shrink-0 px-3 py-1.5 text-xs sm:text-sm font-semibold border rounded-full transition-all duration-200 ease-in-out ${
           !hasActiveFilters
             ? 'bg-accent border-accent text-white dark:text-zinc-900 shadow-md shadow-accent/20'
             : 'bg-white dark:bg-zinc-700 border-gray-300 dark:border-zinc-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-600 hover:border-gray-400 dark:hover:border-zinc-500'
@@ -85,7 +85,7 @@ const TagFilter: React.FC<TagFilterProps> = ({ tags, options, optionCounts, acti
           <div key={tag} className="relative" ref={el => { dropdownsRef.current[tag] = el; }}>
             <button
               onClick={() => setOpenDropdown(openDropdown === tag ? null : tag)}
-              className={`flex items-center gap-2 px-4 py-1.5 text-sm font-semibold border rounded-full transition-all duration-200 ease-in-out ${
+            className={`shrink-0 flex items-center gap-2 px-3 py-1.5 text-xs sm:text-sm font-semibold border rounded-full transition-all duration-200 ease-in-out ${
                 activeValues.length > 0
                   ? 'bg-accent border-accent text-white dark:text-zinc-900 shadow-md shadow-accent/20'
                   : 'bg-white dark:bg-zinc-700 border-gray-300 dark:border-zinc-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-600 hover:border-gray-400 dark:hover:border-zinc-500'
@@ -144,7 +144,7 @@ const TagFilter: React.FC<TagFilterProps> = ({ tags, options, optionCounts, acti
       {hasActiveFilters && (
         <button
           onClick={onClearAll}
-          className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-all duration-200 animate-fade-in"
+        className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-all duration-200 animate-fade-in"
         >
           <XIcon className="w-4 h-4" />
           Limpar Filtros

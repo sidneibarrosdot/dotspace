@@ -65,7 +65,7 @@ const PortfolioCard: React.FC<PortfolioCardProps> = ({ item, onClick, onLike, on
 
   return (
     <div
-      className="flex flex-col rounded-xl overflow-hidden shadow-md hover:shadow-xl transform transition-all duration-300 hover:-translate-y-1 cursor-pointer border border-gray-200 dark:border-zinc-700/50 bg-white dark:bg-zinc-800 h-full sm:min-h-[360px] group"
+      className="flex flex-col rounded-xl overflow-hidden shadow-md hover:shadow-xl transform transition-all duration-300 hover:-translate-y-1 cursor-pointer border border-gray-200 dark:border-zinc-700/50 bg-white dark:bg-zinc-800 h-full sm:min-h-[360px] group min-w-0"
       onClick={() => onClick(item)}
       role="button"
       tabIndex={0}
@@ -121,24 +121,24 @@ const PortfolioCard: React.FC<PortfolioCardProps> = ({ item, onClick, onLike, on
       </div>
 
       {/* Content Section */}
-      <div className="flex flex-col flex-grow p-4 sm:p-5">
+      <div className="flex flex-col flex-grow p-3 sm:p-5 min-w-0">
         <div className="flex-grow">
-          <p className="text-xs font-bold text-accent uppercase tracking-wider mb-1 line-clamp-1" title={item.Cliente}>
+          <p className="text-[10px] sm:text-xs font-bold text-accent uppercase tracking-wider mb-1 line-clamp-1" title={item.Cliente}>
             {item.Cliente}
           </p>
-          <h3 className="text-lg font-bold text-zinc-900 dark:text-white mb-2 line-clamp-2 leading-tight" title={item.Projeto}>
+          <h3 className="text-sm sm:text-lg font-bold text-zinc-900 dark:text-white mb-2 line-clamp-2 leading-tight" title={item.Projeto}>
             {item.Projeto}
           </h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-1" title={item.Time}>
+          <p className="text-[11px] sm:text-sm text-gray-600 dark:text-gray-400 line-clamp-1" title={item.Time}>
             Time: {item.Time}
           </p>
         </div>
 
         {/* Footer Stats */}
-        <div className="flex items-center justify-between mt-2 pt-2 sm:mt-4 sm:pt-4 border-t border-gray-100 dark:border-zinc-700/50">
-          <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
-            <div className="flex items-center gap-1.5" title="Visualizações">
-              <EyeIcon className="w-4 h-4" />
+        <div className="flex items-center justify-start mt-2 pt-2 sm:mt-4 sm:pt-4 border-t border-gray-100 dark:border-zinc-700/50">
+          <div className="flex w-full items-center justify-start gap-2.5 text-[11px] text-gray-500 dark:text-gray-400 min-w-0 sm:gap-4 sm:text-sm">
+            <div className="inline-flex min-h-11 min-w-11 shrink-0 items-center gap-1.5 rounded-md px-2 sm:px-0" title="Visualizações">
+              <EyeIcon className="w-4 h-4 shrink-0" />
               <span className="font-medium">{item.views || 0}</span>
             </div>
             <button 
@@ -147,12 +147,12 @@ const PortfolioCard: React.FC<PortfolioCardProps> = ({ item, onClick, onLike, on
                 e.stopPropagation(); 
                 if (onLike) onLike(item); 
               }}
-              className={`flex items-center gap-1.5 transition-colors relative z-30 cursor-pointer ${
+              className={`inline-flex min-h-11 min-w-11 shrink-0 items-center gap-1.5 rounded-md px-2 sm:px-0 transition-colors relative z-30 cursor-pointer ${
                 isLiked ? 'text-accent' : 'hover:text-accent'
               }`}
               title={isLiked ? "Descurtir" : "Curtir"}
             >
-              <HeartIcon className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
+              <HeartIcon className={`w-4 h-4 shrink-0 ${isLiked ? 'fill-current' : ''}`} />
               <span className="font-medium">{item.likes || 0}</span>
             </button>
             
@@ -163,13 +163,12 @@ const PortfolioCard: React.FC<PortfolioCardProps> = ({ item, onClick, onLike, on
                   e.stopPropagation(); 
                   onToggleFavorite(item); 
                 }}
-                className={`flex items-center gap-1.5 transition-colors relative z-30 cursor-pointer ${
+                className={`inline-flex min-h-11 min-w-11 shrink-0 items-center gap-1.5 rounded-md px-2 sm:px-0 transition-colors relative z-30 cursor-pointer ${
                   isFavorited ? 'text-accent' : 'hover:text-accent'
                 }`}
                 title={isFavorited ? "Remover dos Favoritos" : "Salvar para ver depois"}
               >
-                <Bookmark className={`w-4 h-4 ${isFavorited ? 'fill-current' : ''}`} />
-                <span className="font-medium">{isFavorited ? 'Salvo' : 'Salvar'}</span>
+                <Bookmark className={`w-4 h-4 shrink-0 ${isFavorited ? 'fill-current' : ''}`} />
               </button>
             )}
 
@@ -186,10 +185,10 @@ const PortfolioCard: React.FC<PortfolioCardProps> = ({ item, onClick, onLike, on
                   }
                   window.setTimeout(() => setShareMessage(''), 2500);
                 }}
-                className="flex items-center gap-1.5 transition-colors relative z-30 cursor-pointer hover:text-accent"
+                className="inline-flex min-h-11 min-w-11 shrink-0 items-center gap-1.5 rounded-md px-2 sm:px-0 transition-colors relative z-30 cursor-pointer hover:text-accent"
                 title="Copiar link deste projeto"
               >
-                <Share2 className="w-4 h-4" />
+                <Share2 className="w-4 h-4 shrink-0" />
                 {shareMessage && (
                   <span className="absolute bottom-full left-1/2 mb-2 -translate-x-1/2 rounded-md bg-zinc-900 px-3 py-2 text-xs font-semibold text-white shadow-lg whitespace-nowrap dark:bg-zinc-700">
                     {shareMessage}

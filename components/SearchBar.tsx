@@ -62,6 +62,8 @@ const SearchBar: React.FC<SearchBarProps> = ({ searchTerm, setSearchTerm, placeh
           <SearchIcon className="h-5 w-5 text-gray-400" />
         </div>
         <input
+          id="portfolio-search"
+          name="portfolio-search"
           type="text"
           placeholder={placeholder}
           value={searchTerm}

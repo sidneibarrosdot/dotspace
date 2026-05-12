@@ -5,7 +5,7 @@ import PortfolioCard from '../components/PortfolioCard';
 import SearchBar from '../components/SearchBar';
 import PortfolioModal from '../components/PortfolioModal';
 import TagFilter from '../components/TagFilter';
-import { Check, ChevronDown, Copy, PencilLine, Plus, Share2, Trash2, X } from 'lucide-react';
+import { ArrowUp, Check, ChevronDown, Copy, PencilLine, Plus, Share2, Trash2, X } from 'lucide-react';
 import type { PortfolioItem } from '../types';
 import DotLogo from '../components/DotLogo';
 import { db } from '../firebase';
@@ -169,6 +169,30 @@ const formatFilterDate = (value: string) => {
   return String(parsed.year);
 };
 
+const getDateSortValue = (value: string) => {
+  const parsed = parseFilterDate(value);
+  if (parsed) {
+    return (parsed.year * 10000) + (parsed.month * 100) + parsed.day;
+  }
+
+  const fallback = Date.parse(value);
+  return Number.isNaN(fallback) ? 0 : fallback;
+};
+
+const comparePortfolioItemsByDateDesc = (a: PortfolioItem, b: PortfolioItem) => {
+  const dateA = getDateSortValue(a.Data || '');
+  const dateB = getDateSortValue(b.Data || '');
+  if (dateA !== dateB) return dateB - dateA;
+
+  const createdA = Date.parse((a as PortfolioItem & { createdAt?: string }).createdAt || '');
+  const createdB = Date.parse((b as PortfolioItem & { createdAt?: string }).createdAt || '');
+  if (!Number.isNaN(createdA) && !Number.isNaN(createdB) && createdA !== createdB) {
+    return createdB - createdA;
+  }
+
+  return String(b.Projeto || '').localeCompare(String(a.Projeto || ''), 'pt-BR');
+};
+
 const encodeFilterValueForUrl = (value: string) => slugify(value);
 
 const decodeFilterValueFromUrl = (value: string) => {
@@ -273,6 +297,11 @@ const BLANK_PROJECT: PortfolioItem = {
     tags: [],
 };
 
+const normalizeCount = (value: unknown) => {
+  const nextValue = Number(value);
+  return Number.isFinite(nextValue) && nextValue > 0 ? nextValue : 0;
+};
+
 const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onNavigateToAdmin, onLogout, theme, toggleTheme, manualInteractionsEnabled }) => {
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -294,6 +323,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
   const [isShareMenuOpen, setIsShareMenuOpen] = useState(false);
   const [isFavoriteMenuOpen, setIsFavoriteMenuOpen] = useState(false);
   const [favoriteListFeedback, setFavoriteListFeedback] = useState('');
+  const [showBackToTop, setShowBackToTop] = useState(false);
   const [favoriteListModal, setFavoriteListModal] = useState<{
     mode: 'rename' | 'delete';
     list: FavoriteList;
@@ -301,6 +331,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
   } | null>(null);
   const shareMenuRef = useRef<HTMLDivElement | null>(null);
   const favoriteMenuRef = useRef<HTMLDivElement | null>(null);
+  const likeCountsRef = useRef<Record<string, number>>({});
 
   const phrases = [
     'Explore as melhores soluções em EdTech do DOT Digital Group. 🚀',
@@ -445,11 +476,13 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
         } as PortfolioItem));
         
         // Sort in memory to be more resilient to missing date fields
-        const sortedList = [...projectList].sort((a, b) => {
-            const dateA = a.Data || '';
-            const dateB = b.Data || '';
-            return dateB.localeCompare(dateA);
-        });
+        const sortedList = [...projectList]
+          .sort(comparePortfolioItemsByDateDesc)
+          .map(item => ({
+            ...item,
+            likes: likeCountsRef.current[item.id] ?? normalizeCount(item.likes),
+            views: normalizeCount(item.views),
+          }));
 
         console.log(`Fetched ${sortedList.length} projects from Firestore`);
         setPortfolioItems(sortedList);
@@ -522,11 +555,50 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
   useEffect(() => {
     if (!isLoggedIn || !user) {
       setLikes([]);
+      likeCountsRef.current = {};
       return;
     }
 
     const unsubscribe = subscribeToLikes(user.uid, (likesList) => {
       setLikes(likesList);
+    });
+
+    return () => unsubscribe();
+  }, [isLoggedIn, user]);
+
+  useEffect(() => {
+    if (!isLoggedIn || !user) {
+      likeCountsRef.current = {};
+      return;
+    }
+
+    const likesCollection = collection(db, 'likes');
+    const likesQuery = query(likesCollection);
+
+    const unsubscribe = onSnapshot(likesQuery, (snapshot) => {
+      const nextCounts = snapshot.docs.reduce<Record<string, number>>((acc, likeDoc) => {
+        const projectId = String(likeDoc.data()?.projectId || '').trim();
+        if (!projectId) return acc;
+        acc[projectId] = (acc[projectId] || 0) + 1;
+        return acc;
+      }, {});
+
+      likeCountsRef.current = nextCounts;
+
+      setPortfolioItems(prevItems =>
+        prevItems.map(item => ({
+          ...item,
+          likes: nextCounts[item.id] ?? normalizeCount(item.likes),
+        }))
+      );
+
+      setSelectedItem(prev =>
+        prev
+          ? { ...prev, likes: nextCounts[prev.id] ?? normalizeCount(prev.likes) }
+          : prev
+      );
+    }, (error) => {
+      console.error('Error fetching like counts:', error);
     });
 
     return () => unsubscribe();
@@ -552,7 +624,22 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
   const handleLike = async (item: PortfolioItem) => {
     if (!isLoggedIn || !user || !item.id) return;
     try {
-      await toggleLike(user.uid, item.id);
+      const likedNow = await toggleLike(user.uid, item.id);
+      const delta = likedNow ? 1 : -1;
+
+      setPortfolioItems(prevItems =>
+        prevItems.map(current =>
+          current.id === item.id
+            ? { ...current, likes: Math.max(0, (current.likes || 0) + delta) }
+            : current
+        )
+      );
+
+      setSelectedItem(prev =>
+        prev && prev.id === item.id
+          ? { ...prev, likes: Math.max(0, (prev.likes || 0) + delta) }
+          : prev
+      );
     } catch (error) {
       console.error("Error toggling like:", error);
     }
@@ -1116,6 +1203,8 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
     const handleScroll = () => {
       if (selectedItem) return; // Don't load more items when modal is open
 
+      setShowBackToTop(window.scrollY > 500);
+
       const nearBottom = window.innerHeight + window.scrollY >= document.body.offsetHeight - 500;
       
       if (nearBottom && visibleCount < filteredItems.length) {
@@ -1243,6 +1332,8 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
                     </label>
                     <div className="flex gap-2">
                       <input
+                        id="favorite-list-name"
+                        name="favorite-list-name"
                         value={newFavoriteListName}
                         onChange={(e) => setNewFavoriteListName(e.target.value)}
                         onKeyDown={(e) => {
@@ -1328,13 +1419,13 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
         />
 
         {loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 sm:gap-8">
+            <div className="grid grid-cols-2 max-[380px]:grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6 lg:gap-8">
                 {Array.from({ length: 8 }).map((_, index) => (
-                    <div key={index} className="h-80 bg-gray-200 dark:bg-zinc-800 rounded-lg animate-pulse"></div>
+                    <div key={index} className="h-[22rem] sm:h-80 bg-gray-200 dark:bg-zinc-800 rounded-lg animate-pulse"></div>
                 ))}
             </div>
         ) : filteredItems.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 sm:gap-8">
+            <div className="grid grid-cols-2 max-[380px]:grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6 lg:gap-8">
                 {filteredItems.slice(0, visibleCount).map((item) => (
                     <PortfolioCard 
                       key={item.id} 
@@ -1374,6 +1465,22 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
               aria-label="Adicionar novo projeto"
           >
               <Plus className="w-8 h-8 pointer-events-none" />
+          </button>
+        </div>
+      )}
+
+      {showBackToTop && (
+        <div className="fixed bottom-28 right-8 z-50 group sm:right-8">
+          <div className="absolute bottom-full right-0 mb-2 px-3 py-1 bg-zinc-800 dark:bg-zinc-700 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap pointer-events-none">
+            Voltar ao topo
+          </div>
+          <button
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="bg-white dark:bg-zinc-800 text-zinc-700 dark:text-gray-200 border border-gray-200 dark:border-zinc-700 rounded-full w-12 h-12 flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5"
+            aria-label="Voltar ao topo"
+            title="Voltar ao topo"
+          >
+            <ArrowUp className="w-5 h-5" />
           </button>
         </div>
       )}
@@ -1427,6 +1534,8 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
               <div className="mt-5">
                 <label className="mb-2 block text-sm font-semibold text-gray-300">Novo nome da lista</label>
                 <input
+                  id="favorite-list-rename"
+                  name="favorite-list-rename"
                   autoFocus
                   value={favoriteListModal.value || ''}
                   onChange={(e) =>

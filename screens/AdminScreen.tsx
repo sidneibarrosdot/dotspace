@@ -71,7 +71,6 @@ import {
     YAxis,
     CartesianGrid,
     Tooltip,
-    ResponsiveContainer,
     Cell,
     PieChart,
     Pie
@@ -211,13 +210,13 @@ const getGoogleSlidesPreviewUrl = (url: string): string | null => {
 };
 
 const UploadIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24" strokeWidth={1.5} stroke="currentColor" {...props}>
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
     </svg>
 );
 
 const ChevronDownIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24" strokeWidth={1.5} stroke="currentColor" {...props}>
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
       <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
     </svg>
 );
@@ -247,6 +246,12 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
   const [endDate, setEndDate] = useState<string>('');
   const [qualityAudit, setQualityAudit] = useState<{ id: string, name: string, issues: string[] }[]>([]);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [chartsReady, setChartsReady] = useState(false);
+
+  useEffect(() => {
+    const rafId = window.requestAnimationFrame(() => setChartsReady(true));
+    return () => window.cancelAnimationFrame(rafId);
+  }, []);
 
   const fetchAuditLogs = async () => {
     const path = 'auditLogs';
@@ -849,7 +854,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
   );
   const getUploadDisplayTitle = (log: UploadLog) => {
     if (log.userEmail === 'sheets-sync@dotgroup.com.br' || log.fileName === 'SYNC PLANILHA') {
-      return 'Sincronização Inteligente';
+      return `Sincronização Inteligente: ${log.details || 'Atualização concluída.'}`;
     }
 
     return log.fileName;
@@ -885,12 +890,12 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
             </div>
         </header>
 
-        <main className="container mx-auto p-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-8 max-w-7xl mx-auto items-stretch">
+        <main className="container mx-auto px-4 py-4 sm:p-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4 sm:gap-8 max-w-7xl mx-auto items-stretch">
             {/* Column 1: Management and History */}
-            <div className="space-y-8 flex h-full flex-col">
-              <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-8 border border-gray-200 dark:border-zinc-700/50">
-                <h1 className="text-2xl font-bold mb-4 text-zinc-900 dark:text-white">Estatísticas do Portfólio</h1>
+            <div className="space-y-4 sm:space-y-8 flex h-full flex-col">
+              <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-4 sm:p-8 border border-gray-200 dark:border-zinc-700/50">
+                <h1 className="text-xl sm:text-2xl font-bold mb-4 text-zinc-900 dark:text-white">Estatísticas do Portfólio</h1>
                 {statsLoading ? (
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 animate-pulse">
                       <div className="h-20 bg-gray-200 dark:bg-zinc-700 rounded-lg"></div>
@@ -906,11 +911,11 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                 )}
               </div>
 
-              <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-8 border border-gray-200 dark:border-zinc-700/50">
+              <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-4 sm:p-8 border border-gray-200 dark:border-zinc-700/50">
                 <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <h1 className="text-2xl font-bold mb-2 text-zinc-900 dark:text-white">Interações Manuais</h1>
-                    <p className="text-gray-600 dark:text-gray-400">
+                  <div className="min-w-0">
+                    <h1 className="text-xl sm:text-2xl font-bold mb-2 text-zinc-900 dark:text-white">Interações Manuais</h1>
+                    <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 max-w-xl">
                       Ative ou desative a criação, edição e exclusão direta no sistema.
                     </p>
                   </div>
@@ -940,15 +945,33 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                     {isSavingSettings ? 'Salvando...' : (manualInteractionsEnabled ? 'Ativadas' : 'Desativadas')}
                   </button>
                 </div>
+                <div className="mt-4 grid grid-cols-3 gap-2 text-xs sm:text-sm">
+                  {[
+                    { label: 'Criar', active: manualInteractionsEnabled },
+                    { label: 'Editar', active: manualInteractionsEnabled },
+                    { label: 'Excluir', active: manualInteractionsEnabled },
+                  ].map((chip) => (
+                    <div
+                      key={chip.label}
+                      className={`rounded-lg px-3 py-2 text-center font-semibold ${
+                        chip.active
+                          ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300'
+                          : 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300'
+                      }`}
+                    >
+                      {chip.label}
+                    </div>
+                  ))}
+                </div>
               </div>
 
-              <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-8 border border-green-500/30 dark:border-green-500/50 mb-8">
+              <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-4 sm:p-8 border border-green-500/30 dark:border-green-500/50 mb-8">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="relative flex h-4 w-4">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-4 w-4 bg-green-500"></span>
                   </div>
-                  <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">Sincronização Automática Ativa</h1>
+                  <h1 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-white">Sincronização Automática Ativa</h1>
                 </div>
                 <p className="text-gray-600 dark:text-gray-400 mb-4">
                   O banco de dados está conectado e sendo atualizado em tempo real através da planilha oficial no Google Sheets. Qualquer alteração feita na planilha será refletida aqui automaticamente.
@@ -967,8 +990,8 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
               </div>
 
               {manualInteractionsEnabled && (
-                <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-8 border border-gray-200 dark:border-zinc-700/50">
-                  <h1 className="text-2xl font-bold mb-2 text-zinc-900 dark:text-white">Atualização Manual (Backup)</h1>
+                <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-4 sm:p-8 border border-gray-200 dark:border-zinc-700/50">
+                  <h1 className="text-xl sm:text-2xl font-bold mb-2 text-zinc-900 dark:text-white">Atualização Manual (Backup)</h1>
                   <p className="text-gray-600 dark:text-gray-400 mb-4">Em caso de falha na sincronização, faça o upload de um arquivo para <span className="font-bold">substituir completamente</span> todos os projetos.</p>
 
                   <div className="mb-6">
@@ -1027,9 +1050,9 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                 </div>
               )}
 
-              <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-8 border border-gray-200 dark:border-zinc-700/50 h-[34rem] overflow-hidden flex flex-col">
+              <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-4 sm:p-8 border border-gray-200 dark:border-zinc-700/50 h-[28rem] sm:h-[34rem] overflow-hidden flex flex-col">
                 <div className="flex flex-col space-y-4 flex-1 min-h-0">
-                    <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Histórico de Uploads</h2>
+                    <h2 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-white">Histórico de Uploads</h2>
                     {latestSheetSyncLog && (
                       <div className="rounded-md border border-green-500/30 bg-green-500/10 p-3 text-sm">
                         <p className="font-semibold text-green-700 dark:text-green-300">Última sync da planilha</p>
@@ -1057,10 +1080,9 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                                 {log.userEmail && (
                                   <p className="text-xs text-gray-500 dark:text-gray-400 break-all">{log.userEmail}</p>
                                 )}
-                                {log.details && (
+                                {log.details && !(log.userEmail === 'sheets-sync@dotgroup.com.br' || log.fileName === 'SYNC PLANILHA') && (
                                   <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 leading-snug break-words">
-                                    <span className="font-semibold text-accent">{log.userEmail === 'sheets-sync@dotgroup.com.br' || log.fileName === 'SYNC PLANILHA' ? 'SYNC PLANILHA:' : 'Detalhe:'}</span>{' '}
-                                    {log.details}
+                                    <span className="font-semibold text-accent">Detalhe:</span> {log.details}
                                   </p>
                                 )}
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{formatTimestamp(log.timestamp)}</p>
@@ -1080,10 +1102,10 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
             </div>
 
             {/* Column 2: Charts and Audit */}
-            <div className="space-y-8 flex h-full flex-col">
-              <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-8 border border-gray-200 dark:border-zinc-700/50">
+            <div className="space-y-4 sm:space-y-8 flex h-full flex-col">
+              <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-4 sm:p-8 border border-gray-200 dark:border-zinc-700/50">
                 <div className="flex items-center justify-between mb-4">
-                    <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">Filtros de Período</h1>
+                    <h1 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-white">Filtros de Período</h1>
                     <button
                         onClick={downloadAllData}
                         className="flex items-center gap-2 text-xs font-bold bg-accent/10 text-accent px-3 py-1.5 rounded-md hover:bg-accent/20 transition-colors"
@@ -1122,10 +1144,10 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                     </button>
                 )}
               </div>
-              <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-8 border border-gray-200 dark:border-zinc-700/50">
-                <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-2xl font-bold text-zinc-900 dark:text-white">Distribuição de Projetos</h2>
-                    <div className="flex items-center gap-2">
+              <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-4 sm:p-8 border border-gray-200 dark:border-zinc-700/50">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
+                    <h2 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-white">Distribuição de Projetos</h2>
+                    <div className="flex flex-wrap items-center gap-2">
                         <button
                             onClick={() => downloadChartData(chartData, 'Distribuicao_Projetos')}
                             className="flex items-center gap-2 text-xs font-bold bg-gray-100 dark:bg-zinc-700 text-gray-700 dark:text-gray-300 px-3 py-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-zinc-600 transition-colors"
@@ -1146,9 +1168,14 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                         </select>
                     </div>
                 </div>
-                <div className="h-64 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={chartData} margin={{ bottom: 40 }}>
+                <div className="overflow-x-auto pb-2">
+                    <div className="h-64 min-w-[720px] w-full">
+                      {!chartsReady ? (
+                        <div className="flex h-full items-center justify-center rounded-lg bg-gray-50 text-sm text-gray-500 dark:bg-zinc-700/30 dark:text-gray-400">
+                          Carregando gráfico...
+                        </div>
+                      ) : (
+                      <BarChart width={720} height={256} data={chartData} margin={{ bottom: 40 }}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme === 'dark' ? '#3f3f46' : '#e5e7eb'} />
                             <XAxis
                                 dataKey="name"
@@ -1178,14 +1205,15 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                                 ))}
                             </Bar>
                         </BarChart>
-                    </ResponsiveContainer>
+                      )}
+                    </div>
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-8 border border-gray-200 dark:border-zinc-700/50">
-                <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-2xl font-bold text-zinc-900 dark:text-white">Projetos por Período</h2>
-                    <div className="flex items-center gap-2">
+              <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-4 sm:p-8 border border-gray-200 dark:border-zinc-700/50">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
+                    <h2 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-white">Projetos por Período</h2>
+                    <div className="flex flex-wrap items-center gap-2">
                         <button
                             onClick={() => downloadChartData(periodChartData, 'Projetos_por_Periodo')}
                             className="flex items-center gap-2 text-xs font-bold bg-gray-100 dark:bg-zinc-700 text-gray-700 dark:text-gray-300 px-3 py-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-zinc-600 transition-colors"
@@ -1197,9 +1225,14 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                         <span className="text-xs text-gray-500 dark:text-gray-400">Filtrado</span>
                     </div>
                 </div>
-                <div className="h-64 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={periodChartData}>
+                <div className="overflow-x-auto pb-2">
+                    <div className="h-64 min-w-[720px] w-full">
+                      {!chartsReady ? (
+                        <div className="flex h-full items-center justify-center rounded-lg bg-gray-50 text-sm text-gray-500 dark:bg-zinc-700/30 dark:text-gray-400">
+                          Carregando gráfico...
+                        </div>
+                      ) : (
+                      <BarChart width={720} height={256} data={periodChartData}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme === 'dark' ? '#3f3f46' : '#e5e7eb'} />
                             <XAxis
                                 dataKey="name"
@@ -1222,13 +1255,14 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                             />
                             <Bar dataKey="value" fill="#99cc00" radius={[4, 4, 0, 0]} />
                         </BarChart>
-                    </ResponsiveContainer>
+                      )}
+                    </div>
                 </div>
               </div>
 
-              <div id="audit-logs-section" className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-8 border border-gray-200 dark:border-zinc-700/50 hover:border-accent/30 transition-all duration-300 h-[34rem] overflow-hidden flex flex-col">
-                <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-2xl font-bold text-zinc-900 dark:text-white">Auditoria de Login</h2>
+              <div id="audit-logs-section" className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-4 sm:p-8 border border-gray-200 dark:border-zinc-700/50 hover:border-accent/30 transition-all duration-300 h-[28rem] sm:h-[34rem] overflow-hidden flex flex-col">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+                    <h2 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-white">Auditoria de Login</h2>
                     <button
                         onClick={downloadAuditLogs}
                         className="flex items-center gap-2 text-xs font-bold bg-accent/10 text-accent px-3 py-1.5 rounded-md hover:bg-accent/20 transition-colors"
@@ -1246,21 +1280,21 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                     </div>
                 )}
 
-                <div className="space-y-4 flex-1 min-h-0 overflow-y-auto pr-2">
+                <div className="space-y-4 flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-2">
                     {accessLogs.length > 0 ? (
                         accessLogs.map(log => (
-                            <div key={log.id} className="p-4 bg-gray-50 dark:bg-zinc-700/30 rounded-lg border-l-4 border-accent">
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <p className="font-bold text-sm text-zinc-800 dark:text-gray-200">{log.userEmail}</p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            <div key={log.id} className="p-3 sm:p-4 bg-gray-50 dark:bg-zinc-700/30 rounded-lg border-l-4 border-accent min-w-0">
+                                <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start min-w-0">
+                                    <div className="min-w-0">
+                                        <p className="font-bold text-sm text-zinc-800 dark:text-gray-200 break-words">{log.userEmail}</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 break-words">
                                             <span className="font-semibold text-accent">{getAuditActionLabel(log.action)}:</span> {log.details || 'Visualizou Painel Admin'}
                                         </p>
                                         {log.version && (
                                             <p className="text-[9px] text-gray-400 mt-0.5">Versão: {log.version}</p>
                                         )}
                                     </div>
-                                    <span className="text-[10px] font-bold text-gray-400 uppercase">
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase whitespace-nowrap sm:text-right">
                                         {formatTimestamp(log.timestamp)}
                                     </span>
                                 </div>

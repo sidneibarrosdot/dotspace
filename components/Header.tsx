@@ -27,14 +27,14 @@ const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, isLoggedIn, onNavig
           <div className="flex items-center gap-2">
             <button 
               onClick={onNavigateToAdmin} 
-              className="text-sm font-bold bg-gray-200 dark:bg-zinc-700 px-4 py-2 rounded-md hover:bg-gray-300 dark:hover:bg-zinc-600 transition-colors"
+              className="text-sm font-bold bg-gray-200 dark:bg-zinc-700 px-4 py-2 min-h-11 rounded-md hover:bg-gray-300 dark:hover:bg-zinc-600 transition-colors"
             >
               {isLoggedIn ? 'Administrar' : 'Acesso Admin'}
             </button>
             {isLoggedIn && onLogout && (
               <button 
                 onClick={onLogout} 
-                className="text-sm font-bold bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-4 py-2 rounded-md hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
+                className="text-sm font-bold bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-4 py-2 min-h-11 rounded-md hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
               >
                 Sair
               </button>
