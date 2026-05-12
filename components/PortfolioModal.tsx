@@ -39,23 +39,26 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
+      userId: auth.currentUser?.uid ? '[redacted]' : undefined,
+      email: '[redacted]',
       emailVerified: auth.currentUser?.emailVerified,
       isAnonymous: auth.currentUser?.isAnonymous,
       tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData.map(provider => ({
-        providerId: provider.providerId,
-        displayName: provider.displayName,
-        email: provider.email,
-        photoUrl: provider.photoURL
-      })) || []
+      providerInfo: []
     },
     operationType,
     path
   }
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+  console.error('Firestore Error: ', JSON.stringify({
+    error: errInfo.error,
+    operationType: errInfo.operationType,
+    path: errInfo.path,
+  }));
+  throw new Error(JSON.stringify({
+    error: errInfo.error,
+    operationType: errInfo.operationType,
+    path: errInfo.path,
+  }));
 }
 
 interface PortfolioModalProps {
@@ -63,6 +66,7 @@ interface PortfolioModalProps {
   onClose: () => void;
   isCreating?: boolean;
   isLoggedIn?: boolean;
+  manualInteractionsEnabled?: boolean;
   user?: User | null;
   onUpdate?: (item: PortfolioItem) => void;
   onAdd?: (item: PortfolioItem) => void;
@@ -193,7 +197,7 @@ const EditableField = ({
     return isArray ? <DetailList title={label} items={items} /> : <DetailItem label={label} value={value} />;
 };
 
-const PortfolioModal: React.FC<PortfolioModalProps> = ({ item, onClose, isCreating = false, isLoggedIn = false, user = null, onUpdate, onAdd, onDelete, onToggleFavorite, isFavorited, onLike, isLiked, theme }) => {
+const PortfolioModal: React.FC<PortfolioModalProps> = ({ item, onClose, isCreating = false, isLoggedIn = false, manualInteractionsEnabled = true, user = null, onUpdate, onAdd, onDelete, onToggleFavorite, isFavorited, onLike, isLiked, theme }) => {
     const [isEditing, setIsEditing] = useState(isCreating);
     const [editableItem, setEditableItem] = useState<PortfolioItem>(item);
     const [isSaving, setIsSaving] = useState(false);
@@ -229,6 +233,10 @@ const PortfolioModal: React.FC<PortfolioModalProps> = ({ item, onClose, isCreati
     const modalTitle = isCreating ? "Adicionar Novo Projeto" : isEditing ? "Editar Projeto" : item.Projeto;
 
     const handleEditToggle = () => {
+        if (!manualInteractionsEnabled) {
+            setSaveError('Interações manuais desativadas pelo administrador.');
+            return;
+        }
         if (isEditing) {
             setEditableItem(item); // Discard changes if canceling
         }
@@ -243,6 +251,10 @@ const PortfolioModal: React.FC<PortfolioModalProps> = ({ item, onClose, isCreati
     };
 
     const handleSave = async () => {
+        if (!manualInteractionsEnabled) {
+            setSaveError('Interações manuais desativadas pelo administrador.');
+            return;
+        }
         setSaveError('');
         if (!editableItem.Projeto?.trim() || !editableItem.Cliente?.trim()) {
             setSaveError("Nome do projeto e Cliente são obrigatórios.");
@@ -298,10 +310,18 @@ const PortfolioModal: React.FC<PortfolioModalProps> = ({ item, onClose, isCreati
     };
     
     const handleDeleteInitiate = () => {
+        if (!manualInteractionsEnabled) {
+            setSaveError('Interações manuais desativadas pelo administrador.');
+            return;
+        }
         setIsConfirmingDelete(true);
     };
 
     const handleConfirmDelete = async () => {
+        if (!manualInteractionsEnabled) {
+            setSaveError('Interações manuais desativadas pelo administrador.');
+            return;
+        }
         if (!item.id || !onDelete) return;
         setIsDeleting(true);
         try {
@@ -404,9 +424,14 @@ const PortfolioModal: React.FC<PortfolioModalProps> = ({ item, onClose, isCreati
                                 ) : (
                                     <h2 id="modal-title" className="text-3xl font-bold text-zinc-900 dark:text-white">{modalTitle}</h2>
                                 )}
+                                {!manualInteractionsEnabled && !isCreating && (
+                                    <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+                                        Interações manuais desativadas pelo administrador
+                                    </p>
+                                )}
                              </div>
                             
-                            {isLoggedIn && !isCreating && (
+                            {isLoggedIn && !isCreating && manualInteractionsEnabled && (
                                 <div className="flex items-center gap-2 ml-4 flex-shrink-0">
                                     <button 
                                         onClick={handleEditToggle} 
@@ -497,7 +522,7 @@ const PortfolioModal: React.FC<PortfolioModalProps> = ({ item, onClose, isCreati
                             </div>
                         </div>
 
-                        {(isEditing || isConfirmingDelete) ? (
+                        {(isEditing || isConfirmingDelete) && manualInteractionsEnabled ? (
                             <div className="pt-8 flex flex-col items-end gap-3">
                                 {saveError && <p className="text-sm text-red-500 w-full text-right">{saveError}</p>}
                                 <div className="flex w-full items-center justify-between">
@@ -549,6 +574,10 @@ const PortfolioModal: React.FC<PortfolioModalProps> = ({ item, onClose, isCreati
                                         </div>
                                     )}
                                 </div>
+                            </div>
+                        ) : isEditing || isConfirmingDelete ? (
+                            <div className="pt-8">
+                                {saveError && <p className="text-sm text-red-500 text-right">{saveError}</p>}
                             </div>
                         ) : null}
                     </div>

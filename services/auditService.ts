@@ -7,6 +7,10 @@ import { User } from 'firebase/auth';
 export const APP_VERSION = '1.0.6';
 
 export const logAudit = async (action: string, details: string, userOverride?: User | null) => {
+    if (action !== 'LOGIN') {
+        return;
+    }
+
     const user = userOverride !== undefined ? userOverride : auth.currentUser;
     if (!user) return;
 
@@ -20,9 +24,5 @@ export const logAudit = async (action: string, details: string, userOverride?: U
         });
     } catch (error) {
         console.error("Error logging audit:", error);
-        if (user) {
-            console.error("User UID:", user.uid);
-            console.error("User Email:", user.email);
-        }
     }
 };

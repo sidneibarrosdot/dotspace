@@ -5,7 +5,6 @@ import { db, auth } from '../firebase';
 import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, writeBatch, doc, onSnapshot } from 'firebase/firestore';
 import { User } from 'firebase/auth';
 import type { PortfolioItem } from '../types';
-import { logAudit, APP_VERSION } from '../services/auditService';
 
 enum OperationType {
   CREATE = 'create',
@@ -39,23 +38,26 @@ const handleFirestoreError = (error: unknown, operationType: OperationType, path
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
+      userId: auth.currentUser?.uid ? '[redacted]' : undefined,
+      email: '[redacted]',
       emailVerified: auth.currentUser?.emailVerified,
       isAnonymous: auth.currentUser?.isAnonymous,
       tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData.map(provider => ({
-        providerId: provider.providerId,
-        displayName: provider.displayName,
-        email: provider.email,
-        photoUrl: provider.photoURL
-      })) || []
+      providerInfo: []
     },
     operationType,
     path
   };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+  console.error('Firestore Error: ', JSON.stringify({
+    error: errInfo.error,
+    operationType: errInfo.operationType,
+    path: errInfo.path,
+  }));
+  throw new Error(JSON.stringify({
+    error: errInfo.error,
+    operationType: errInfo.operationType,
+    path: errInfo.path,
+  }));
 };
 
 // PapaParse and XLSX are loaded from a CDN script in index.html
@@ -80,6 +82,8 @@ interface AdminScreenProps {
   onLogout: () => void;
   onNavigate: () => void;
   theme: 'light' | 'dark';
+  manualInteractionsEnabled: boolean;
+  onToggleManualInteractions: (enabled: boolean) => Promise<void> | void;
 }
 
 interface UploadLog {
@@ -89,6 +93,8 @@ interface UploadLog {
         nanoseconds: number;
     } | null;
     fileName: string;
+    userEmail?: string;
+    details?: string;
 }
 
 interface AccessLog {
@@ -223,7 +229,7 @@ const ArrowLeftIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
     </svg>
 );
 
-const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, theme }) => {
+const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, theme, manualInteractionsEnabled, onToggleManualInteractions }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
@@ -234,15 +240,13 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
   const [statsLoading, setStatsLoading] = useState(true);
   const [isLogsVisible, setIsLogsVisible] = useState(false);
   const [isAccessLogsVisible, setIsAccessLogsVisible] = useState(false);
-  const [isConfirmingClearAll, setIsConfirmingClearAll] = useState(false);
-  const [confirmText, setConfirmText] = useState('');
-  const [isClearing, setIsClearing] = useState(false);
   const [chartData, setChartData] = useState<any[]>([]);
   const [periodChartData, setPeriodChartData] = useState<any[]>([]);
   const [chartFilter, setChartFilter] = useState<'client' | 'team' | 'methodology' | 'media'>('client');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [qualityAudit, setQualityAudit] = useState<{ id: string, name: string, issues: string[] }[]>([]);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
 
   const fetchAuditLogs = async () => {
     const path = 'auditLogs';
@@ -251,7 +255,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
       const q = query(logsCollection, orderBy('timestamp', 'desc'));
 
       const snapshot = await getDocs(q);
-      const allowedActions = ['CREATE', 'UPDATE', 'DELETE', 'UPLOAD', 'LOGIN', 'CLEAR_ALL', 'SYNC_SHEETS_SMART', 'SYNC_API_SMART'];
+      const allowedActions = ['LOGIN'];
       const logList = snapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data() } as AccessLog))
         .filter(log => allowedActions.includes(log.action));
@@ -700,10 +704,10 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
 
         await addDoc(collection(db, 'uploadLogs'), {
             fileName: selectedFile.name,
+            userEmail: user.email,
+            details: `Substituiu portfólio via arquivo: ${selectedFile.name}`,
             timestamp: serverTimestamp(),
         });
-
-        await logAudit('UPLOAD', `Substituiu portfólio via arquivo: ${selectedFile.name}`, user);
 
         await fetchLogs();
         await fetchStats();
@@ -800,45 +804,6 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
     return date.toLocaleString('pt-BR');
   };
 
-  const handleClearAllProjects = async () => {
-    setIsClearing(true);
-    setUploadStatus('processing');
-    setMessage('Excluindo todos os projetos...');
-    const path = 'projects';
-    try {
-        const projectsCollectionRef = collection(db, path);
-        const querySnapshot = await getDocs(projectsCollectionRef);
-
-        if (querySnapshot.empty) {
-            setMessage('Nenhum projeto para excluir.');
-            setUploadStatus('idle');
-            setIsClearing(false);
-            setIsConfirmingClearAll(false);
-            return;
-        }
-
-        const batch = writeBatch(db);
-        querySnapshot.forEach(doc => {
-            batch.delete(doc.ref);
-        });
-        await batch.commit();
-        await logAudit('CLEAR_ALL', `Excluiu todos os ${querySnapshot.size} projetos da base de dados`, user);
-
-        setMessage(`${querySnapshot.size} projetos foram excluídos com sucesso.`);
-        setUploadStatus('success');
-        await fetchStats(); // Refresh stats
-
-    } catch (error) {
-        console.error("Error clearing all projects: ", error);
-        setMessage('Falha ao excluir os projetos. Tente novamente.');
-        setUploadStatus('error');
-        handleFirestoreError(error, OperationType.DELETE, path);
-    } finally {
-        setIsClearing(false);
-        setIsConfirmingClearAll(false);
-    }
-  };
-
   const renderStat = (label: string, value: string | number | null) => (
     <div className="min-w-0 p-4 bg-gray-50 dark:bg-zinc-700/50 rounded-lg">
       <p className="text-sm text-gray-500 dark:text-gray-400">{label}</p>
@@ -879,6 +844,17 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
     document.body.removeChild(link);
   };
 
+  const latestSheetSyncLog = uploadLogs.find((log) =>
+    log.userEmail === 'sheets-sync@dotgroup.com.br' || log.fileName === 'SYNC PLANILHA'
+  );
+  const getUploadDisplayTitle = (log: UploadLog) => {
+    if (log.userEmail === 'sheets-sync@dotgroup.com.br' || log.fileName === 'SYNC PLANILHA') {
+      return 'Sincronização Inteligente';
+    }
+
+    return log.fileName;
+  };
+
   return (
       <div className="min-h-screen">
         <header className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm border-b border-gray-200 dark:border-zinc-700/50">
@@ -910,9 +886,9 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
         </header>
 
         <main className="container mx-auto p-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-8 max-w-7xl mx-auto items-stretch">
             {/* Column 1: Management and History */}
-            <div className="space-y-8">
+            <div className="space-y-8 flex h-full flex-col">
               <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-8 border border-gray-200 dark:border-zinc-700/50">
                 <h1 className="text-2xl font-bold mb-4 text-zinc-900 dark:text-white">Estatísticas do Portfólio</h1>
                 {statsLoading ? (
@@ -931,12 +907,39 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
               </div>
 
               <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-8 border border-gray-200 dark:border-zinc-700/50">
-                <h1 className="text-2xl font-bold mb-2 text-zinc-900 dark:text-white">Gerenciamento Rápido</h1>
-                <p className="text-gray-600 dark:text-gray-400 mb-6">Para agilidade no dia a dia, gerencie os projetos individualmente na página principal.</p>
-                <ul className="list-disc list-inside space-y-2 text-gray-700 dark:text-gray-300">
-                  <li><span className="font-semibold">Adicionar:</span> Use o botão flutuante (+) para criar um novo projeto.</li>
-                  <li><span className="font-semibold">Editar & Excluir:</span> Clique em qualquer projeto para abrir os detalhes e encontrar as opções de edição.</li>
-                </ul>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h1 className="text-2xl font-bold mb-2 text-zinc-900 dark:text-white">Interações Manuais</h1>
+                    <p className="text-gray-600 dark:text-gray-400">
+                      Ative ou desative a criação, edição e exclusão direta no sistema.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setIsSavingSettings(true);
+                      try {
+                        await onToggleManualInteractions(!manualInteractionsEnabled);
+                        setMessage(manualInteractionsEnabled ? 'Interações manuais desativadas.' : 'Interações manuais ativadas.');
+                        setUploadStatus('success');
+                      } catch (error) {
+                        console.error('Error updating manual interactions setting:', error);
+                        setMessage('Não foi possível atualizar a configuração.');
+                        setUploadStatus('error');
+                      } finally {
+                        setIsSavingSettings(false);
+                      }
+                    }}
+                    disabled={isSavingSettings}
+                    className={`inline-flex min-w-[140px] items-center justify-center rounded-full px-4 py-2 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                      manualInteractionsEnabled
+                        ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300'
+                        : 'bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-300'
+                    }`}
+                  >
+                    {isSavingSettings ? 'Salvando...' : (manualInteractionsEnabled ? 'Ativadas' : 'Desativadas')}
+                  </button>
+                </div>
               </div>
 
               <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-8 border border-green-500/30 dark:border-green-500/50 mb-8">
@@ -951,7 +954,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                   O banco de dados está conectado e sendo atualizado em tempo real através da planilha oficial no Google Sheets. Qualquer alteração feita na planilha será refletida aqui automaticamente.
                 </p>
                 <a
-                  href="https://docs.google.com/spreadsheets/d/1CBjAmCleku5d1pi3ALpxGGfSWbI_fm9f/edit?usp=sharing"
+                  href="https://docs.google.com/spreadsheets/d/1LEGUYM0OmxQ3sT1U0YZzZP9kVA7aWIX-HVHDco-PIXk/edit?gid=1693495370#gid=1693495370"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 text-sm font-bold text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 transition-colors bg-green-50 dark:bg-green-900/20 px-4 py-2 rounded-md"
@@ -963,77 +966,108 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                 </a>
               </div>
 
-              <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-8 border border-gray-200 dark:border-zinc-700/50">
-                <h1 className="text-2xl font-bold mb-2 text-zinc-900 dark:text-white">Atualização Manual (Backup)</h1>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">Em caso de falha na sincronização, faça o upload de um arquivo para <span className="font-bold">substituir completamente</span> todos os projetos.</p>
+              {manualInteractionsEnabled && (
+                <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-8 border border-gray-200 dark:border-zinc-700/50">
+                  <h1 className="text-2xl font-bold mb-2 text-zinc-900 dark:text-white">Atualização Manual (Backup)</h1>
+                  <p className="text-gray-600 dark:text-gray-400 mb-4">Em caso de falha na sincronização, faça o upload de um arquivo para <span className="font-bold">substituir completamente</span> todos os projetos.</p>
 
-                <div className="mb-6">
-                  <button
-                    onClick={downloadTemplate}
-                    className="flex items-center gap-2 text-sm font-bold text-accent hover:text-accent-dark transition-colors"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                    </svg>
-                    Baixar Modelo de Planilha
-                  </button>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <label htmlFor="file-upload" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Selecione o arquivo
-                    </label>
-                    <label htmlFor="file-upload" className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 dark:border-zinc-600 border-dashed rounded-md cursor-pointer hover:border-accent hover:bg-gray-50 dark:hover:bg-zinc-700/30 transition-all group">
-                      <div className="space-y-1 text-center">
-                        <UploadIcon className="mx-auto h-12 w-12 text-gray-400 group-hover:text-accent transition-colors" />
-                        <div className="flex text-sm text-gray-600 dark:text-gray-400">
-                          <span className="relative rounded-md font-medium text-accent group-hover:text-accent-dark focus-within:outline-none">
-                            Carregar um arquivo
-                          </span>
-                          <p className="pl-1">ou arraste e solte</p>
-                        </div>
-                        <p className="text-xs text-gray-500 dark:text-gray-500">
-                          CSV, XLSX, XLS
-                        </p>
-                        <input id="file-upload" name="file-upload" type="file" className="sr-only" onChange={handleFileChange} accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" />
-                      </div>
-                    </label>
-                    {selectedFile && <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Arquivo selecionado: {selectedFile.name}</p>}
+                  <div className="mb-6">
+                    <button
+                      onClick={downloadTemplate}
+                      className="flex items-center gap-2 text-sm font-bold text-accent hover:text-accent-dark transition-colors"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                      </svg>
+                      Baixar Modelo de Planilha
+                    </button>
                   </div>
 
-                  <button
-                    onClick={handleProcessFile}
-                    disabled={!selectedFile || uploadStatus === 'processing'}
-                    className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white dark:text-zinc-900 bg-accent hover:bg-accent-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent transition-colors disabled:bg-gray-400 dark:disabled:bg-zinc-600 disabled:cursor-not-allowed"
-                  >
-                    {uploadStatus === 'processing' ? 'Processando...' : 'Substituir Portfólio'}
-                  </button>
-
-                  {message && (
-                    <div className={`text-sm text-center p-3 rounded-md ${
-                      uploadStatus === 'success' ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300' :
-                      uploadStatus === 'error' ? 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-300' :
-                      'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300'
-                    }`}>
-                      {message}
+                  <div className="space-y-4">
+                    <div>
+                      <label htmlFor="file-upload" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Selecione o arquivo
+                      </label>
+                      <label htmlFor="file-upload" className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 dark:border-zinc-600 border-dashed rounded-md cursor-pointer hover:border-accent hover:bg-gray-50 dark:hover:bg-zinc-700/30 transition-all group">
+                        <div className="space-y-1 text-center">
+                          <UploadIcon className="mx-auto h-12 w-12 text-gray-400 group-hover:text-accent transition-colors" />
+                          <div className="flex text-sm text-gray-600 dark:text-gray-400">
+                            <span className="relative rounded-md font-medium text-accent group-hover:text-accent-dark focus-within:outline-none">
+                              Carregar um arquivo
+                            </span>
+                            <p className="pl-1">ou arraste e solte</p>
+                          </div>
+                          <p className="text-xs text-gray-500 dark:text-gray-500">
+                            CSV, XLSX, XLS
+                          </p>
+                          <input id="file-upload" name="file-upload" type="file" className="sr-only" onChange={handleFileChange} accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" />
+                        </div>
+                      </label>
+                      {selectedFile && <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Arquivo selecionado: {selectedFile.name}</p>}
                     </div>
-                  )}
-                </div>
-              </div>
 
-              <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-8 border border-gray-200 dark:border-zinc-700/50">
-                <div className="flex flex-col space-y-4">
+                    <button
+                      onClick={handleProcessFile}
+                      disabled={!selectedFile || uploadStatus === 'processing'}
+                      className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white dark:text-zinc-900 bg-accent hover:bg-accent-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent transition-colors disabled:bg-gray-400 dark:disabled:bg-zinc-600 disabled:cursor-not-allowed"
+                    >
+                      {uploadStatus === 'processing' ? 'Processando...' : 'Substituir Portfólio'}
+                    </button>
+
+                    {message && (
+                      <div className={`text-sm text-center p-3 rounded-md ${
+                        uploadStatus === 'success' ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300' :
+                        uploadStatus === 'error' ? 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-300' :
+                        'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300'
+                      }`}>
+                        {message}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-8 border border-gray-200 dark:border-zinc-700/50 h-[34rem] overflow-hidden flex flex-col">
+                <div className="flex flex-col space-y-4 flex-1 min-h-0">
                     <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Histórico de Uploads</h2>
-                    <div className="max-h-64 overflow-y-auto pr-2">
+                    {latestSheetSyncLog && (
+                      <div className="rounded-md border border-green-500/30 bg-green-500/10 p-3 text-sm">
+                        <p className="font-semibold text-green-700 dark:text-green-300">Última sync da planilha</p>
+                        <p className="mt-1 text-zinc-800 dark:text-gray-200 font-medium">
+                          {latestSheetSyncLog.details || latestSheetSyncLog.fileName}
+                        </p>
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          {formatTimestamp(latestSheetSyncLog.timestamp)}
+                        </p>
+                      </div>
+                    )}
+                    <div className="flex-1 min-h-0 overflow-y-auto pr-2">
                         {uploadLogs.length > 0 ? (
                           uploadLogs.map((log) => (
-                            <div key={log.id} className="flex justify-between items-center p-3 mb-2 bg-gray-50 dark:bg-zinc-700/50 rounded-md">
-                              <div>
-                                <p className="font-semibold text-sm text-zinc-800 dark:text-gray-200">{log.fileName}</p>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">{formatTimestamp(log.timestamp)}</p>
+                            <div key={log.id} className="flex items-start justify-between gap-3 p-3 mb-2 bg-gray-50 dark:bg-zinc-700/50 rounded-md">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <p className="font-semibold text-sm text-zinc-800 dark:text-gray-200">{getUploadDisplayTitle(log)}</p>
+                                  {(log.userEmail === 'sheets-sync@dotgroup.com.br' || log.fileName === 'SYNC PLANILHA') && (
+                                    <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-green-700 dark:bg-green-900/30 dark:text-green-300">
+                                      Sync Planilha
+                                    </span>
+                                  )}
+                                </div>
+                                {log.userEmail && (
+                                  <p className="text-xs text-gray-500 dark:text-gray-400 break-all">{log.userEmail}</p>
+                                )}
+                                {log.details && (
+                                  <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 leading-snug break-words">
+                                    <span className="font-semibold text-accent">{log.userEmail === 'sheets-sync@dotgroup.com.br' || log.fileName === 'SYNC PLANILHA' ? 'SYNC PLANILHA:' : 'Detalhe:'}</span>{' '}
+                                    {log.details}
+                                  </p>
+                                )}
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{formatTimestamp(log.timestamp)}</p>
                               </div>
-                              <span className="text-xs font-medium bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300 px-2 py-1 rounded-full">Sucesso</span>
+                              <span className="text-xs font-medium bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300 px-2 py-1 rounded-full shrink-0">
+                                Sucesso
+                              </span>
                             </div>
                           ))
                         ) : (
@@ -1043,50 +1077,10 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                 </div>
               </div>
 
-                <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-8 border border-red-500/30 dark:border-red-500/50">
-                    <h2 className="text-2xl font-bold mb-2 text-red-600 dark:text-red-400">Zona de Perigo</h2>
-                    <p className="text-gray-600 dark:text-gray-400 mb-6">Esta ação não pode ser desfeita. Tenha certeza absoluta antes de prosseguir.</p>
-
-                    {isConfirmingClearAll ? (
-                        <div className="flex flex-col gap-4">
-                            <p className="text-sm font-semibold text-red-600 dark:text-red-400">Tem certeza que deseja excluir todos os projetos? Esta ação é irreversível.</p>
-                            <input
-                                type="text"
-                                placeholder="Digite EXCLUIR para confirmar"
-                                value={confirmText}
-                                onChange={(e) => setConfirmText(e.target.value)}
-                                className="w-full text-sm bg-gray-50 dark:bg-zinc-700 border border-red-300 dark:border-red-900/50 rounded-md p-2 focus:ring-red-500 focus:border-red-500"
-                            />
-                            <div className="flex justify-end gap-3">
-                                <button
-                                    onClick={() => { setIsConfirmingClearAll(false); setConfirmText(''); }}
-                                    disabled={isClearing}
-                                    className="text-sm font-bold bg-gray-200 dark:bg-zinc-700 px-4 py-2 rounded-md hover:bg-gray-300 dark:hover:bg-zinc-600 transition-colors"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    onClick={handleClearAllProjects}
-                                    disabled={isClearing || confirmText !== 'EXCLUIR'}
-                                    className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-300 disabled:opacity-50"
-                                >
-                                    {isClearing ? 'Excluindo...' : 'Confirmar Exclusão'}
-                                </button>
-                            </div>
-                        </div>
-                    ) : (
-                        <button
-                            onClick={() => setIsConfirmingClearAll(true)}
-                            className="w-full bg-red-600/10 dark:bg-red-900/20 text-red-700 dark:text-red-400 hover:bg-red-600/20 dark:hover:bg-red-900/40 font-bold py-2 px-4 rounded-md transition-colors"
-                        >
-                            Limpar Todos os Projetos
-                        </button>
-                    )}
-                </div>
             </div>
 
             {/* Column 2: Charts and Audit */}
-            <div className="space-y-8">
+            <div className="space-y-8 flex h-full flex-col">
               <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-8 border border-gray-200 dark:border-zinc-700/50">
                 <div className="flex items-center justify-between mb-4">
                     <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">Filtros de Período</h1>
@@ -1232,9 +1226,9 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                 </div>
               </div>
 
-              <div id="audit-logs-section" className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-8 border border-gray-200 dark:border-zinc-700/50 hover:border-accent/30 transition-all duration-300">
+              <div id="audit-logs-section" className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-8 border border-gray-200 dark:border-zinc-700/50 hover:border-accent/30 transition-all duration-300 h-[34rem] overflow-hidden flex flex-col">
                 <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-2xl font-bold text-zinc-900 dark:text-white">Auditoria de Ações</h2>
+                    <h2 className="text-2xl font-bold text-zinc-900 dark:text-white">Auditoria de Login</h2>
                     <button
                         onClick={downloadAuditLogs}
                         className="flex items-center gap-2 text-xs font-bold bg-accent/10 text-accent px-3 py-1.5 rounded-md hover:bg-accent/20 transition-colors"
@@ -1244,7 +1238,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                         Download Auditoria
                     </button>
                 </div>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Monitoramento de ações feitas no painel e das sincronizações automáticas vindas da planilha.</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Registro de acessos autorizados ao painel.</p>
 
                 {logsError && (
                     <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-xs rounded-md border border-red-200 dark:border-red-800">
@@ -1252,7 +1246,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                     </div>
                 )}
 
-                <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+                <div className="space-y-4 flex-1 min-h-0 overflow-y-auto pr-2">
                     {accessLogs.length > 0 ? (
                         accessLogs.map(log => (
                             <div key={log.id} className="p-4 bg-gray-50 dark:bg-zinc-700/30 rounded-lg border-l-4 border-accent">
@@ -1273,7 +1267,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                             </div>
                         ))
                     ) : (
-                        <p className="text-center text-gray-500 dark:text-gray-400 py-4">Nenhuma ação registrada.</p>
+                        <p className="text-center text-gray-500 dark:text-gray-400 py-4">Nenhum login registrado.</p>
                     )}
                 </div>
               </div>

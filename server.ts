@@ -197,15 +197,9 @@ async function startServer() {
 
       // Log the sync
       await firestore.collection('uploadLogs').add({
-        fileName: 'Automatic Smart Sync (API)',
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
-      });
-
-      await firestore.collection('auditLogs').add({
+        fileName: 'SYNC API',
         userEmail: 'api-sync@dotgroup.com.br',
-        action: 'SYNC_API_SMART',
-        details: `Sincronização automática via API: ${updatedCount} atualizados/criados, ${deletedCount} removidos, ${skippedRows} linhas ignoradas/deduplicadas`,
-        version: '1.0.7',
+        details: `Atualizou ${updatedCount}, removeu ${deletedCount} e ignorou/deduplicou ${skippedRows} (Smart Sync)`,
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
       });
 

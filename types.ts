@@ -43,3 +43,12 @@ export interface Like {
   projectId: string;
   timestamp: string;
 }
+
+export type AppEnvironment = 'production' | 'test';
+
+export interface AppSettings {
+  manualInteractionsEnabled: boolean;
+  environment: AppEnvironment;
+  updatedAt?: string;
+  updatedBy?: string;
+}

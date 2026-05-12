@@ -251,6 +251,7 @@ interface PortfolioScreenProps {
     onLogout: () => void;
     theme: 'light' | 'dark';
     toggleTheme: () => void;
+    manualInteractionsEnabled: boolean;
 }
 
 const BLANK_PROJECT: PortfolioItem = {
@@ -272,7 +273,7 @@ const BLANK_PROJECT: PortfolioItem = {
     tags: [],
 };
 
-const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onNavigateToAdmin, onLogout, theme, toggleTheme }) => {
+const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onNavigateToAdmin, onLogout, theme, toggleTheme, manualInteractionsEnabled }) => {
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -667,6 +668,11 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
   };
 
   const handleOpenCreateModal = () => {
+    if (!manualInteractionsEnabled) {
+      setShareFeedback('Interações manuais desativadas pelo administrador.');
+      window.setTimeout(() => setShareFeedback(''), 3000);
+      return;
+    }
     setSelectedItem(BLANK_PROJECT);
     setIsCreatingNewItem(true);
   };
@@ -1357,7 +1363,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
         )}
       </main>
 
-      {isLoggedIn && (
+      {isLoggedIn && manualInteractionsEnabled && (
         <div className="fixed bottom-8 right-8 group z-50">
           <div className="absolute bottom-full right-0 mb-2 px-3 py-1 bg-zinc-800 dark:bg-zinc-700 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap pointer-events-none">
             Adicionar manualmente uma PMV
@@ -1379,6 +1385,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
           theme={theme}
           isCreating={isCreatingNewItem}
           isLoggedIn={isLoggedIn}
+          manualInteractionsEnabled={manualInteractionsEnabled}
           user={user}
           onUpdate={handleUpdateProject}
           onAdd={handleProjectAdded}

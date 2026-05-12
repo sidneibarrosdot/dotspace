@@ -3,10 +3,10 @@ import LoginScreen from './screens/LoginScreen';
 import AdminScreen from './screens/AdminScreen';
 import PortfolioScreen from './screens/PortfolioScreen';
 import ErrorBoundary from './components/ErrorBoundary';
-import { auth, db } from './firebase';
+import { auth } from './firebase';
 import { logAudit } from './services/auditService';
+import { DEFAULT_APP_SETTINGS, subscribeToAppSettings, updateAppSettings } from './services/appSettingsService';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
-import { doc, getDocFromServer } from 'firebase/firestore';
 
 export type View = 'portfolio' | 'login' | 'admin';
 export type Theme = 'light' | 'dark';
@@ -19,6 +19,7 @@ const App: React.FC = () => {
     const savedTheme = localStorage.getItem('portfolio-theme') as Theme;
     return savedTheme || 'dark';
   });
+  const [appSettings, setAppSettings] = useState(DEFAULT_APP_SETTINGS);
 
   const toggleTheme = () => {
     setTheme((prevTheme) => (prevTheme === 'light' ? 'dark' : 'light'));
@@ -34,15 +35,12 @@ const App: React.FC = () => {
     localStorage.setItem('portfolio-theme', theme);
   }, [theme, currentView]);
 
-  const APP_VERSION = '1.0.6';
-
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
         const isAllowedEmail = currentUser?.email?.endsWith('@dotgroup.com.br');
 
         if (currentUser && isAllowedEmail) {
           setUser(currentUser);
-          console.log(`User logged in: ${currentUser.email} (UID: ${currentUser.uid})`);
           // If logged in, the main view is the portfolio
           logAudit('LOGIN', `Usuário logou: ${currentUser.email}`, currentUser);
           setCurrentView('portfolio');
@@ -53,11 +51,46 @@ const App: React.FC = () => {
           // If not logged in or unauthorized, stay on the login screen
           setUser(null);
           setCurrentView('login');
-        }
-        setAuthLoading(false);
-      });
+      }
+      setAuthLoading(false);
+    });
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setAppSettings(DEFAULT_APP_SETTINGS);
+      return;
+    }
+
+    const unsubscribe = subscribeToAppSettings((settings) => {
+      setAppSettings(settings);
+    });
+
+    return unsubscribe;
+  }, [user]);
+
+  const handleUpdateAppSettings = async (enabled: boolean) => {
+    const previousSettings = appSettings;
+    setAppSettings((prev) => ({
+      ...prev,
+      manualInteractionsEnabled: enabled,
+      environment: 'production',
+    }));
+
+    try {
+      await updateAppSettings(
+        {
+          manualInteractionsEnabled: enabled,
+          environment: 'production',
+        },
+        user?.email || null
+      );
+    } catch (error) {
+      setAppSettings(previousSettings);
+      throw error;
+    }
+  };
 
   const handleLoginSuccess = () => {
     // After successful login, go to the portfolio screen
@@ -93,10 +126,29 @@ const App: React.FC = () => {
     // If logged in, route between portfolio and admin
     switch (currentView) {
       case 'admin':
-        return <AdminScreen user={user} onLogout={handleLogout} onNavigate={() => navigateTo('portfolio')} theme={theme} />;
+        return (
+          <AdminScreen
+            user={user}
+            onLogout={handleLogout}
+            onNavigate={() => navigateTo('portfolio')}
+            theme={theme}
+            manualInteractionsEnabled={appSettings.manualInteractionsEnabled}
+            onToggleManualInteractions={handleUpdateAppSettings}
+          />
+        );
       case 'portfolio':
       default:
-        return <PortfolioScreen user={user} isLoggedIn={true} onNavigateToAdmin={() => navigateTo('admin')} onLogout={handleLogout} theme={theme} toggleTheme={toggleTheme} />;
+        return (
+          <PortfolioScreen
+            user={user}
+            isLoggedIn={true}
+            onNavigateToAdmin={() => navigateTo('admin')}
+            onLogout={handleLogout}
+            theme={theme}
+            toggleTheme={toggleTheme}
+            manualInteractionsEnabled={appSettings.manualInteractionsEnabled}
+          />
+        );
     }
   };
 

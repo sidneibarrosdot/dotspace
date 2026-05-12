@@ -259,18 +259,8 @@ function saveToFirestore(projects, token) {
     update: {
       name: resourcePathPrefix + "/uploadLogs/" + generateId(),
       fields: {
-        fileName: { stringValue: 'Sincronização Inteligente (Manteve IDs)' },
-        timestamp: { timestampValue: new Date().toISOString() }
-      }
-    }
-  });
-
-  writes.push({
-    update: {
-      name: resourcePathPrefix + "/auditLogs/" + generateId(),
-      fields: {
+        fileName: { stringValue: 'SYNC PLANILHA' },
         userEmail: { stringValue: 'sheets-sync@dotgroup.com.br' },
-        action: { stringValue: 'SYNC_SHEETS_SMART' },
         details: { stringValue: "Atualizou " + updatedCount + ", removeu " + deletedCount + " e ignorou/deduplicou " + skippedCount + " (Smart Sync)" },
         timestamp: { timestampValue: new Date().toISOString() }
       }
