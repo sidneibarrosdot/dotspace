@@ -2,7 +2,7 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# Banco PMVs DOT
+# dot.space
 
 Aplicacao React/Vite com servidor Express para o portfolio de PMVs DOT, integrada ao Firebase/Firestore e sincronizacao automatica via Google Sheets.
 

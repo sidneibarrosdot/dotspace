@@ -1,64 +1,130 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import LoginScreen from './screens/LoginScreen';
 import AdminScreen from './screens/AdminScreen';
 import PortfolioScreen from './screens/PortfolioScreen';
+import ProcessosScreen from './screens/ProcessosScreen';
+import TreinamentosScreen from './screens/TreinamentosScreen';
+import KRsScreen from './screens/KRsScreen';
+import ForumScreen from './screens/ForumScreen';
 import ErrorBoundary from './components/ErrorBoundary';
-import { auth } from './firebase';
+import PostLoginLoader from './components/PostLoginLoader';
+import { auth, firebaseReady } from './firebase';
 import { logAudit } from './services/auditService';
 import { DEFAULT_APP_SETTINGS, subscribeToAppSettings, updateAppSettings } from './services/appSettingsService';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 
-export type View = 'portfolio' | 'login' | 'admin';
+export type View = 'portfolio' | 'processos' | 'treinamentos' | 'krs' | 'forum' | 'login' | 'admin';
 export type Theme = 'light' | 'dark';
+
+const LOCAL_SESSION_KEY = 'dot-space.local-session';
+const GCP_LOGIN_ENABLED = false;
+
+const createLocalUser = (email: string, displayName: string): User =>
+  ({
+    uid: `local-${email.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'user'}`,
+    email,
+    displayName,
+    photoURL: null,
+    emailVerified: true,
+    isAnonymous: false,
+    providerId: 'local',
+  } as unknown as User);
+
+const loadLocalSession = (): User | null => {
+  try {
+    const raw = window.localStorage.getItem(LOCAL_SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { email?: string; displayName?: string } | null;
+    if (!parsed?.email || !parsed?.displayName) return null;
+    return createLocalUser(parsed.email, parsed.displayName);
+  } catch {
+    return null;
+  }
+};
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
-  const [currentView, setCurrentView] = useState<View>('login'); // Start at login until auth is confirmed
+  const [currentView, setCurrentView] = useState<View>('login');
   const [authLoading, setAuthLoading] = useState(true);
   const [theme, setTheme] = useState<Theme>(() => {
     const savedTheme = localStorage.getItem('portfolio-theme') as Theme;
     return savedTheme || 'dark';
   });
   const [appSettings, setAppSettings] = useState(DEFAULT_APP_SETTINGS);
+  const [postLoginLoading, setPostLoginLoading] = useState(false);
+  const [postLoginExiting, setPostLoginExiting] = useState(false);
+  const loginTransitionPlayedRef = useRef(false);
 
   const toggleTheme = () => {
     setTheme((prevTheme) => (prevTheme === 'light' ? 'dark' : 'light'));
   };
 
+  const startPostLoginTransition = (nextUser: User) => {
+    loginTransitionPlayedRef.current = true;
+    setPostLoginLoading(true);
+    setPostLoginExiting(false);
+    window.setTimeout(() => {
+      setPostLoginExiting(true);
+      window.setTimeout(() => {
+        setUser(nextUser);
+        setCurrentView('portfolio');
+        setPostLoginLoading(false);
+        setPostLoginExiting(false);
+      }, 700);
+    }, 2200);
+  };
+
   useEffect(() => {
     const root = window.document.documentElement;
-    if (theme === 'light' || currentView === 'login') {
-      root.classList.remove('dark');
-    } else {
+    if (theme === 'dark') {
       root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
     }
     localStorage.setItem('portfolio-theme', theme);
   }, [theme, currentView]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-        const isAllowedEmail = currentUser?.email?.endsWith('@dotgroup.com.br');
-
-        if (currentUser && isAllowedEmail) {
-          setUser(currentUser);
-          // If logged in, the main view is the portfolio
-          logAudit('LOGIN', `Usuário logou: ${currentUser.email}`, currentUser);
-          setCurrentView('portfolio');
-        } else {
-          if (currentUser) {
-            signOut(auth);
-          }
-          // If not logged in or unauthorized, stay on the login screen
-          setUser(null);
-          setCurrentView('login');
+    if (!firebaseReady) {
+      const savedUser = loadLocalSession();
+      if (savedUser) {
+        setUser(savedUser);
+        setCurrentView('portfolio');
+      } else {
+        setUser(null);
+        setCurrentView('login');
       }
       setAuthLoading(false);
+      return;
+    }
+
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      const isAllowedEmail = currentUser?.email?.endsWith('@dotgroup.com.br');
+
+      if (currentUser && isAllowedEmail) {
+        if (!loginTransitionPlayedRef.current) {
+          startPostLoginTransition(currentUser);
+          logAudit('LOGIN', `Usuário logou: ${currentUser.email}`, currentUser);
+        } else {
+          setUser(currentUser);
+          setCurrentView('portfolio');
+        }
+      } else {
+        if (currentUser) {
+          signOut(auth);
+        }
+        setUser(null);
+        setCurrentView('login');
+      }
+
+      setAuthLoading(false);
     });
+
     return unsubscribe;
   }, []);
 
   useEffect(() => {
-    if (!user) {
+    if (!firebaseReady || !user) {
       setAppSettings(DEFAULT_APP_SETTINGS);
       return;
     }
@@ -71,6 +137,15 @@ const App: React.FC = () => {
   }, [user]);
 
   const handleUpdateAppSettings = async (enabled: boolean) => {
+    if (!firebaseReady) {
+      setAppSettings((prev) => ({
+        ...prev,
+        manualInteractionsEnabled: enabled,
+        environment: 'production',
+      }));
+      return;
+    }
+
     const previousSettings = appSettings;
     setAppSettings((prev) => ({
       ...prev,
@@ -92,38 +167,106 @@ const App: React.FC = () => {
     }
   };
 
-  const handleLoginSuccess = () => {
-    // After successful login, go to the portfolio screen
-    setCurrentView('portfolio');
+  const handleLocalLogin = (email: string, displayName: string) => {
+    const nextUser = createLocalUser(email, displayName);
+    window.localStorage.setItem(
+      LOCAL_SESSION_KEY,
+      JSON.stringify({ email: nextUser.email, displayName: nextUser.displayName, uid: nextUser.uid })
+    );
+    startPostLoginTransition(nextUser);
   };
 
   const handleLogout = () => {
-    const userEmail = user?.email;
-    signOut(auth).then(() => {
-      // After logout, return to the login screen
+    if (!firebaseReady) {
+      window.localStorage.removeItem(LOCAL_SESSION_KEY);
+      loginTransitionPlayedRef.current = false;
+      setUser(null);
       setCurrentView('login');
-    }).catch(error => console.error('Logout error:', error));
+      return;
+    }
+
+    signOut(auth)
+      .then(() => {
+        loginTransitionPlayedRef.current = false;
+        setCurrentView('login');
+      })
+      .catch((error) => console.error('Logout error:', error));
   };
 
   const navigateTo = (view: View) => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     setCurrentView(view);
   };
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentView]);
 
   const renderView = () => {
     if (authLoading) {
       return (
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-accent"></div>
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="h-32 w-32 animate-spin rounded-full border-b-2 border-t-2 border-accent" />
         </div>
       );
     }
-    
-    // If not logged in, always show login screen
-    if (!user) {
-        return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
+
+    if (postLoginLoading) {
+      return <PostLoginLoader theme={theme} exiting={postLoginExiting} />;
     }
 
-    // If logged in, route between portfolio and admin
+    if (!user) {
+      return (
+        <LoginScreen
+          onLocalLogin={handleLocalLogin}
+          offlineMode={!firebaseReady}
+          gcpLoginEnabled={GCP_LOGIN_ENABLED}
+        />
+      );
+    }
+
+    const commonProps = {
+      onNavigateToPortfolio: () => navigateTo('portfolio' as View),
+      onNavigateToProcessos: () => navigateTo('processos' as View),
+      onNavigateToTreinamentos: () => navigateTo('treinamentos' as View),
+      onNavigateToKRs: () => navigateTo('krs' as View),
+      onNavigateToForum: () => navigateTo('forum' as View),
+      onNavigateToAdmin: () => navigateTo('admin' as View),
+      onLogout: handleLogout,
+      theme,
+      toggleTheme,
+      isLoggedIn: true,
+      user,
+    };
+
+    if (!firebaseReady) {
+      switch (currentView) {
+        case 'admin':
+          return (
+            <AdminScreen
+              user={user}
+              onLogout={handleLogout}
+              onNavigate={() => navigateTo('portfolio')}
+              theme={theme}
+              manualInteractionsEnabled={false}
+              onToggleManualInteractions={handleUpdateAppSettings}
+              offlineMode
+            />
+          );
+        case 'processos':
+          return <ProcessosScreen {...commonProps} offlineMode />;
+        case 'treinamentos':
+          return <TreinamentosScreen {...commonProps} offlineMode />;
+        case 'krs':
+          return <KRsScreen {...commonProps} offlineMode />;
+        case 'forum':
+          return <ForumScreen {...commonProps} offlineMode />;
+        case 'portfolio':
+        default:
+          return <PortfolioScreen {...commonProps} manualInteractionsEnabled={false} offlineMode />;
+      }
+    }
+
     switch (currentView) {
       case 'admin':
         return (
@@ -136,28 +279,24 @@ const App: React.FC = () => {
             onToggleManualInteractions={handleUpdateAppSettings}
           />
         );
+      case 'processos':
+        return <ProcessosScreen {...commonProps} offlineMode={!firebaseReady} />;
+      case 'treinamentos':
+        return <TreinamentosScreen {...commonProps} offlineMode={!firebaseReady} />;
+      case 'krs':
+        return <KRsScreen {...commonProps} offlineMode={!firebaseReady} />;
+      case 'forum':
+        return <ForumScreen {...commonProps} offlineMode={!firebaseReady} />;
       case 'portfolio':
       default:
-        return (
-          <PortfolioScreen
-            user={user}
-            isLoggedIn={true}
-            onNavigateToAdmin={() => navigateTo('admin')}
-            onLogout={handleLogout}
-            theme={theme}
-            toggleTheme={toggleTheme}
-            manualInteractionsEnabled={appSettings.manualInteractionsEnabled}
-          />
-        );
+        return <PortfolioScreen {...commonProps} manualInteractionsEnabled={appSettings.manualInteractionsEnabled} />;
     }
   };
 
   return (
     <ErrorBoundary>
-      <div className="min-h-screen flex flex-col bg-gray-100 dark:bg-zinc-900 text-zinc-800 dark:text-gray-100 font-sans transition-colors duration-300">
-        <div className="flex-grow">
-          {renderView()}
-        </div>
+      <div className="ui-motion flex min-h-screen flex-col bg-gray-100 font-sans text-zinc-800 transition-colors duration-300 dark:bg-zinc-900 dark:text-gray-100">
+        <div className="flex-grow">{renderView()}</div>
       </div>
     </ErrorBoundary>
   );

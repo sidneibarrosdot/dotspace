@@ -215,6 +215,66 @@ async function startServer() {
     res.json({ status: "ok" });
   });
 
+  app.get("/api/calendar/events", async (req, res) => {
+    const calendarId = String(req.query.calendarId || process.env.GOOGLE_CALENDAR_ID || 'primary');
+    const maxResults = Math.min(Math.max(Number(req.query.maxResults || 5), 1), 10);
+    const timeMin = String(req.query.timeMin || new Date().toISOString());
+    const apiKey = process.env.GOOGLE_CALENDAR_API_KEY?.trim();
+    const accessToken = process.env.GOOGLE_CALENDAR_ACCESS_TOKEN?.trim();
+
+    if (!apiKey && !accessToken) {
+      return res.status(503).json({
+        error: 'Google Calendar não configurado no servidor.',
+        hint: 'Defina GOOGLE_CALENDAR_API_KEY para calendário público ou GOOGLE_CALENDAR_ACCESS_TOKEN para acesso autenticado.',
+      });
+    }
+
+    try {
+      const params = new URLSearchParams({
+        singleEvents: 'true',
+        orderBy: 'startTime',
+        maxResults: String(maxResults),
+        timeMin,
+      });
+
+      if (apiKey) params.set('key', apiKey);
+
+      const response = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?${params.toString()}`, {
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        return res.status(response.status).json({
+          error: payload.error?.message || 'Falha ao buscar eventos no Google Calendar.',
+        });
+      }
+
+      const payload = await response.json() as { items?: unknown[]; nextSyncToken?: string; timeZone?: string; accessRole?: string };
+      const items = Array.isArray(payload.items) ? payload.items : [];
+
+      res.json({
+        calendarId,
+        accessRole: payload.accessRole || null,
+        timeZone: payload.timeZone || null,
+        items: items.map((event: any) => ({
+          id: event.id,
+          summary: event.summary,
+          description: event.description,
+          location: event.location,
+          htmlLink: event.htmlLink,
+          status: event.status,
+          start: event.start,
+          end: event.end,
+        })),
+        nextSyncToken: payload.nextSyncToken || null,
+      });
+    } catch (error: any) {
+      console.error('Error fetching Google Calendar events:', error);
+      res.status(500).json({ error: 'Erro ao consultar Google Calendar.', details: error.message });
+    }
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

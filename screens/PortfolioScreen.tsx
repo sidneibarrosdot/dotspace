@@ -1,13 +1,37 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import Header from '../components/Header';
+import MobileFooterNav from '../components/MobileFooterNav';
 import PortfolioCard from '../components/PortfolioCard';
-import SearchBar from '../components/SearchBar';
 import PortfolioModal from '../components/PortfolioModal';
-import TagFilter from '../components/TagFilter';
-import { ArrowUp, Check, ChevronDown, Copy, PencilLine, Plus, Share2, Trash2, X } from 'lucide-react';
+import CalendarAgenda from '../components/CalendarAgenda';
+import {
+  FEEDBACK_COPY_ERROR,
+  FEEDBACK_COPY_SUCCESS,
+  FEEDBACK_TIMEOUT_ERROR,
+  FEEDBACK_TIMEOUT_SUCCESS,
+} from '../constants/feedbackMessages';
+import {
+  ArrowUp,
+  BookmarkCheck,
+  Check,
+  ChevronDown,
+  Copy,
+  FolderKanban,
+  LayoutGrid,
+  BookMarked,
+  MessageSquareMore,
+  PencilLine,
+  Plus,
+  Play,
+  Share2,
+  Sparkles,
+  Trash2,
+  X,
+} from 'lucide-react';
 import type { PortfolioItem } from '../types';
-import DotLogo from '../components/DotLogo';
+import { processosItems } from '../data/processosItems';
+import { portfolioItems as localPortfolioItems } from '../data/portfolioItems';
 import { db } from '../firebase';
 import { addDoc, collection, query, onSnapshot, doc, updateDoc, increment, getDoc, Timestamp } from 'firebase/firestore';
 import { logAudit } from '../services/auditService';
@@ -21,7 +45,7 @@ import {
 } from '../services/favoriteService';
 import { toggleLike, subscribeToLikes } from '../services/likeService';
 import { User } from 'firebase/auth';
-import { Bookmark, BookmarkCheck } from 'lucide-react';
+import { Bookmark } from 'lucide-react';
 import type { FavoriteList, Like } from '../types';
 
 type Theme = 'light' | 'dark';
@@ -272,10 +296,15 @@ interface PortfolioScreenProps {
     user: User | null;
     isLoggedIn: boolean;
     onNavigateToAdmin: () => void;
+    onNavigateToProcessos: () => void;
+    onNavigateToTreinamentos: () => void;
+    onNavigateToKRs: () => void;
+    onNavigateToForum: () => void;
     onLogout: () => void;
     theme: 'light' | 'dark';
     toggleTheme: () => void;
     manualInteractionsEnabled: boolean;
+    offlineMode?: boolean;
 }
 
 const BLANK_PROJECT: PortfolioItem = {
@@ -302,8 +331,9 @@ const normalizeCount = (value: unknown) => {
   return Number.isFinite(nextValue) && nextValue > 0 ? nextValue : 0;
 };
 
-const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onNavigateToAdmin, onLogout, theme, toggleTheme, manualInteractionsEnabled }) => {
-  const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
+const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onNavigateToAdmin, onNavigateToProcessos, onNavigateToTreinamentos, onNavigateToKRs, onNavigateToForum, onLogout, theme, toggleTheme, manualInteractionsEnabled, offlineMode = false }) => {
+  const isLightMode = theme === 'light';
+  const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>(offlineMode ? localPortfolioItems : []);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilters, setActiveFilters] = useState<Record<string, string[]>>({});
@@ -333,15 +363,28 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
   const favoriteMenuRef = useRef<HTMLDivElement | null>(null);
   const likeCountsRef = useRef<Record<string, number>>({});
 
+  useEffect(() => {
+    if (!offlineMode) return;
+
+    setPortfolioItems(localPortfolioItems);
+    setLoading(false);
+    setFavoriteLists([]);
+    setLikes([]);
+    likeCountsRef.current = {};
+    setActiveFavoriteListId('');
+    setNewFavoriteListName('');
+    setShowFavoritesOnly(false);
+  }, [offlineMode]);
+
   const phrases = [
-    'Explore as melhores soluções em EdTech do DOT Digital Group. 🚀',
-    'Inovação e tecnologia aplicadas à educação corporativa e acadêmica. 🎓',
-    'Transformando o aprendizado através de experiências digitais memoráveis. ✨',
-    'Conheça o portfólio de PMVs que estão revolucionando o mercado educacional. 💡',
-    'Design, tecnologia e educação: a tríade que move as soluções da DOT. 🛠️',
-    'Navegue por um universo de propostas visuais e metodológicas para seu projeto educacional. 🎨',
-    'Soluções educacionais sob medida para potencializar o conhecimento. 📈',
-    'Onde a criatividade encontra a metodologia para criar o futuro da educação. 🌟'
+    'Um hub DOT para conectar processos, treinamentos e conhecimento em um só lugar. ✨',
+    'Tudo o que o time precisa para se atualizar com rapidez, clareza e governança. 🚀',
+    'Processos vivos, treinamentos organizados e links seguros para todos os colaboradores. 🔗',
+    'A central de conteúdos que mantém a operação alinhada e o time em movimento. 📚',
+    'Atualize, compartilhe e acesse materiais DOT sem perder contexto. 💡',
+    'Conhecimento útil, curado e fácil de encontrar para o dia a dia do time. 🎯',
+    'Do processo ao treinamento, o DOT Space conecta o que importa. 🌟',
+    'Um espaço para consultar, aprender e executar com mais consistência. 🛠️'
   ];
 
   useEffect(() => {
@@ -419,7 +462,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
   }, [portfolioItems, projectSlugToOpen, selectedItem]);
 
   useEffect(() => {
-    if (!shareIdToLoad || !isLoggedIn) return;
+    if (offlineMode || !shareIdToLoad || !isLoggedIn) return;
 
     let cancelled = false;
 
@@ -457,9 +500,14 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
     return () => {
       cancelled = true;
     };
-  }, [shareIdToLoad, isLoggedIn]);
+  }, [shareIdToLoad, isLoggedIn, offlineMode]);
 
   useEffect(() => {
+    if (offlineMode) {
+        setLoading(false);
+        return;
+    }
+
     if (!isLoggedIn) {
         setLoading(false);
         return;
@@ -493,10 +541,10 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
     });
 
     return () => unsubscribe();
-  }, [isLoggedIn]);
+  }, [isLoggedIn, offlineMode]);
 
   useEffect(() => {
-    if (!isLoggedIn || !user) {
+    if (offlineMode || !isLoggedIn || !user) {
       setFavoriteLists([]);
       setActiveFavoriteListId('');
       setNewFavoriteListName('');
@@ -541,7 +589,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
       cancelled = true;
       unsubscribe();
     };
-  }, [isLoggedIn, user]);
+  }, [isLoggedIn, user, offlineMode]);
 
   const activeFavoriteList = useMemo(() => {
     if (favoriteLists.length === 0) return null;
@@ -553,7 +601,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
   const activeFavoriteListName = activeFavoriteList?.name || 'Favoritos';
 
   useEffect(() => {
-    if (!isLoggedIn || !user) {
+    if (offlineMode || !isLoggedIn || !user) {
       setLikes([]);
       likeCountsRef.current = {};
       return;
@@ -564,10 +612,10 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
     });
 
     return () => unsubscribe();
-  }, [isLoggedIn, user]);
+  }, [isLoggedIn, user, offlineMode]);
 
   useEffect(() => {
-    if (!isLoggedIn || !user) {
+    if (offlineMode || !isLoggedIn || !user) {
       likeCountsRef.current = {};
       return;
     }
@@ -612,13 +660,24 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
     });
 
     return () => unsubscribe();
-  }, [isLoggedIn, user]);
+  }, [isLoggedIn, user, offlineMode]);
 
   const handleCardClick = async (item: PortfolioItem) => {
     setSelectedItem(item);
     setIsCreatingNewItem(false);
     
-    // Increment views
+    // Increment views locally in offline mode
+    if (offlineMode && item.id) {
+      setPortfolioItems(prevItems =>
+        prevItems.map(currentItem =>
+          currentItem.id === item.id
+            ? { ...currentItem, views: normalizeCount(currentItem.views) + 1 }
+            : currentItem
+        )
+      );
+      return;
+    }
+
     if (item.id) {
       try {
         const docRef = doc(db, 'projects', item.id);
@@ -632,7 +691,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
   };
 
   const handleLike = async (item: PortfolioItem) => {
-    if (!isLoggedIn || !user || !item.id) return;
+    if (offlineMode || !isLoggedIn || !user || !item.id) return;
     try {
       await toggleLike(user.uid, item.id);
     } catch (error) {
@@ -641,7 +700,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
   };
 
   const handleToggleFavorite = async (item: PortfolioItem) => {
-    if (!isLoggedIn || !user || !item.id || !activeFavoriteList?.id) return;
+    if (offlineMode || !isLoggedIn || !user || !item.id || !activeFavoriteList?.id) return;
     try {
       const isNowFavorited = await toggleProjectInFavoriteList(user.uid, activeFavoriteList.id, item.id);
 
@@ -667,7 +726,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
   };
 
   const handleCreateFavoriteList = async () => {
-    if (!isLoggedIn || !user) return;
+    if (offlineMode || !isLoggedIn || !user) return;
 
     const trimmedName = newFavoriteListName.trim();
     if (!trimmedName) {
@@ -692,7 +751,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
   };
 
   const handleRenameFavoriteList = async (list: FavoriteList) => {
-    if (!isLoggedIn || !user) return;
+    if (offlineMode || !isLoggedIn || !user) return;
 
     if (list.isDefault) {
       setFavoriteListFeedback('A lista padrão não pode ser renomeada.');
@@ -705,7 +764,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
   };
 
   const handleDeleteFavoriteList = async (list: FavoriteList) => {
-    if (!isLoggedIn || !user) return;
+    if (offlineMode || !isLoggedIn || !user) return;
 
     if (list.isDefault) {
       setFavoriteListFeedback('A lista padrão não pode ser excluída.');
@@ -730,7 +789,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
   };
 
   const handleFavoriteListModalConfirm = async () => {
-    if (!isLoggedIn || !user || !favoriteListModal) return;
+    if (offlineMode || !isLoggedIn || !user || !favoriteListModal) return;
 
     try {
       if (favoriteListModal.mode === 'rename') {
@@ -990,6 +1049,13 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
       throw new Error(`Too many projects to share: ${projectIds.length}`);
     }
 
+    if (offlineMode) {
+      const url = new URL(window.location.href);
+      url.search = '';
+      url.searchParams.set(SHARE_PROJECTS_PARAM, projectRefs.join(','));
+      return url.toString();
+    }
+
     const shareRef = await addDoc(collection(db, 'shares'), {
       type: 'projects',
       projectIds,
@@ -1005,6 +1071,19 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
   };
 
   const getShareUrl = async () => {
+    if (offlineMode) {
+      if (sharedProjectIds.length > 0) {
+        const url = new URL(window.location.href);
+        url.search = '';
+        url.searchParams.set(SHARE_PROJECTS_PARAM, sharedProjectIds.join(','));
+        return url.toString();
+      }
+
+      if (Boolean(searchTerm.trim()) || Object.values(activeFilters).some(values => Array.isArray(values) && values.length > 0)) {
+        return buildFilterShareUrl();
+      }
+    }
+
     const hasFavoriteSelection = activeFavoriteProjectIds.length > 0;
     if (hasFavoriteSelection) {
       const favoriteProjects = activeFavoriteProjectIds
@@ -1081,7 +1160,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
       return `A seleção passou de ${MAX_SHARED_PROJECTS} projetos. Reduza os favoritos para compartilhar.`;
     }
 
-    return 'Não foi possível copiar';
+    return FEEDBACK_COPY_ERROR;
   };
 
   const handleShareMenuToggle = () => {
@@ -1104,12 +1183,12 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
     try {
       const shareUrl = await getShareUrl();
       await copyTextToClipboard(shareUrl);
-      setShareFeedback('Link copiado');
-      window.setTimeout(() => setShareFeedback(''), 2500);
+      setShareFeedback(FEEDBACK_COPY_SUCCESS);
+      window.setTimeout(() => setShareFeedback(''), FEEDBACK_TIMEOUT_SUCCESS);
     } catch (error) {
       console.error('Error copying portfolio share link:', error);
       setShareFeedback(getShareErrorMessage(error));
-      window.setTimeout(() => setShareFeedback(''), 4500);
+      window.setTimeout(() => setShareFeedback(''), FEEDBACK_TIMEOUT_ERROR);
     }
   };
 
@@ -1126,14 +1205,14 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
       const shareUrl = await getShareUrl();
       if (!navigator.share) {
         await copyTextToClipboard(shareUrl);
-        setShareFeedback('Link copiado');
-        window.setTimeout(() => setShareFeedback(''), 2500);
+        setShareFeedback(FEEDBACK_COPY_SUCCESS);
+        window.setTimeout(() => setShareFeedback(''), FEEDBACK_TIMEOUT_SUCCESS);
         return;
       }
 
       await navigator.share({
-        title: 'Banco de PMVs DOT',
-        text: 'Veja esta seleção no Banco de PMVs DOT.',
+        title: 'dot.space',
+        text: 'Veja esta seleção no dot.space.',
         url: shareUrl,
       });
       setShareFeedback('');
@@ -1144,7 +1223,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
       }
       console.error('Error sharing portfolio view:', error);
       setShareFeedback('Não foi possível compartilhar');
-      window.setTimeout(() => setShareFeedback(''), 3000);
+      window.setTimeout(() => setShareFeedback(''), FEEDBACK_TIMEOUT_ERROR);
     }
   };
 
@@ -1152,6 +1231,12 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
     const shareUrl = buildProjectShareUrl(item);
     await copyTextToClipboard(shareUrl);
   };
+
+  const featuredItem = useMemo(() => portfolioItems[0] || null, [portfolioItems]);
+  const recentItems = useMemo(
+    () => [...portfolioItems].sort(comparePortfolioItemsByDateDesc).slice(0, 6),
+    [portfolioItems]
+  );
 
   // FIX: Added robust type guards and string conversions to prevent runtime errors during filtering.
   // This ensures that operations like .split() or .includes() are performed on strings,
@@ -1235,238 +1320,288 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
 
   return (
     <div className={`bg-gray-100 dark:bg-zinc-900 min-h-screen transition-colors duration-300`}>
-      <Header theme={theme} toggleTheme={toggleTheme} isLoggedIn={isLoggedIn} onNavigateToAdmin={onNavigateToAdmin} onLogout={onLogout} />
+      <Header
+        theme={theme}
+        toggleTheme={toggleTheme}
+        isLoggedIn={isLoggedIn}
+        sessionActive={Boolean(user)}
+        canManageAdmin={isLoggedIn}
+        offlineMode={offlineMode}
+        onNavigateToAdmin={onNavigateToAdmin}
+        onLogout={onLogout}
+      />
       
-      <div className="text-center py-12 sm:py-20 bg-gray-100 dark:bg-zinc-800 border-b border-gray-200 dark:border-zinc-700/50">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 className="text-2xl sm:text-4xl text-zinc-800 dark:text-gray-100 font-semibold lg:w-3/5 mx-auto leading-tight">
-                {randomPhrase}
-            </h2>
-          </div>
-      </div>
+      <main className="container mx-auto px-4 py-6 pb-28 sm:px-6 sm:py-8 sm:pb-8 lg:px-8">
+        <section className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)] mb-8">
+          <aside className="hidden xl:block">
+            <div
+              className={`sticky top-24 rounded-[30px] p-6 shadow-[0_30px_80px_rgba(0,0,0,0.28)] ${
+                isLightMode
+                  ? 'border border-zinc-200 bg-white text-zinc-900 shadow-[0_30px_80px_rgba(15,23,42,0.08)]'
+                  : 'border border-white/10 bg-[#151517] text-white'
+              }`}
+            >
+              <div className="space-y-2">
+                {[
+                  { label: 'Home', icon: LayoutGrid, action: () => window.scrollTo({ top: 0, behavior: 'smooth' }), active: true },
+                  { label: 'Processos', icon: FolderKanban, action: onNavigateToProcessos, active: false },
+                  { label: 'Treinamentos', icon: Sparkles, action: onNavigateToTreinamentos, active: false },
+                  { label: "Banco de KR's", icon: BookMarked, action: onNavigateToKRs, active: false },
+                  { label: 'Fórum', icon: MessageSquareMore, action: onNavigateToForum, active: false },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  const active = item.active;
+                  return (
+                    <button
+                      key={item.label}
+                      type="button"
+                      onClick={item.action}
+                      disabled={!item.action}
+                      className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold transition-colors ${
+                        active
+                          ? 'bg-[#88C125] text-white'
+                          : isLightMode
+                            ? 'bg-white/0 text-zinc-700 hover:bg-zinc-50 disabled:cursor-default disabled:hover:bg-white/0 disabled:opacity-55'
+                            : 'bg-white/0 text-white/82 hover:bg-white/8 disabled:cursor-default disabled:hover:bg-white/0 disabled:opacity-55'
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
 
-      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
-        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center gap-4 mb-8 sm:mb-12">
-          <div className="flex-grow w-full">
-            <SearchBar 
-              searchTerm={searchTerm} 
-              setSearchTerm={setSearchTerm} 
-              placeholder="Buscar por projeto, cliente, tecnologia..." 
-              suggestions={searchTerm ? filteredItems : []}
-              onSuggestionClick={handleCardClick}
-            />
-          </div>
-          
-          {isLoggedIn && (
-            <div className="relative flex w-full sm:w-auto items-center gap-2" ref={favoriteMenuRef}>
-              <button
-                onClick={handleToggleFavoritesOnly}
-                className={`flex items-center justify-center gap-2 px-6 py-3 rounded-full font-bold transition-all duration-300 shadow-md whitespace-nowrap h-[52px] w-full sm:w-auto ${
-                  showFavoritesOnly 
-                    ? 'bg-accent text-white dark:text-zinc-900' 
-                    : 'bg-white dark:bg-zinc-800 text-zinc-800 dark:text-gray-200 border border-gray-200 dark:border-zinc-700'
+            </div>
+          </aside>
+
+          <div className="space-y-6">
+            <section
+              className={`relative overflow-hidden rounded-[34px] px-6 py-8 shadow-[0_30px_90px_rgba(0,0,0,0.12)] sm:px-8 sm:py-10 ${
+                isLightMode
+                  ? 'border border-zinc-200 bg-gradient-to-br from-white via-[#fbfcf7] to-[#eef4de] text-zinc-900'
+                  : 'border border-white/10 bg-gradient-to-br from-[#1d1d22] via-[#232329] to-[#111112] text-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]'
+              }`}
+            >
+              <div
+                className={`absolute inset-0 ${
+                  isLightMode
+                    ? 'bg-[radial-gradient(circle_at_top_right,rgba(153,204,0,0.16),transparent_36%),radial-gradient(circle_at_bottom_left,rgba(247,142,67,0.12),transparent_26%)]'
+                    : 'bg-[radial-gradient(circle_at_top_right,rgba(153,204,0,0.12),transparent_36%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.05),transparent_26%)]'
                 }`}
-              >
-                {showFavoritesOnly ? <BookmarkCheck className="w-5 h-5" /> : <Bookmark className="w-5 h-5" />}
-                {showFavoritesOnly ? 'Ver Todos' : `${activeFavoriteListName}${activeFavoriteProjectIds.length > 0 ? ` (${activeFavoriteProjectIds.length})` : ''}`}
-              </button>
-              <button
-                onClick={() => setIsFavoriteMenuOpen(open => !open)}
-                className="flex h-[52px] w-[52px] items-center justify-center rounded-full border border-gray-200 bg-white text-zinc-700 shadow-md transition-colors hover:bg-gray-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-gray-200 dark:hover:bg-zinc-700"
-                title="Gerenciar listas de favoritos"
-              >
-                <ChevronDown className={`w-5 h-5 transition-transform ${isFavoriteMenuOpen ? 'rotate-180' : ''}`} />
-              </button>
+              />
+              <div className="relative z-10 grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
+                <div>
+                  <p className={`text-xs font-semibold uppercase tracking-[0.38em] ${isLightMode ? 'text-[#88C125]' : 'text-[#99cc00]'}`}>
+                    DOT SPACE
+                  </p>
+                  <h1 className={`mt-3 max-w-4xl text-3xl font-black leading-tight sm:text-4xl lg:text-5xl ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>
+                    {randomPhrase}
+                  </h1>
+                  <p className={`mt-4 max-w-2xl text-sm leading-7 sm:text-base ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>
+                    Acesso central aos materiais, processos e treinamentos com governança rígida,
+                    versionamento claro e navegação rápida.
+                  </p>
+                </div>
 
-              {isFavoriteMenuOpen && (
-                <div className="absolute left-0 top-full z-50 mt-2 w-full min-w-80 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl dark:border-zinc-700 dark:bg-zinc-800 sm:w-96">
-                  <div className="border-b border-gray-100 px-4 py-3 dark:border-zinc-700">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Listas de favoritos</p>
+                <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+                  {[
+                    { label: 'Processos', value: processosItems.length, accent: 'bg-[#88C125]' },
+                    { label: 'Treinamentos', value: portfolioItems.length, accent: 'bg-[#4CD07D]' },
+                    { label: "Banco de KR's", value: 12, accent: 'bg-[#F78E43]' },
+                    {
+                      label: 'Fórum',
+                      value: 5,
+                      accent: 'bg-[#EEC137]'
+                    },
+                  ].map((item) => (
+                    <div
+                      key={item.label}
+                      className={`rounded-3xl border p-3 backdrop-blur-sm sm:p-4 ${
+                        isLightMode
+                          ? 'border-zinc-200 bg-white/80 shadow-sm'
+                          : 'border-white/10 bg-white/8'
+                      }`}
+                    >
+                      <div className={`mb-2 h-1.5 w-12 rounded-full ${item.accent}`} />
+                      <p className={`text-[10px] font-semibold uppercase tracking-[0.32em] sm:text-xs ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>
+                        {item.label}
+                      </p>
+                      <p className={`mt-1 text-2xl font-bold leading-none sm:text-[2rem] ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>
+                        {item.value}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            <section className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+              <article className="rounded-[30px] border border-zinc-200/80 bg-white p-6 shadow-[0_25px_60px_rgba(15,23,42,0.08)] dark:border-zinc-800 dark:bg-zinc-900">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[#88c125]">Novidades</p>
+                    <h2 className="mt-2 text-3xl font-black tracking-tight text-zinc-900 dark:text-white">Conteúdos recentes</h2>
                   </div>
-                  <div className="max-h-60 overflow-y-auto">
-                    {favoriteLists.length > 0 ? (
-                      favoriteLists.map((list) => (
-                        <div
-                          key={list.id}
-                          className={`flex items-stretch gap-1 px-2 py-1 transition-colors hover:bg-gray-100 dark:hover:bg-zinc-700 ${
-                            list.id === activeFavoriteListId ? 'bg-accent/10 text-accent' : 'text-zinc-800 dark:text-gray-200'
-                          }`}
-                        >
-                          <button
-                            onClick={() => handleSelectFavoriteList(list.id)}
-                            className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-md px-2 py-2 text-left text-sm font-semibold"
-                          >
-                            <span className="truncate">
-                              {list.name}
-                              {list.isDefault ? <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-gray-400">Padrão</span> : null}
-                            </span>
-                            <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{list.projectIds.length}</span>
-                          </button>
-                          {!list.isDefault && (
-                            <div className="flex items-center gap-1 pr-1">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  void handleRenameFavoriteList(list);
-                                }}
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-white hover:text-accent dark:text-gray-400 dark:hover:bg-zinc-900"
-                                aria-label={`Renomear lista ${list.name}`}
-                                title="Renomear lista"
-                              >
-                                <PencilLine className="h-4 w-4" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  void handleDeleteFavoriteList(list);
-                                }}
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-white hover:text-red-500 dark:text-gray-400 dark:hover:bg-zinc-900"
-                                aria-label={`Excluir lista ${list.name}`}
-                                title="Excluir lista"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      ))
-                    ) : (
-                      <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">Nenhuma lista criada.</div>
-                    )}
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm('')}
+                    className="rounded-full bg-zinc-100 px-4 py-2 text-sm font-bold text-zinc-700 transition-colors hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+                  >
+                    Ver todos
+                  </button>
+                </div>
+                <p className="mt-3 max-w-2xl text-sm leading-7 text-zinc-500 dark:text-zinc-400">
+                  O que acabou de entrar no hub aparece primeiro aqui. A área tem mais destaque porque concentra os
+                  materiais mais quentes do dia.
+                </p>
+                <div className="mt-6 grid gap-4 md:grid-cols-2 xl:max-w-[760px]">
+                  {recentItems.slice(0, 2).map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => handleCardClick(item)}
+                      className="group overflow-hidden rounded-[26px] border border-zinc-200 bg-white text-left shadow-sm transition-transform hover:-translate-y-1 dark:border-zinc-800 dark:bg-zinc-950"
+                    >
+                      <div className="relative h-48 overflow-hidden">
+                        <img src={item.Imagem_capa} alt={item.Projeto} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-transparent to-transparent" />
+                        <span className="absolute left-4 top-4 rounded-full bg-[#99cc00] px-3 py-1 text-[10px] font-black uppercase tracking-[0.25em] text-zinc-900">
+                          {item.Cliente}
+                        </span>
+                      </div>
+                      <div className="p-5">
+                        <p className="text-sm font-black uppercase tracking-[0.2em] text-[#88c125]">{item.Time}</p>
+                        <h3 className="mt-2 text-xl font-bold leading-tight text-zinc-900 dark:text-white">{item.Projeto}</h3>
+                        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">{item.Assunto_geral}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </article>
+
+              <article className="overflow-hidden rounded-[30px] border border-zinc-200/80 bg-white shadow-[0_25px_60px_rgba(15,23,42,0.08)] dark:border-zinc-800 dark:bg-zinc-900">
+                <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-5 dark:border-zinc-800">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[#88c125]">Continuar fazendo</p>
+                    <h2 className="mt-2 text-2xl font-black tracking-tight text-zinc-900 dark:text-white">Destaque da casa</h2>
                   </div>
-                  <div className="border-t border-gray-100 px-4 py-4 dark:border-zinc-700">
-                    <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                      Nova lista
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        id="favorite-list-name"
-                        name="favorite-list-name"
-                        value={newFavoriteListName}
-                        onChange={(e) => setNewFavoriteListName(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleCreateFavoriteList();
-                          }
-                        }}
-                        placeholder="Ex.: Cursos do agro"
-                        className="h-11 flex-1 rounded-md border border-gray-200 bg-white px-3 text-sm text-zinc-800 outline-none ring-0 placeholder:text-gray-400 focus:border-accent dark:border-zinc-700 dark:bg-zinc-900 dark:text-gray-100"
+                  <span className="rounded-full bg-[#88C125]/15 px-3 py-1 text-xs font-bold uppercase tracking-[0.22em] text-[#88C125]">
+                    Último acesso
+                  </span>
+                </div>
+                {featuredItem ? (
+                  <div className="flex flex-col">
+                    <div className="relative h-[250px] bg-zinc-800 sm:h-[260px]">
+                      <img
+                        src={featuredItem.Imagem_capa}
+                        alt={featuredItem.Projeto}
+                        className="h-full w-full object-cover"
                       />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+                      <div className="absolute left-4 top-4 rounded-full bg-black/70 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-white">
+                        {featuredItem.Cliente}
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-4 p-5">
+                      <div>
+                        <div className="flex flex-wrap gap-2">
+                          <span className="rounded-full bg-[#4CD07D] px-3 py-1 text-[10px] font-black uppercase tracking-[0.28em] text-white">
+                            {featuredItem.Time || 'Conteúdo'}
+                          </span>
+                          <span className="rounded-full bg-zinc-100 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                            {featuredItem.Data}
+                          </span>
+                        </div>
+                        <h3 className="mt-3 text-[1.6rem] font-black leading-tight text-zinc-900 dark:text-white">
+                          {featuredItem.Projeto}
+                        </h3>
+                        <p className="mt-2 max-w-xl text-sm leading-6 text-zinc-600 dark:text-zinc-300">
+                          {featuredItem.Assunto_geral}
+                        </p>
+                      </div>
                       <button
-                        onClick={handleCreateFavoriteList}
-                        className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-accent px-4 text-sm font-bold text-white dark:text-zinc-900"
+                        type="button"
+                        onClick={() => handleCardClick(featuredItem)}
+                        className="inline-flex items-center gap-2 self-start rounded-2xl bg-[#111111] px-5 py-3 text-sm font-bold text-white transition-transform hover:-translate-y-0.5"
                       >
-                        <Plus className="h-4 w-4" />
-                        Criar
+                        <Play className="h-4 w-4" />
+                        Explorar
                       </button>
                     </div>
-                    {favoriteListFeedback && (
-                      <p className="mt-2 text-xs font-medium text-gray-500 dark:text-gray-400">{favoriteListFeedback}</p>
-                    )}
+                  </div>
+                ) : null}
+              </article>
+            </section>
+
+            <section className="grid gap-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(300px,0.95fr)]">
+              <article className="overflow-hidden rounded-[30px] border border-zinc-200/80 bg-white shadow-[0_25px_60px_rgba(15,23,42,0.08)] dark:border-zinc-800 dark:bg-zinc-900 lg:col-span-2">
+                <div className="grid gap-0 lg:grid-cols-[minmax(0,1.15fr)_minmax(300px,0.85fr)]">
+                  <div className="relative overflow-hidden px-6 py-7 sm:px-8 sm:py-8">
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(76,208,125,0.18),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(247,142,67,0.16),transparent_26%)]" />
+                    <div className="relative z-10">
+                      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.35em] text-[#88C125]">
+                        <Sparkles className="h-4 w-4" />
+                        IA em alta
+                      </div>
+                      <h2 className="mt-3 max-w-2xl text-3xl font-black leading-tight text-zinc-900 dark:text-white sm:text-4xl">
+                        Inteligência Artificial aplicada a processos e treinamentos.
+                      </h2>
+                      <p className="mt-4 max-w-2xl text-sm leading-7 text-zinc-600 dark:text-zinc-300 sm:text-base">
+                        Um destaque para a categoria que mais está ganhando espaço na empresa. Aqui ficam conteúdos,
+                        iniciativas e materiais que conectam automação, produtividade e capacitação do time.
+                      </p>
+                      <div className="mt-6 flex flex-wrap gap-3">
+                        {['Chatbots', 'Automação', 'Conteúdo', 'Produtividade'].map((tag) => (
+                          <span
+                            key={tag}
+                            className="rounded-full border border-zinc-200 bg-white/90 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-zinc-700 shadow-sm dark:border-zinc-700 dark:bg-zinc-800/90 dark:text-zinc-200"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-zinc-200 bg-zinc-50 p-6 dark:border-zinc-800 dark:bg-zinc-950/60 sm:p-7 lg:border-t-0 lg:border-l">
+                    <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[#88C125]">O que está em foco</p>
+                    <div className="mt-5 space-y-3">
+                      {[
+                        'IA para acelerar fluxos de aprovação e busca de conhecimento',
+                        'Treinamentos internos com apoio de assistentes inteligentes',
+                        'Materiais e processos preparados para uso por todos os times',
+                      ].map((item) => (
+                        <div key={item} className="rounded-3xl border border-zinc-200 bg-white px-4 py-4 dark:border-zinc-800 dark:bg-zinc-900">
+                          <p className="text-sm leading-6 text-zinc-700 dark:text-zinc-200">{item}</p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              )}
-            </div>
-          )}
+              </article>
+            </section>
 
-          <div className="relative w-full sm:w-auto" ref={shareMenuRef}>
-            <button
-              onClick={handleShareMenuToggle}
-              className="flex items-center justify-center gap-2 px-6 py-3 rounded-full font-bold transition-all duration-300 shadow-md whitespace-nowrap h-[52px] w-full sm:w-auto bg-white dark:bg-zinc-800 text-zinc-800 dark:text-gray-200 border border-gray-200 dark:border-zinc-700 hover:bg-gray-100 dark:hover:bg-zinc-700"
-              title="Compartilhar seleção"
-            >
-              {shareFeedback === 'Link copiado' ? <Check className="w-5 h-5 text-accent" /> : <Share2 className="w-5 h-5" />}
-              Compartilhar
-            </button>
-            {isShareMenuOpen && (
-              <div className="absolute right-0 top-full z-50 mt-2 w-full min-w-64 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl dark:border-zinc-700 dark:bg-zinc-800 sm:w-72">
-                <button
-                  onClick={handleNativeShare}
-                  className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-semibold text-zinc-800 transition-colors hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-zinc-700"
-                >
-                  <Share2 className="h-5 w-5 text-accent" />
-                  <span>Enviar para outro app</span>
-                </button>
-                <button
-                  onClick={handleCopyShareLink}
-                  className="flex w-full items-center gap-3 border-t border-gray-100 px-4 py-3 text-left text-sm font-semibold text-zinc-800 transition-colors hover:bg-gray-100 dark:border-zinc-700 dark:text-gray-200 dark:hover:bg-zinc-700"
-                >
-                  <Copy className="h-5 w-5 text-accent" />
-                  <span>Copiar link</span>
-                </button>
-              </div>
-            )}
-            {shareFeedback && (
-              <div className="absolute left-1/2 top-full z-40 mt-2 -translate-x-1/2 rounded-md bg-zinc-900 px-3 py-2 text-xs font-semibold text-white shadow-lg whitespace-nowrap dark:bg-zinc-700">
-                {shareFeedback}
-              </div>
-            )}
+            <section className="grid gap-6">
+              <CalendarAgenda />
+            </section>
+
           </div>
-        </div>
-
-        {sharedProjectIds.length > 0 && (
-          <div className="max-w-4xl mx-auto -mt-6 mb-8 flex flex-col sm:flex-row items-center justify-center gap-3 rounded-lg border border-accent/30 bg-accent/10 px-4 py-3 text-sm text-zinc-700 dark:text-gray-200">
-            <span className="font-semibold">Visualizando uma seleção compartilhada com {filteredItems.length} projeto{filteredItems.length === 1 ? '' : 's'}.</span>
-            <button
-              onClick={handleClearAllFilters}
-              className="font-bold text-accent hover:text-accent-dark"
-            >
-              Ver todo o portfólio
-            </button>
-          </div>
-        )}
-        
-        <TagFilter 
-            tags={filterTags}
-            options={filterOptions.options}
-            optionCounts={filterOptions.optionCounts}
-            activeFilters={activeFilters}
-            onFilterChange={handleFilterChange}
-            onClearAll={handleClearAllFilters}
-        />
-
-        {loading ? (
-            <div className="grid grid-cols-2 max-[380px]:grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6 lg:gap-8">
-                {Array.from({ length: 8 }).map((_, index) => (
-                    <div key={index} className="h-[22rem] sm:h-80 bg-gray-200 dark:bg-zinc-800 rounded-lg animate-pulse"></div>
-                ))}
-            </div>
-        ) : filteredItems.length > 0 ? (
-            <div className="grid grid-cols-2 max-[380px]:grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6 lg:gap-8">
-                {filteredItems.slice(0, visibleCount).map((item) => (
-                    <PortfolioCard 
-                      key={item.id} 
-                      item={item} 
-                      onClick={handleCardClick} 
-                      onLike={handleLike} 
-                      onToggleFavorite={handleToggleFavorite}
-                      onShare={handleShareProject}
-                      isFavorited={activeFavoriteProjectIds.includes(item.id)}
-                      isLiked={likes.some(l => l.projectId === item.id)}
-                      theme={theme} 
-                    />
-                ))}
-            </div>
-        ) : (
-            <div className="text-center py-16">
-                <h3 className="text-xl font-semibold text-zinc-800 dark:text-gray-200">Nenhum projeto encontrado</h3>
-                <p className="text-gray-500 dark:text-gray-400 mt-2">Tente ajustar seus filtros ou o termo de busca.</p>
-                <button
-                    onClick={handleClearAllFilters}
-                    className="mt-6 px-6 py-2 bg-accent hover:bg-accent-dark text-white dark:text-zinc-900 rounded-full font-bold transition-all duration-300 shadow-md hover:shadow-lg"
-                >
-                    Limpar Todos os Filtros
-                </button>
-            </div>
-        )}
+        </section>
       </main>
 
-      {isLoggedIn && manualInteractionsEnabled && (
+      <MobileFooterNav
+        theme={theme}
+        items={[
+          { label: 'Home', icon: LayoutGrid, onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }), active: true },
+          { label: 'Processos', icon: FolderKanban, onClick: onNavigateToProcessos },
+          { label: 'Treinamentos', icon: Sparkles, onClick: onNavigateToTreinamentos },
+          { label: "Banco de KR's", icon: BookMarked, onClick: onNavigateToKRs },
+          { label: 'Fórum', icon: MessageSquareMore, onClick: onNavigateToForum },
+        ]}
+      />
+
+      {!offlineMode && isLoggedIn && manualInteractionsEnabled && (
         <div className="fixed bottom-8 right-8 group z-50">
           <div className="absolute bottom-full right-0 mb-2 px-3 py-1 bg-zinc-800 dark:bg-zinc-700 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap pointer-events-none">
             Adicionar manualmente uma PMV
@@ -1503,16 +1638,16 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
           onClose={handleCloseModal}
           theme={theme}
           isCreating={isCreatingNewItem}
-          isLoggedIn={isLoggedIn}
+          isLoggedIn={isLoggedIn && !offlineMode}
           manualInteractionsEnabled={manualInteractionsEnabled}
           user={user}
           onUpdate={handleUpdateProject}
           onAdd={handleProjectAdded}
           onDelete={handleDeleteProject}
-          onToggleFavorite={handleToggleFavorite}
-          isFavorited={activeFavoriteProjectIds.includes(selectedItem.id)}
-          onLike={handleLike}
-          isLiked={likes.some(l => l.projectId === selectedItem.id)}
+          onToggleFavorite={offlineMode ? undefined : handleToggleFavorite}
+          isFavorited={offlineMode ? false : activeFavoriteProjectIds.includes(selectedItem.id)}
+          onLike={offlineMode ? undefined : handleLike}
+          isLiked={offlineMode ? false : likes.some(l => l.projectId === selectedItem.id)}
         />
       )}
 

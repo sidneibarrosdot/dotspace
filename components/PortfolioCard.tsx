@@ -2,6 +2,7 @@ import React from 'react';
 import type { PortfolioItem } from '../types';
 import DotLogo from './DotLogo';
 import { HeartIcon, EyeIcon, Bookmark, Share2 } from 'lucide-react';
+import { FEEDBACK_COPY_ERROR, FEEDBACK_COPY_SUCCESS, FEEDBACK_TIMEOUT_SUCCESS } from '../constants/feedbackMessages';
 
 interface PortfolioCardProps {
   item: PortfolioItem;
@@ -179,11 +180,11 @@ const PortfolioCard: React.FC<PortfolioCardProps> = ({ item, onClick, onLike, on
                   e.stopPropagation();
                   try {
                     await onShare(item);
-                    setShareMessage('Link copiado');
+                    setShareMessage(FEEDBACK_COPY_SUCCESS);
                   } catch {
-                    setShareMessage('Erro ao copiar');
+                    setShareMessage(FEEDBACK_COPY_ERROR);
                   }
-                  window.setTimeout(() => setShareMessage(''), 2500);
+                  window.setTimeout(() => setShareMessage(''), FEEDBACK_TIMEOUT_SUCCESS);
                 }}
                 className="inline-flex min-h-11 min-w-11 shrink-0 items-center gap-1.5 rounded-md px-2 sm:px-0 transition-colors relative z-30 cursor-pointer hover:text-accent"
                 title="Copiar link deste projeto"
