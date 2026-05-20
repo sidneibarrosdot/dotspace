@@ -1,8 +1,8 @@
 // ==== CONFIGURAÇÕES DO FIREBASE ====
-const CLIENT_EMAIL = 'firebase-adminsdk-fbsvc@bancopmvs-492018.iam.gserviceaccount.com';
+const CLIENT_EMAIL = '';
 
-const PROJECT_ID = 'bancopmvs-492018';
-const DATABASE_ID = 'ai-studio-246517dd-309c-4b97-8325-3c8821906926';
+const PROJECT_ID = '';
+const DATABASE_ID = '';
 const AUTO_SYNC_DELAY_MS = 5 * 60 * 1000;
 const AUTO_SYNC_TRIGGER_FUNCTION = 'runScheduledSync';
 const EDIT_TRIGGER_FUNCTION = 'schedulePortfolioSyncOnEdit';

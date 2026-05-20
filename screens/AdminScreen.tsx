@@ -5,6 +5,7 @@ import { db, auth } from '../firebase';
 import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, writeBatch, doc, onSnapshot } from 'firebase/firestore';
 import { User } from 'firebase/auth';
 import type { PortfolioItem } from '../types';
+import { portfolioItems as localPortfolioItems } from '../data/portfolioItems';
 
 enum OperationType {
   CREATE = 'create',
@@ -83,6 +84,7 @@ interface AdminScreenProps {
   theme: 'light' | 'dark';
   manualInteractionsEnabled: boolean;
   onToggleManualInteractions: (enabled: boolean) => Promise<void> | void;
+  offlineMode?: boolean;
 }
 
 interface UploadLog {
@@ -112,6 +114,29 @@ interface PortfolioStats {
     totalProjects: number;
     lastUpdated: string | null;
     activeUsers: number;
+}
+
+interface AdminAccessProfile {
+  name: string;
+  role: string;
+  area: string;
+  status: 'ativo' | 'pendente' | 'restrito';
+  lastAccess: string;
+}
+
+interface AdminAlert {
+  id: string;
+  title: string;
+  detail: string;
+  level: 'critico' | 'atencao' | 'ok';
+}
+
+interface AdminPermissionRule {
+  module: string;
+  colaborador: boolean;
+  editor: boolean;
+  gestor: boolean;
+  admin: boolean;
 }
 
 const PT_BR_MONTHS = [
@@ -228,7 +253,7 @@ const ArrowLeftIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
     </svg>
 );
 
-const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, theme, manualInteractionsEnabled, onToggleManualInteractions }) => {
+const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, theme, manualInteractionsEnabled, onToggleManualInteractions, offlineMode = false }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
@@ -241,6 +266,10 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
   const [isAccessLogsVisible, setIsAccessLogsVisible] = useState(false);
   const [chartData, setChartData] = useState<any[]>([]);
   const [periodChartData, setPeriodChartData] = useState<any[]>([]);
+  const [ssoRequired, setSsoRequired] = useState(true);
+  const [domainRestrictionEnabled, setDomainRestrictionEnabled] = useState(true);
+  const [auditExportEnabled, setAuditExportEnabled] = useState(true);
+  const [ipRestrictionEnabled, setIpRestrictionEnabled] = useState(false);
   const [chartFilter, setChartFilter] = useState<'client' | 'team' | 'methodology' | 'media'>('client');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
@@ -252,6 +281,61 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
     const rafId = window.requestAnimationFrame(() => setChartsReady(true));
     return () => window.cancelAnimationFrame(rafId);
   }, []);
+
+  useEffect(() => {
+    if (!offlineMode) return;
+
+    const totalProjects = localPortfolioItems.length;
+    const lastUpdated = localPortfolioItems
+      .map(item => item.Data)
+      .filter(Boolean)
+      .sort((a, b) => String(b).localeCompare(String(a)))[0] || null;
+
+    setStats({
+      totalProjects,
+      lastUpdated: lastUpdated ? String(lastUpdated) : null,
+      activeUsers: 1,
+    });
+    setStatsLoading(false);
+    setUploadLogs([]);
+    setAccessLogs([]);
+    setQualityAudit(localPortfolioItems.slice(0, 5).map((item) => ({
+      id: item.id,
+      name: item.Projeto,
+      issues: [],
+    })));
+
+    const clientCounts = localPortfolioItems.reduce<Record<string, number>>((acc, item) => {
+      const key = item.Cliente || 'Sem Cliente';
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+    setChartData(
+      Object.entries(clientCounts)
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 8)
+    );
+
+    const periodCounts = localPortfolioItems.reduce<Record<string, number>>((acc, item) => {
+      const period = parseProjectPeriod(item.Data);
+      if (period) {
+        acc[period.key] = (acc[period.key] || 0) + 1;
+      }
+      return acc;
+    }, {});
+    setPeriodChartData(
+      Object.entries(periodCounts)
+        .map(([name, value]) => {
+          const [year, month] = name.split('-');
+          const monthName = new Date(parseInt(year), parseInt(month) - 1).toLocaleString('pt-BR', { month: 'short' });
+          return { name: `${monthName}/${year.slice(2)}`, value, originalDate: name };
+        })
+        .sort((a, b) => a.originalDate.localeCompare(b.originalDate))
+    );
+
+    setChartsReady(true);
+  }, [offlineMode]);
 
   const fetchAuditLogs = async () => {
     const path = 'auditLogs';
@@ -457,6 +541,9 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
   };
 
   useEffect(() => {
+    if (offlineMode) {
+      return;
+    }
     let unsubscribeAudit: any;
     let unsubscribeUpload: any;
     let unsubscribeStats: any;
@@ -474,9 +561,23 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
         if (unsubscribeUpload) unsubscribeUpload();
         if (unsubscribeStats) unsubscribeStats();
     };
-  }, [chartFilter, startDate, endDate]);
+  }, [chartFilter, startDate, endDate, offlineMode]);
 
   const downloadAllData = async () => {
+    if (offlineMode) {
+      const csvContent = localPortfolioItems.map(item => JSON.stringify(item)).join('\n');
+      const blob = new Blob([csvContent], { type: 'text/plain;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `dados_local_${new Date().toISOString().split('T')[0]}.txt`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return;
+    }
+
     const path = 'projects';
     try {
         const projectsCollection = collection(db, path);
@@ -513,6 +614,19 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
   };
 
   const downloadChartData = async (data: any[], title: string) => {
+    if (offlineMode) {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `${title.toLowerCase().replace(/\s+/g, '_')}_local.json`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return;
+    }
+
     const headers = ['Nome', 'Quantidade'];
     const csvContent = [
         headers.join(','),
@@ -737,6 +851,12 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
   };
 
   const handleProcessFile = () => {
+    if (offlineMode) {
+      setUploadStatus('success');
+      setMessage('Ação registrada. Conecte o banco para concluir escrita definitiva.');
+      return;
+    }
+
     if (!selectedFile) {
       setUploadStatus('error');
       setMessage('Por favor, selecione um arquivo primeiro.');
@@ -860,21 +980,346 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
     return log.fileName;
   };
 
+  const adminLogoClassName = 'shrink-0';
+  const monitoredAreas = [
+    { area: 'Processos', total: 24, review: 5, audit: 12 },
+    { area: 'Treinamentos', total: 18, review: 3, audit: 9 },
+    { area: "Banco de KR's", total: 16, review: 4, audit: 10 },
+    { area: 'Fórum', total: 28, review: 2, audit: 7 },
+  ];
+  const accessProfiles: AdminAccessProfile[] = [
+    { name: 'Sidnei Barros', role: 'ADMIN', area: 'Governança', status: 'ativo', lastAccess: 'Hoje, 08:42' },
+    { name: 'Time People Ops', role: 'GESTOR', area: 'Treinamentos', status: 'ativo', lastAccess: 'Hoje, 08:10' },
+    { name: 'Equipe Compliance', role: 'EDITOR', area: 'Processos', status: 'pendente', lastAccess: 'Ontem, 17:36' },
+    { name: 'Finance Squad', role: 'COLABORADOR', area: "Banco de KR's", status: 'restrito', lastAccess: 'Ontem, 16:21' },
+  ];
+  const permissionMatrix: AdminPermissionRule[] = [
+    { module: 'Processos', colaborador: true, editor: true, gestor: true, admin: true },
+    { module: 'Treinamentos', colaborador: true, editor: true, gestor: true, admin: true },
+    { module: "Banco de KR's", colaborador: true, editor: true, gestor: true, admin: true },
+    { module: 'Fórum', colaborador: true, editor: true, gestor: true, admin: true },
+    { module: 'Painel administrativo', colaborador: false, editor: false, gestor: true, admin: true },
+    { module: 'Configurações globais', colaborador: false, editor: false, gestor: false, admin: true },
+  ];
+  const adminAlerts: AdminAlert[] = [
+    { id: 'a1', title: 'Fila de revisão crescendo', detail: '5 itens aguardando aprovação em Processos.', level: 'atencao' },
+    { id: 'a2', title: 'Sincronização estável', detail: 'Último pull da base sem inconsistências.', level: 'ok' },
+    { id: 'a3', title: 'Permissão divergente detectada', detail: '1 perfil com escopo fora da área padrão.', level: 'critico' },
+  ];
+  const governanceChecklist = [
+    { label: 'Versionamento semântico obrigatório', status: true },
+    { label: 'Justificativa para mudanças críticas', status: true },
+    { label: 'Auditoria de acesso em tempo real', status: true },
+    { label: 'Validação de links externos ativos', status: false },
+  ];
+
+  const statusBadgeClass = (status: AdminAccessProfile['status']) => {
+    if (status === 'ativo') return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300';
+    if (status === 'pendente') return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300';
+    return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300';
+  };
+
+  const alertBadgeClass = (level: AdminAlert['level']) => {
+    if (level === 'ok') return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300';
+    if (level === 'atencao') return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300';
+    return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300';
+  };
+
   return (
-      <div className="min-h-screen">
+      offlineMode ? (
+        <div className="min-h-screen bg-gray-100 dark:bg-zinc-900">
+          <header className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm border-b border-gray-200 dark:border-zinc-700/50">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex min-h-20 items-center justify-between gap-4 py-3">
+                <div className="flex items-center gap-4">
+                  <DotLogo className={adminLogoClassName} theme={theme} variant="login" />
+                  <span className="hidden text-xl font-bold md:inline lg:text-2xl">
+                    <span className="text-zinc-900 dark:text-white">Painel do </span>
+                    <span className="text-accent">Administrador</span>
+                  </span>
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className="hidden sm:inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-700">
+                    Sessão ativa
+                  </span>
+                  <button onClick={onLogout} className="text-sm font-bold bg-gray-200 dark:bg-zinc-700 px-4 py-2 rounded-md hover:bg-gray-300 dark:hover:bg-zinc-600 transition-colors">Logout</button>
+                  <button
+                    onClick={onNavigate}
+                    className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors text-zinc-600 dark:text-gray-400"
+                    title="Voltar para o Portfólio"
+                    aria-label="Voltar para o Portfólio"
+                  >
+                    <ArrowLeftIcon className="w-6 h-6" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <main className="container mx-auto px-4 py-8 sm:p-8">
+            <div className="max-w-6xl mx-auto space-y-6">
+              <div className="rounded-2xl border border-emerald-300 bg-emerald-50 p-6 text-emerald-900 shadow-sm dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200">
+                <p className="text-sm font-semibold uppercase tracking-[0.2em]">Administração central</p>
+                <h1 className="mt-2 text-2xl font-bold">Gestão de acessos, auditoria e governança</h1>
+                <p className="mt-2 text-sm leading-relaxed">
+                  Controle operacional completo para monitorar conteúdo, revisar permissões e acompanhar a integridade das áreas do sistema.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {renderStat('Projetos monitorados', stats.totalProjects)}
+                {renderStat('Última Data', stats.lastUpdated)}
+                {renderStat('Usuário ativo', user.displayName || user.email || '—')}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                {renderStat('Perfis monitorados', accessProfiles.length)}
+                {renderStat('Itens em revisão', monitoredAreas.reduce((acc, item) => acc + item.review, 0))}
+                {renderStat('Eventos auditoria (7d)', monitoredAreas.reduce((acc, item) => acc + item.audit, 0))}
+                {renderStat('Alertas ativos', adminAlerts.filter((alert) => alert.level !== 'ok').length)}
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="rounded-2xl bg-white p-6 shadow-lg border border-gray-200 dark:bg-zinc-800 dark:border-zinc-700/50">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Projetos por Cliente</h2>
+                    <span className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700 bg-emerald-100 px-2 py-1 rounded-full">Atualizado</span>
+                  </div>
+                  <div className="h-64 overflow-x-auto">
+                    {!chartsReady ? (
+                      <div className="flex h-full items-center justify-center rounded-lg bg-gray-50 text-sm text-gray-500 dark:bg-zinc-700/30 dark:text-gray-400">
+                        Carregando gráfico...
+                      </div>
+                    ) : (
+                      <BarChart width={720} height={256} data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme === 'dark' ? '#3f3f46' : '#e5e7eb'} />
+                        <XAxis dataKey="name" tick={{ fontSize: 10, fill: theme === 'dark' ? '#a1a1aa' : '#71717a' }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fontSize: 10, fill: theme === 'dark' ? '#a1a1aa' : '#71717a' }} axisLine={false} tickLine={false} />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: theme === 'dark' ? '#18181b' : '#ffffff',
+                            borderColor: theme === 'dark' ? '#3f3f46' : '#e5e7eb',
+                            color: theme === 'dark' ? '#ffffff' : '#000000'
+                          }}
+                          itemStyle={{ color: '#99cc00' }}
+                        />
+                        <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                          {chartData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={index % 2 === 0 ? '#99cc00' : '#86b300'} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl bg-white p-6 shadow-lg border border-gray-200 dark:bg-zinc-800 dark:border-zinc-700/50">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Projetos por Período</h2>
+                    <span className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700 bg-emerald-100 px-2 py-1 rounded-full">Atualizado</span>
+                  </div>
+                  <div className="h-64 overflow-x-auto">
+                    {!chartsReady ? (
+                      <div className="flex h-full items-center justify-center rounded-lg bg-gray-50 text-sm text-gray-500 dark:bg-zinc-700/30 dark:text-gray-400">
+                        Carregando gráfico...
+                      </div>
+                    ) : (
+                      <BarChart width={720} height={256} data={periodChartData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme === 'dark' ? '#3f3f46' : '#e5e7eb'} />
+                        <XAxis dataKey="name" tick={{ fontSize: 10, fill: theme === 'dark' ? '#a1a1aa' : '#71717a' }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fontSize: 10, fill: theme === 'dark' ? '#a1a1aa' : '#71717a' }} axisLine={false} tickLine={false} />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: theme === 'dark' ? '#18181b' : '#ffffff',
+                            borderColor: theme === 'dark' ? '#3f3f46' : '#e5e7eb',
+                            color: theme === 'dark' ? '#ffffff' : '#000000'
+                          }}
+                          itemStyle={{ color: '#99cc00' }}
+                        />
+                        <Bar dataKey="value" fill="#99cc00" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="rounded-2xl bg-white p-6 shadow-lg border border-gray-200 dark:bg-zinc-800 dark:border-zinc-700/50">
+                  <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Operações</h2>
+                  <ul className="mt-4 space-y-2 text-sm text-gray-600 dark:text-gray-300">
+                    <li>• Revisar governança de processos e treinamentos</li>
+                    <li>• Monitorar indicadores por área</li>
+                    <li>• Auditar alterações críticas</li>
+                    <li>• Gerenciar políticas de acesso</li>
+                  </ul>
+                </div>
+                <div className="rounded-2xl bg-white p-6 shadow-lg border border-gray-200 dark:bg-zinc-800 dark:border-zinc-700/50">
+                  <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Política de segurança</h2>
+                  <p className="mt-4 text-sm text-gray-600 dark:text-gray-300">
+                    Todas as ações administrativas são rastreadas por auditoria e seguem controle por perfil de acesso.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+                <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-zinc-700/50 dark:bg-zinc-800 xl:col-span-2">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Acessos e perfis</h2>
+                    <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-accent">Controle RBAC</span>
+                  </div>
+                  <div className="mt-5 overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-[0.16em] text-gray-500 dark:border-zinc-700 dark:text-gray-400">
+                          <th className="pb-2 pr-4">Usuário/Time</th>
+                          <th className="pb-2 pr-4">Perfil</th>
+                          <th className="pb-2 pr-4">Área</th>
+                          <th className="pb-2 pr-4">Status</th>
+                          <th className="pb-2">Último acesso</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {accessProfiles.map((profile) => (
+                          <tr key={profile.name} className="border-b border-gray-100 dark:border-zinc-700/60">
+                            <td className="py-3 pr-4 font-semibold text-zinc-900 dark:text-white">{profile.name}</td>
+                            <td className="py-3 pr-4 text-gray-600 dark:text-gray-300">{profile.role}</td>
+                            <td className="py-3 pr-4 text-gray-600 dark:text-gray-300">{profile.area}</td>
+                            <td className="py-3 pr-4">
+                              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${statusBadgeClass(profile.status)}`}>
+                                {profile.status}
+                              </span>
+                            </td>
+                            <td className="py-3 text-gray-500 dark:text-gray-400">{profile.lastAccess}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+
+                <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-zinc-700/50 dark:bg-zinc-800">
+                  <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Alertas operacionais</h2>
+                  <div className="mt-4 space-y-3">
+                    {adminAlerts.map((alert) => (
+                      <div key={alert.id} className="rounded-xl border border-gray-200 p-3 dark:border-zinc-700">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="font-semibold text-zinc-900 dark:text-white">{alert.title}</p>
+                          <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase ${alertBadgeClass(alert.level)}`}>{alert.level}</span>
+                        </div>
+                        <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">{alert.detail}</p>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              </div>
+
+              <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+                <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-zinc-700/50 dark:bg-zinc-800">
+                  <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Governança e conformidade</h2>
+                  <div className="mt-4 space-y-3">
+                    {governanceChecklist.map((item) => (
+                      <div key={item.label} className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 dark:border-zinc-700">
+                        <span className="text-sm text-gray-700 dark:text-gray-200">{item.label}</span>
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                            item.status
+                              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                              : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                          }`}
+                        >
+                          {item.status ? 'OK' : 'Pendente'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-zinc-700/50 dark:bg-zinc-800">
+                  <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Monitoramento por área</h2>
+                  <div className="mt-4 space-y-3">
+                    {monitoredAreas.map((item) => (
+                      <div key={item.area} className="rounded-xl border border-gray-200 p-3 dark:border-zinc-700">
+                        <div className="flex items-center justify-between">
+                          <p className="font-semibold text-zinc-900 dark:text-white">{item.area}</p>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">{item.total} itens</span>
+                        </div>
+                        <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                          <div className="rounded-md bg-gray-100 px-2 py-1.5 text-gray-700 dark:bg-zinc-700/60 dark:text-gray-200">Revisão: {item.review}</div>
+                          <div className="rounded-md bg-gray-100 px-2 py-1.5 text-gray-700 dark:bg-zinc-700/60 dark:text-gray-200">Auditoria: {item.audit}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              </div>
+
+              <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+                <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-zinc-700/50 dark:bg-zinc-800">
+                  <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Matriz de permissões</h2>
+                  <div className="mt-4 overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-[0.16em] text-gray-500 dark:border-zinc-700 dark:text-gray-400">
+                          <th className="pb-2 pr-4">Módulo</th>
+                          <th className="pb-2 pr-4">Colaborador</th>
+                          <th className="pb-2 pr-4">Editor</th>
+                          <th className="pb-2 pr-4">Gestor</th>
+                          <th className="pb-2">Admin</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {permissionMatrix.map((rule) => (
+                          <tr key={rule.module} className="border-b border-gray-100 dark:border-zinc-700/60">
+                            <td className="py-3 pr-4 font-semibold text-zinc-900 dark:text-white">{rule.module}</td>
+                            {[rule.colaborador, rule.editor, rule.gestor, rule.admin].map((allowed, index) => (
+                              <td key={`${rule.module}-${index}`} className="py-3 pr-4">
+                                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${allowed ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-700/50 dark:text-zinc-300'}`}>
+                                  {allowed ? 'Permitido' : 'Bloqueado'}
+                                </span>
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+
+                <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-zinc-700/50 dark:bg-zinc-800">
+                  <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Controles de acesso</h2>
+                  <div className="mt-4 space-y-3">
+                    {[
+                      { label: 'SSO obrigatório', value: ssoRequired, toggle: setSsoRequired },
+                      { label: 'Restrição por domínio (@dotgroup.com.br)', value: domainRestrictionEnabled, toggle: setDomainRestrictionEnabled },
+                      { label: 'Exportação de auditoria habilitada', value: auditExportEnabled, toggle: setAuditExportEnabled },
+                      { label: 'Restrição por IP corporativo', value: ipRestrictionEnabled, toggle: setIpRestrictionEnabled },
+                    ].map((control) => (
+                      <button
+                        key={control.label}
+                        type="button"
+                        onClick={() => control.toggle((current) => !current)}
+                        className="flex w-full items-center justify-between rounded-xl border border-gray-200 px-3 py-3 text-left transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-700/30"
+                      >
+                        <span className="text-sm font-medium text-zinc-800 dark:text-zinc-100">{control.label}</span>
+                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${control.value ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-700/60 dark:text-zinc-300'}`}>
+                          {control.value ? 'Ativo' : 'Inativo'}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              </div>
+            </div>
+          </main>
+        </div>
+      ) : (
+        <div className="min-h-screen">
         <header className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm border-b border-gray-200 dark:border-zinc-700/50">
             <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex items-center justify-between h-16">
+                <div className="flex min-h-20 items-center justify-between gap-4 py-3">
                     <div className="flex items-center gap-4">
-                        <button
-                            onClick={onNavigate}
-                            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors text-zinc-600 dark:text-gray-400"
-                            title="Voltar para o Portfólio"
-                        >
-                            <ArrowLeftIcon className="w-6 h-6" />
-                        </button>
-                        <DotLogo className="h-8" theme={theme}/>
-                        <span className="text-2xl font-bold hidden md:inline">
+                        <DotLogo className={adminLogoClassName} theme={theme} variant="login" />
+                        <span className="hidden text-xl font-bold md:inline lg:text-2xl">
                             <span className="text-zinc-900 dark:text-white">Painel do </span>
                             <span className="text-accent">Administrador</span>
                         </span>
@@ -885,6 +1330,14 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                           <span className="text-sm font-medium text-zinc-800 dark:text-gray-200">{user.email}</span>
                         </div>
                         <button onClick={onLogout} className="text-sm font-bold bg-gray-200 dark:bg-zinc-700 px-4 py-2 rounded-md hover:bg-gray-300 dark:hover:bg-zinc-600 transition-colors">Logout</button>
+                        <button
+                            onClick={onNavigate}
+                            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors text-zinc-600 dark:text-gray-400"
+                            title="Voltar para o Portfólio"
+                            aria-label="Voltar para o Portfólio"
+                        >
+                            <ArrowLeftIcon className="w-6 h-6" />
+                        </button>
                     </div>
                 </div>
             </div>
@@ -1309,6 +1762,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
           </div>
         </main>
       </div>
+      )
   );
 };
 

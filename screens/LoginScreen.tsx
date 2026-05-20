@@ -1,131 +1,119 @@
 
 import React, { useState } from 'react';
 import DotLogo from '../components/DotLogo';
-import { auth } from '../firebase';
-import { 
-  AuthError, 
-  GoogleAuthProvider, 
-  signInWithPopup,
-  signOut
-} from 'firebase/auth';
+import LoginBackdrop from '../components/LoginBackdrop';
+import planetsDark from '../assets/planetas-dark.svg';
 
 interface LoginScreenProps {
-  onLoginSuccess: () => void;
+  onLocalLogin: (email: string, displayName: string) => void;
+  offlineMode: boolean;
+  gcpLoginEnabled: boolean;
 }
 
-const GoogleIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
-  <svg viewBox="0 0 24 24" {...props}>
-    <path
-      fill="#EA4335"
-      d="M5.266 9.765A7.077 7.077 0 0 1 12 4.909c1.69 0 3.218.6 4.418 1.582L19.91 3C17.782 1.145 15.055 0 12 0 7.273 0 3.191 2.727 1.245 6.664L5.266 9.765z"
-    />
-    <path
-      fill="#FBBC05"
-      d="M1.245 6.664A11.942 11.942 0 0 0 0 12c0 1.92.445 3.736 1.245 5.336L5.266 14.235A7.094 7.094 0 0 1 4.909 12c0-.791.136-1.545.357-2.235L1.245 6.664z"
-    />
-    <path
-      fill="#4285F4"
-      d="M12 24c3.127 0 5.891-1.036 7.827-2.818l-4.127-3.4c-1.045.7-2.391 1.118-3.7 1.118-2.855 0-5.273-1.927-6.136-4.527l-4.021 3.101C3.191 21.273 7.273 24 12 24z"
-    />
-    <path
-      fill="#34A853"
-      d="M23.491 9.818H12V14.19h6.636c-.282 1.491-1.127 2.755-2.382 3.591l4.127 3.4C22.782 19.018 24 16.273 24 12c0-.764-.109-1.509-.509-2.182z"
-    />
-  </svg>
-);
-
-const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
+const LoginScreen: React.FC<LoginScreenProps> = ({ onLocalLogin, offlineMode, gcpLoginEnabled }) => {
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
 
-  const ALLOWED_DOMAIN = 'dotgroup.com.br';
-
-  const isValidDomain = (email: string) => {
-    const lowerEmail = email.toLowerCase();
-    return lowerEmail.endsWith(`@${ALLOWED_DOMAIN}`);
-  };
-
-  const handleGoogleLogin = () => {
+  const handleAccess = () => {
     setError('');
-    setLoading(true);
-    const provider = new GoogleAuthProvider();
-
-    signInWithPopup(auth, provider)
-      .then((result) => {
-        const userEmail = result.user.email;
-        if (userEmail && isValidDomain(userEmail)) {
-          onLoginSuccess();
-        } else {
-          signOut(auth);
-          setError(`Acesso restrito a e-mails @${ALLOWED_DOMAIN}`);
-        }
-      })
-      .catch((err: AuthError) => {
-        handleAuthError(err);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  };
-
-  const handleAuthError = (err: AuthError) => {
-    console.error("Auth error:", err.code, err.message);
-    switch (err.code) {
-      case 'auth/popup-closed-by-user':
-        setError('O login com Google foi cancelado.');
-        break;
-      default:
-        setError('Ocorreu um erro. Tente novamente.');
-        break;
-    }
+    onLocalLogin('acesso@dotgroup.com.br', 'Usuário DOT');
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-accent p-4">
-      <div className="w-full max-w-[412px] bg-white rounded-xl shadow-2xl relative overflow-hidden">
-        {/* Random Library/Archive Image Header */}
-        <div className="w-full h-44 overflow-hidden relative">
-          <img 
-            src={`https://images.unsplash.com/photo-1568667256549-094345857637?auto=format&fit=crop&q=80&w=800&sig=${Math.floor(Date.now() / 3600000)}`}
-            alt="Library Archive"
-            className="w-full h-full object-cover transition-transform duration-1000 hover:scale-105"
-            referrerPolicy="no-referrer"
+    <LoginBackdrop>
+      <main className="relative z-10 flex min-h-screen items-center justify-center px-4 py-10">
+        <style>{`
+          @keyframes bg-planet-breath {
+            0% { transform: translateX(-50%) translateY(50%) scale(1); opacity: 0.42; }
+            50% { transform: translateX(-50%) translateY(47%) scale(1.03); opacity: 0.56; }
+            100% { transform: translateX(-50%) translateY(50%) scale(1); opacity: 0.42; }
+          }
+          @keyframes bg-planet-breath-soft {
+            0% { transform: translateX(-50%) translateY(52%) scale(0.97) rotate(0deg); opacity: 0.22; }
+            50% { transform: translateX(-50%) translateY(49%) scale(1) rotate(3deg); opacity: 0.32; }
+            100% { transform: translateX(-50%) translateY(52%) scale(0.97) rotate(0deg); opacity: 0.22; }
+          }
+        `}</style>
+
+        <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+          <img
+            src={planetsDark}
+            alt=""
+            aria-hidden="true"
+            className="absolute left-1/2 bottom-0 h-[82vh] w-[82vh] -translate-x-1/2 translate-y-1/2 blur-[42px] saturate-150 opacity-70"
+            style={{ animation: 'bg-planet-breath 16s ease-in-out infinite' }}
+            draggable={false}
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent" />
+          <img
+            src={planetsDark}
+            alt=""
+            aria-hidden="true"
+            className="absolute left-1/2 bottom-[-6vh] h-[58vh] w-[58vh] -translate-x-1/2 translate-y-1/2 blur-[24px] saturate-125 opacity-40"
+            style={{ animation: 'bg-planet-breath-soft 22s ease-in-out infinite' }}
+            draggable={false}
+          />
         </div>
 
-        <div className="p-8 pt-10 space-y-8">
-          <div className="text-center">
-              <DotLogo theme="light" className="h-12 mx-auto mb-6" />
-              <h2 className="text-2xl font-bold text-zinc-900">
-                Banco de PMV's
-              </h2>
+        <div className="animate-ui-rise relative z-20 w-full max-w-[440px]">
+          <div className="mb-8 flex justify-center md:mb-10">
+            <DotLogo
+              theme="dark"
+              variant="login"
+              className="drop-shadow-[0_14px_35px_rgba(0,0,0,0.45)] [--brand-planet:clamp(86px,14vw,112px)]"
+            />
           </div>
-          
-          <div className="space-y-6">
-            {error && (
-              <div className="p-3 bg-red-50 border border-red-100 rounded-md">
-                <p className="text-sm text-red-500 text-center animate-fade-in">{error}</p>
+
+          <div className="relative overflow-hidden rounded-[30px] border border-white/14 bg-black/38 px-5 py-6 text-white shadow-[0_40px_120px_rgba(0,0,0,0.56)] backdrop-blur-[34px] md:px-6 md:py-7">
+            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.08)_0%,rgba(255,255,255,0.025)_28%,rgba(0,0,0,0.08)_100%)]" />
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.07),transparent_72%)]" />
+            <div className="pointer-events-none absolute inset-0 rounded-[30px] ring-1 ring-inset ring-white/8" />
+
+            <div className="relative flex flex-col items-center text-center">
+              <p className="text-xs font-semibold uppercase tracking-[0.38em] text-[#b6f23f]">
+                Acesso interno
+              </p>
+              <p className="mt-3 w-full text-sm leading-6 text-white/74">
+                Um espaço que conecta processos, treinamentos e conhecimento para manter o time em órbita.
+              </p>
+
+              <div className="mt-6 w-full space-y-3">
+                <button
+                  type="button"
+                  onClick={handleAccess}
+                  className="flex w-full items-center justify-center gap-3 rounded-2xl border border-white/14 bg-black/24 px-4 py-4 text-base font-bold text-white shadow-[0_18px_32px_rgba(0,0,0,0.28)] backdrop-blur-2xl transition-transform duration-200 hover:-translate-y-0.5 hover:bg-white/8"
+                >
+                  Acessar plataforma
+                </button>
+
+                <button
+                  type="button"
+                  disabled={!gcpLoginEnabled}
+                  className="flex w-full items-center justify-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-base font-semibold text-white/70 shadow-[0_10px_28px_rgba(0,0,0,0.16)] backdrop-blur-2xl transition-colors disabled:cursor-not-allowed disabled:opacity-55"
+                  title="Login corporativo disponível após integração"
+                  >
+                  <img
+                    src="https://www.svgrepo.com/show/303108/google-icon-logo.svg"
+                    alt=""
+                    aria-hidden="true"
+                    className="h-5 w-5 shrink-0"
+                  />
+                  Entrar com Google
+                </button>
               </div>
-            )}
-            
-            <button
-              type="button"
-              onClick={handleGoogleLogin}
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-3 py-3 px-4 border border-gray-300 rounded-md shadow-sm text-base font-semibold text-zinc-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed group"
-            >
-              <GoogleIcon className="h-6 w-6 transition-transform group-hover:scale-110" />
-              <span>{loading ? 'Processando...' : 'Entrar com Google'}</span>
-            </button>
 
-            <p className="text-center text-gray-500 text-[11px] leading-relaxed">
-              Faça login com seu e-mail DOT Digital Group para acessar o banco.
-            </p>
+              <p className="mt-6 text-[11px] font-medium uppercase tracking-[0.26em] text-white/42">
+                Acesso restrito @dotgroup.com.br
+              </p>
+
+              {error && (
+                <p className="mt-4 rounded-xl border border-red-300/20 bg-red-500/10 px-4 py-3 text-center text-sm text-red-50">
+                  {error}
+                </p>
+              )}
+            </div>
           </div>
         </div>
-      </div>
-    </div>
+      </main>
+    </LoginBackdrop>
   );
 };
 

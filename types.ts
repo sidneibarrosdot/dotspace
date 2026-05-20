@@ -18,6 +18,27 @@ export interface PortfolioItem {
   tags?: string[];
   likes?: number;
   views?: number;
+  versao?: string;
+  integridade?: string;
+  ultimaRevisao?: string;
+  links?: Array<{
+    label: string;
+    href: string;
+    hint?: string;
+  }>;
+  pinned?: boolean;
+  objetivo?: string;
+  indicador?: string;
+  meta?: string;
+  resultado?: string;
+  ciclo?: string;
+  responsavel?: string;
+  statusKR?: string;
+  krLinks?: Array<{
+    label: string;
+    href: string;
+    hint?: string;
+  }>;
 }
 
 export interface Favorite {

@@ -9,6 +9,8 @@
   --color-accent-contrast: #4d7c0f;
 
   --animate-fade-in: fadeIn 0.3s ease-out;
+  --animate-rise-in: riseIn 0.45s ease-out;
+  --animate-section-rise: sectionRise 0.58s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 
   @keyframes fadeIn {
     0% {
@@ -17,6 +19,89 @@
     100% {
       opacity: 1;
     }
+  }
+
+  @keyframes riseIn {
+    0% {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes sectionRise {
+    0% {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes dot-loader {
+    0% {
+      transform: translateX(-105%);
+    }
+    50% {
+      transform: translateX(110%);
+    }
+    100% {
+      transform: translateX(-105%);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ui-motion button,
+  .ui-motion a,
+  .ui-motion input,
+  .ui-motion select {
+    transition:
+      transform 180ms ease,
+      box-shadow 220ms ease,
+      background-color 220ms ease,
+      border-color 220ms ease,
+      color 220ms ease,
+      opacity 220ms ease;
+  }
+
+  .ui-motion button:hover,
+  .ui-motion a:hover {
+    transform: translateY(-1px);
+  }
+
+  .ui-motion .animate-ui-rise {
+    animation: var(--animate-rise-in);
+  }
+
+  .ui-motion main section,
+  .ui-motion main article {
+    animation: var(--animate-section-rise);
+  }
+
+  .ui-motion main section:nth-of-type(2),
+  .ui-motion main article:nth-of-type(2) {
+    animation-delay: 70ms;
+  }
+
+  .ui-motion main section:nth-of-type(3),
+  .ui-motion main article:nth-of-type(3) {
+    animation-delay: 120ms;
+  }
+
+  .ui-motion main section:nth-of-type(4),
+  .ui-motion main article:nth-of-type(4) {
+    animation-delay: 170ms;
+  }
+
+  .ui-motion main section:nth-of-type(n + 5),
+  .ui-motion main article:nth-of-type(n + 5) {
+    animation-delay: 210ms;
   }
 }
 
