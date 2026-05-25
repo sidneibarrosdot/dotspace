@@ -25,7 +25,7 @@ const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, isLoggedIn, session
   };
 
   return (
-    <header className="sticky top-0 z-50 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm border-b border-gray-200 dark:border-zinc-700/50">
+    <header className="sticky top-0 z-50 bg-white/92 dark:bg-zinc-900/80 backdrop-blur-sm border-b border-zinc-300 dark:border-zinc-700/50">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex min-h-16 items-center justify-between gap-4 py-2 sm:min-h-20">
           <div className="flex min-w-0 items-center gap-3 sm:gap-4">
@@ -42,7 +42,7 @@ const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, isLoggedIn, session
               <button 
                 onClick={adminEnabled ? onNavigateToAdmin : undefined} 
                 disabled={!adminEnabled}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-gray-200 text-zinc-900 transition-colors hover:bg-gray-300 dark:bg-zinc-700 dark:text-white dark:hover:bg-zinc-600 disabled:cursor-not-allowed disabled:opacity-60 sm:h-11 sm:w-11"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-zinc-300 text-zinc-950 transition-colors hover:bg-zinc-400 dark:bg-zinc-700 dark:text-white dark:hover:bg-zinc-600 disabled:cursor-not-allowed disabled:opacity-60 sm:h-11 sm:w-11"
                 title={adminEnabled ? 'Painel Administrativo' : 'Painel Administrativo disponível após login'}
                 aria-label={adminEnabled ? 'Painel Administrativo' : 'Painel Administrativo disponível após login'}
               >

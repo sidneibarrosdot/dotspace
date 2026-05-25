@@ -61,7 +61,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ searchTerm, setSearchTerm, placeh
     <div className="relative" ref={dropdownRef}>
       <div className="relative">
         <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-          <SearchIcon className={`h-5 w-5 ${isLightMode ? 'text-zinc-400' : 'text-gray-400'}`} />
+          <SearchIcon className={`h-5 w-5 ${isLightMode ? 'text-zinc-500' : 'text-gray-400'}`} />
         </div>
         <input
           id="portfolio-search"
@@ -74,7 +74,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ searchTerm, setSearchTerm, placeh
           onFocus={() => searchTerm.length > 0 && setShowSuggestions(true)}
           className={`w-full rounded-full border py-3 pl-12 pr-12 transition-all duration-300 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent ${
             isLightMode
-              ? 'border-zinc-200 bg-white text-zinc-900 placeholder:text-zinc-400 shadow-sm'
+              ? 'border-zinc-300 bg-zinc-50 text-zinc-900 placeholder:text-zinc-500 shadow-sm'
               : 'border-zinc-700 bg-zinc-800 text-white placeholder:text-gray-400 shadow-sm'
           }`}
         />
@@ -82,7 +82,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ searchTerm, setSearchTerm, placeh
           <button
             onClick={() => { setSearchTerm(''); setShowSuggestions(false); }}
             className={`absolute inset-y-0 right-0 flex items-center pr-4 transition-colors ${
-              isLightMode ? 'text-zinc-400 hover:text-zinc-600' : 'text-gray-400 hover:text-gray-200'
+              isLightMode ? 'text-zinc-500 hover:text-zinc-700' : 'text-gray-400 hover:text-gray-200'
             }`}
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
@@ -94,7 +94,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ searchTerm, setSearchTerm, placeh
 
       {showSuggestions && suggestions.length > 0 && (
         <div className={`absolute z-50 mt-2 w-full overflow-hidden rounded-2xl border shadow-xl animate-in fade-in slide-in-from-top-2 duration-200 ${
-          isLightMode ? 'border-zinc-200 bg-white' : 'border-zinc-700 bg-zinc-800'
+          isLightMode ? 'border-zinc-300 bg-white' : 'border-zinc-700 bg-zinc-800'
         }`}>
           <div className="max-h-80 overflow-y-auto">
             {suggestions.slice(0, 8).map((item) => (
@@ -103,7 +103,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ searchTerm, setSearchTerm, placeh
                 onClick={() => handleSuggestionClick(item)}
                 className={`flex w-full items-center gap-4 border-b px-5 py-3 text-left transition-colors last:border-0 ${
                   isLightMode
-                    ? 'border-zinc-100 hover:bg-zinc-50'
+                    ? 'border-zinc-200 hover:bg-zinc-100'
                     : 'border-zinc-700/50 hover:bg-zinc-700/50'
                 }`}
               >
@@ -139,8 +139,8 @@ const SearchBar: React.FC<SearchBarProps> = ({ searchTerm, setSearchTerm, placeh
             ))}
           </div>
           {suggestions.length > 8 && (
-            <div className={`border-t px-5 py-2 text-center ${isLightMode ? 'border-zinc-100 bg-zinc-50' : 'border-zinc-700/50 bg-zinc-800/50'}`}>
-              <p className={`text-[10px] font-bold uppercase tracking-wider ${isLightMode ? 'text-zinc-400' : 'text-gray-400'}`}>Pressione Enter para ver todos os {suggestions.length} resultados</p>
+            <div className={`border-t px-5 py-2 text-center ${isLightMode ? 'border-zinc-200 bg-zinc-50' : 'border-zinc-700/50 bg-zinc-800/50'}`}>
+              <p className={`text-[10px] font-bold uppercase tracking-wider ${isLightMode ? 'text-zinc-500' : 'text-gray-400'}`}>Pressione Enter para ver todos os {suggestions.length} resultados</p>
             </div>
           )}
         </div>

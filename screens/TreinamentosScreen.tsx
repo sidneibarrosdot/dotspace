@@ -12,12 +12,13 @@ import {
   ArrowRight,
   BookOpen,
   ChevronDown,
+  LayoutGrid,
+  List,
   Eye,
   ExternalLink,
   Filter,
   Home,
   Heart,
-  LayoutGrid,
   BookMarked,
   MessageSquareMore,
   Bookmark,
@@ -69,6 +70,7 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
   const [shareFeedback, setShareFeedback] = useState('');
   const [expandedTrainingId, setExpandedTrainingId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const { interactions, getState, incrementViews, toggleLike, toggleFavorite, registerShare } = useLocalCardInteractions('treinamentos');
   const isLightMode = theme === 'light';
   const pageClass = isLightMode ? 'min-h-screen bg-gray-100 text-zinc-900 transition-colors duration-300' : 'min-h-screen bg-[#111114] text-white transition-colors duration-300';
@@ -81,10 +83,10 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
   const heroOverlayClass = isLightMode
     ? 'absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(247,142,67,0.12),transparent_36%),radial-gradient(circle_at_bottom_left,rgba(15,23,42,0.05),transparent_26%)]'
     : 'absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(247,142,67,0.12),transparent_36%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.05),transparent_26%)]';
-  const heroStatClass = isLightMode ? 'min-h-[112px] rounded-3xl border border-zinc-200 bg-white p-4 shadow-sm backdrop-blur-sm' : 'min-h-[112px] rounded-3xl border border-white/10 bg-white/8 p-4 backdrop-blur-sm';
+  const heroStatClass = isLightMode ? 'min-h-[108px] rounded-3xl border border-zinc-200 bg-white p-3.5 shadow-sm backdrop-blur-sm' : 'min-h-[108px] rounded-3xl border border-white/10 bg-white/8 p-3.5 backdrop-blur-sm';
   const filtersClass = isLightMode
-    ? 'relative z-40 space-y-4 rounded-[30px] border border-zinc-200 bg-white p-5 shadow-[0_25px_60px_rgba(15,23,42,0.08)] sm:p-6'
-    : 'relative z-40 space-y-4 rounded-[30px] border border-white/10 bg-[#151517] p-5 shadow-[0_25px_60px_rgba(0,0,0,0.2)] sm:p-6';
+    ? 'relative z-40 space-y-4 rounded-[30px] border border-zinc-200 bg-white p-4 shadow-[0_25px_60px_rgba(15,23,42,0.08)] sm:p-5'
+    : 'relative z-40 space-y-4 rounded-[30px] border border-white/10 bg-[#151517] p-4 shadow-[0_25px_60px_rgba(0,0,0,0.2)] sm:p-5';
   const filtersButtonClass = isLightMode
     ? 'inline-flex h-[52px] w-full items-center justify-between gap-3 rounded-full border border-zinc-200 bg-zinc-50 px-5 text-sm font-semibold text-zinc-800 transition-colors hover:bg-zinc-100 lg:w-48'
     : 'inline-flex h-[52px] w-full items-center justify-between gap-3 rounded-full border border-white/10 bg-white/6 px-5 text-sm font-semibold text-white/90 transition-colors hover:bg-white/10 lg:w-48';
@@ -101,6 +103,9 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
     ? 'rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-600 hover:bg-zinc-50'
     : 'rounded-full border border-white/10 bg-white/0 px-4 py-2 text-sm font-semibold text-white/65 hover:bg-white/6';
   const cardClass = isLightMode
+    ? 'group overflow-hidden rounded-[28px] border border-zinc-200 bg-white shadow-[0_20px_50px_rgba(15,23,42,0.08)] transition-transform hover:-translate-y-1'
+    : 'group overflow-hidden rounded-[28px] border border-white/10 bg-[#17171b] shadow-[0_20px_50px_rgba(0,0,0,0.22)] transition-transform hover:-translate-y-1';
+  const listCardClass = isLightMode
     ? 'group overflow-hidden rounded-[28px] border border-zinc-200 bg-white shadow-[0_20px_50px_rgba(15,23,42,0.08)] transition-transform hover:-translate-y-1'
     : 'group overflow-hidden rounded-[28px] border border-white/10 bg-[#17171b] shadow-[0_20px_50px_rgba(0,0,0,0.22)] transition-transform hover:-translate-y-1';
   const cardTextClass = isLightMode ? 'text-zinc-600' : 'text-white/70';
@@ -156,6 +161,10 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [viewMode]);
 
   useEffect(() => {
     if (!expandedTrainingId) return;
@@ -235,7 +244,7 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
         onLogout={onLogout}
       />
 
-      <main className="container mx-auto px-4 py-6 pb-28 sm:px-6 sm:py-8 sm:pb-8 lg:px-8">
+      <main className="container mx-auto px-4 py-6 pb-44 sm:px-6 sm:py-8 sm:pb-8 lg:px-8">
         <section className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
           <aside className="hidden xl:block">
             <div className={sidebarClass}>
@@ -272,7 +281,7 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
               <div className="relative z-10 grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.38em] text-[#F78E43]">Treinamentos</p>
-                  <h1 className={`mt-3 max-w-4xl text-3xl font-black leading-tight sm:text-4xl lg:text-5xl ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>
+                  <h1 className={`mt-3 max-w-4xl text-2xl font-black leading-tight sm:text-3xl lg:text-4xl ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>
                     Um hub para manter todos os colaboradores atualizados
                   </h1>
                   <p className={`mt-4 max-w-2xl text-sm leading-7 sm:text-base ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>
@@ -295,7 +304,7 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                 <div className="grid grid-cols-2 gap-3">
                   {stats.map((item) => (
                     <div key={item.label} className={heroStatClass}>
-                      <div className="mb-3 h-1.5 w-16 rounded-full" style={{ backgroundColor: item.accent }} />
+                      <div className="mb-3 h-1.5 w-16 rounded-full bg-zinc-300/70 dark:bg-white/20" />
                       <p className={`text-xs font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/50'}`}>{item.label}</p>
                       <p className={`mt-2 text-3xl font-black ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>{item.value}</p>
                     </div>
@@ -421,114 +430,328 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                     {area}
                   </button>
                 ))}
+
+                <div className="ml-auto flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('grid')}
+                    className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${
+                      viewMode === 'grid'
+                        ? 'border-[#88C125] bg-[#88C125] text-white'
+                        : isLightMode
+                          ? 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
+                          : 'border-white/10 bg-white/6 text-white/75 hover:bg-white/10'
+                    }`}
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                    Grade
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('list')}
+                    className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${
+                      viewMode === 'list'
+                        ? 'border-[#88C125] bg-[#88C125] text-white'
+                        : isLightMode
+                          ? 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
+                          : 'border-white/10 bg-white/6 text-white/75 hover:bg-white/10'
+                    }`}
+                  >
+                    <List className="h-4 w-4" />
+                    Lista
+                  </button>
+                </div>
               </div>
             </section>
 
             {filteredItems.length > 0 ? (
               <>
-                <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <section className={viewMode === 'grid' ? 'grid gap-4 md:grid-cols-2 xl:grid-cols-3' : 'grid gap-4'}>
                   {paginatedItems.map((item, index) => {
                     const localState = getState(item.id, item.views ?? 0, item.likes ?? 0, Boolean(item.pinned));
+                    const accent = '#F78E43';
 
                     return (
                       <article
                         key={item.id}
-                        className={cardClass}
+                        className={viewMode === 'grid' ? cardClass : listCardClass}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setExpandedTrainingId((current) => (current === item.id ? null : item.id))}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            setExpandedTrainingId((current) => (current === item.id ? null : item.id));
+                          }
+                        }}
                       >
-                      <div className="relative h-48 overflow-hidden">
-                        <img
-                          src={item.Imagem_capa}
-                          alt={item.Projeto}
-                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent" />
-                        <span className="absolute left-4 top-4 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.25em] text-white" style={{ backgroundColor: ['#88C125', '#4CD07D', '#F78E43', '#EEC137'][index % 4] }}>
-                          {item.Time || item.Cliente}
-                        </span>
-                      </div>
+                        {viewMode === 'grid' ? (
+                          <div className="flex h-full flex-col">
+                            <div className="relative h-40 overflow-hidden">
+                              <img
+                                src={item.Imagem_capa}
+                                alt={item.Projeto}
+                                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
+                              <span className="absolute left-4 top-4 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.25em] text-white" style={{ backgroundColor: accent }}>
+                                {item.Time || item.Cliente}
+                              </span>
+                            </div>
 
-                      <div className="p-5">
-                        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[#88C125]">
-                          {item.Time}
-                        </p>
-                        <h2 className={`mt-2 text-xl font-black leading-tight ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>{item.Projeto}</h2>
-                        <p className={`mt-3 text-sm leading-7 ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>{item.Assunto_geral}</p>
-                        <div className={`mt-3 flex flex-wrap items-center gap-2 text-xs ${isLightMode ? 'text-zinc-500' : 'text-white/55'}`}>
-                          <button
-                            type="button"
-                            onClick={() => incrementViews(item.id, item.views ?? 0, item.likes ?? 0, Boolean(item.pinned))}
-                            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 ${isLightMode ? 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
-                          >
-                            <Eye className="h-3.5 w-3.5" /> {localState.views}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => toggleLike(item.id, item.views ?? 0, item.likes ?? 0, Boolean(item.pinned))}
-                            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 ${isLightMode ? 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
-                          >
-                            <Heart className={`h-3.5 w-3.5 ${localState.liked ? 'fill-current' : ''}`} /> {localState.likes}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => toggleFavorite(item.id, item.views ?? 0, item.likes ?? 0, Boolean(item.pinned))}
-                            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 ${isLightMode ? 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
-                          >
-                            <Bookmark className={`h-3.5 w-3.5 ${localState.favorited ? 'fill-current' : ''}`} /> {localState.favorited ? 'Favoritado' : 'Favorito'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleShareItem(item)}
-                            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 ${isLightMode ? 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
-                          >
-                            <Share2 className="h-3.5 w-3.5" /> Compartilhar
-                          </button>
-                        </div>
+                            <div className={`flex flex-1 flex-col p-5 ${isLightMode ? 'border-t border-zinc-200/70 bg-white' : 'border-t border-white/10 bg-[#17171b]'}`}>
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="min-w-0">
+                                  <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[#F78E43]">
+                                    {item.Time}
+                                  </p>
+                                  <h2 className={`mt-1.5 text-[1.1rem] font-black leading-tight ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>
+                                    {item.Projeto}
+                                  </h2>
+                                </div>
+                              </div>
 
-                        <div className="mt-5 flex items-center gap-3">
-                          <button
-                            type="button"
-                            onClick={() => setExpandedTrainingId((current) => (current === item.id ? null : item.id))}
-                            className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${
-                              isLightMode ? 'border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50' : 'border-white/10 bg-white/6 text-white hover:bg-white/10'
-                            }`}
-                          >
-                            {expandedTrainingId === item.id ? 'Fechar detalhes' : 'Ver detalhes'}
-                            <ArrowRight className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => openAccess(item)}
-                            className="inline-flex items-center gap-2 rounded-full bg-[#88C125] px-4 py-2 text-sm font-bold text-white transition-colors hover:brightness-95"
-                          >
-                            Acessar
-                            <ExternalLink className="h-4 w-4" />
-                          </button>
-                        </div>
+                              <p className={`mt-3 text-sm leading-6 ${isLightMode ? 'text-zinc-600' : 'text-white/72'}`}>
+                                {item.Assunto_geral}
+                              </p>
 
-                        {expandedTrainingId === item.id && (
-                          <div className={`mt-5 rounded-2xl border p-4 ${isLightMode ? 'border-zinc-200 bg-zinc-50' : 'border-white/10 bg-white/5'}`}>
-                            <div className="grid gap-3 sm:grid-cols-2">
-                              <div>
-                                <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Categoria</p>
-                                <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.Cliente || 'Treinamento'}</p>
+                            <div className={`mt-4 rounded-2xl border px-4 py-3 hidden ${isLightMode ? 'border-zinc-200 bg-zinc-50' : 'border-white/10 bg-white/5'}`}>
+                                <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>
+                                  Detalhes rápidos
+                                </p>
+                                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                                  <div>
+                                    <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Público-alvo</p>
+                                    <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.Publico_alvo || 'Não informado'}</p>
+                                  </div>
+                                  <div>
+                                    <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Metodologia</p>
+                                    <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.Metodologias || 'Não informada'}</p>
+                                  </div>
+                                  <div>
+                                    <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Recursos</p>
+                                    <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.Mídias || item.Outros_recursos || 'Não informados'}</p>
+                                  </div>
+                                  <div>
+                                    <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Data</p>
+                                    <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.Data || 'Sem data'}</p>
+                                  </div>
+                                </div>
                               </div>
-                              <div>
-                                <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Data</p>
-                                <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.Data || 'Sem data'}</p>
+
+                              <div className={`mt-4 flex flex-wrap items-center gap-2 text-xs ${isLightMode ? 'text-zinc-500' : 'text-white/55'}`}>
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    incrementViews(item.id, item.views ?? 0, item.likes ?? 0, Boolean(item.pinned));
+                                  }}
+                                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 ${isLightMode ? 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
+                                >
+                                  <Eye className="h-3.5 w-3.5" /> {localState.views}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    toggleLike(item.id, item.views ?? 0, item.likes ?? 0, Boolean(item.pinned));
+                                  }}
+                                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 ${isLightMode ? 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
+                                >
+                                  <Heart className={`h-3.5 w-3.5 ${localState.liked ? 'fill-current' : ''}`} /> {localState.likes}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    toggleFavorite(item.id, item.views ?? 0, item.likes ?? 0, Boolean(item.pinned));
+                                  }}
+                                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 ${isLightMode ? 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
+                                >
+                                  <Bookmark className={`h-3.5 w-3.5 ${localState.favorited ? 'fill-current' : ''}`} /> {localState.favorited ? 'Favoritado' : 'Favorito'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    handleShareItem(item);
+                                  }}
+                                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 ${isLightMode ? 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
+                                >
+                                  <Share2 className="h-3.5 w-3.5" /> Compartilhar
+                                </button>
                               </div>
-                              <div>
-                                <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Público-alvo</p>
-                                <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.Publico_alvo || 'Não informado'}</p>
+
+                              <div className="mt-auto flex flex-wrap items-center gap-3 pt-5">
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    setExpandedTrainingId((current) => (current === item.id ? null : item.id));
+                                  }}
+                                  className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-semibold transition-colors ${
+                                    isLightMode ? 'border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50' : 'border-white/10 bg-white/6 text-white hover:bg-white/10'
+                                  }`}
+                                >
+                                  {expandedTrainingId === item.id ? 'Fechar detalhes' : 'Ver detalhes'}
+                                  <ArrowRight className="h-4 w-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    openAccess(item);
+                                  }}
+                                  className="inline-flex items-center gap-2 rounded-full bg-[#88C125] px-3.5 py-2 text-sm font-bold text-white transition-colors hover:brightness-95"
+                                >
+                                  Acessar
+                                  <ExternalLink className="h-4 w-4" />
+                                </button>
                               </div>
-                              <div>
-                                <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Metodologia</p>
-                                <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.Metodologias || 'Não informada'}</p>
+
+                              {expandedTrainingId === item.id && (
+                                <div className={`mt-5 rounded-2xl border p-4 ${isLightMode ? 'border-zinc-200 bg-zinc-50' : 'border-white/10 bg-white/5'}`}>
+                                  <div className="grid gap-3 sm:grid-cols-2">
+                                    <div>
+                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Categoria</p>
+                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.Cliente || 'Treinamento'}</p>
+                                    </div>
+                                    <div>
+                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Tema</p>
+                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.Assunto_especifico || 'Não informado'}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="grid gap-0 lg:grid-cols-[260px_minmax(0,1fr)]">
+                            <div className="relative h-32 overflow-hidden lg:h-full">
+                              <img
+                                src={item.Imagem_capa}
+                                alt={item.Projeto}
+                                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent" />
+                              <span className="absolute left-4 top-4 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.25em] text-white" style={{ backgroundColor: accent }}>
+                                {item.Time || item.Cliente}
+                              </span>
+                            </div>
+
+                            <div className={`p-4 lg:p-5`}>
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="min-w-0">
+                                  <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[#F78E43]">
+                                    {item.Time}
+                                  </p>
+                                  <h2 className={`mt-1.5 text-[1.08rem] font-black leading-tight ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>
+                                    {item.Projeto}
+                                  </h2>
+                                  <p className={`mt-2 text-sm leading-6 line-clamp-2 ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>
+                                    {item.Assunto_geral}
+                                  </p>
+                                </div>
+                                <span className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.25em] text-white" style={{ backgroundColor: accent }}>
+                                  {item.Time || item.Cliente}
+                                </span>
                               </div>
+                              <div className={`mt-3 flex flex-wrap items-center gap-2 text-xs ${isLightMode ? 'text-zinc-500' : 'text-white/55'}`}>
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    incrementViews(item.id, item.views ?? 0, item.likes ?? 0, Boolean(item.pinned));
+                                  }}
+                                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 ${isLightMode ? 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
+                                >
+                                  <Eye className="h-3.5 w-3.5" /> {localState.views}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    toggleLike(item.id, item.views ?? 0, item.likes ?? 0, Boolean(item.pinned));
+                                  }}
+                                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 ${isLightMode ? 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
+                                >
+                                  <Heart className={`h-3.5 w-3.5 ${localState.liked ? 'fill-current' : ''}`} /> {localState.likes}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    toggleFavorite(item.id, item.views ?? 0, item.likes ?? 0, Boolean(item.pinned));
+                                  }}
+                                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 ${isLightMode ? 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
+                                >
+                                  <Bookmark className={`h-3.5 w-3.5 ${localState.favorited ? 'fill-current' : ''}`} /> {localState.favorited ? 'Favoritado' : 'Favorito'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    handleShareItem(item);
+                                  }}
+                                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 ${isLightMode ? 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
+                                >
+                                  <Share2 className="h-3.5 w-3.5" /> Compartilhar
+                                </button>
+                              </div>
+
+                              <div className="mt-4 flex flex-wrap items-center gap-3">
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    setExpandedTrainingId((current) => (current === item.id ? null : item.id));
+                                  }}
+                                  className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-semibold transition-colors ${
+                                    isLightMode ? 'border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50' : 'border-white/10 bg-white/6 text-white hover:bg-white/10'
+                                  }`}
+                                >
+                                  {expandedTrainingId === item.id ? 'Fechar detalhes' : 'Ver detalhes'}
+                                  <ArrowRight className="h-4 w-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    openAccess(item);
+                                  }}
+                                  className="inline-flex items-center gap-2 rounded-full bg-[#88C125] px-3.5 py-2 text-sm font-bold text-white transition-colors hover:brightness-95"
+                                >
+                                  Acessar
+                                  <ExternalLink className="h-4 w-4" />
+                                </button>
+                              </div>
+
+                              {expandedTrainingId === item.id && (
+                                <div className={`mt-5 rounded-2xl border p-4 ${isLightMode ? 'border-zinc-200 bg-zinc-50' : 'border-white/10 bg-white/5'}`}>
+                                  <div className="grid gap-3 sm:grid-cols-2">
+                                    <div>
+                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Categoria</p>
+                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.Cliente || 'Treinamento'}</p>
+                                    </div>
+                                    <div>
+                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Data</p>
+                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.Data || 'Sem data'}</p>
+                                    </div>
+                                    <div>
+                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Público-alvo</p>
+                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.Publico_alvo || 'Não informado'}</p>
+                                    </div>
+                                    <div>
+                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Metodologia</p>
+                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.Metodologias || 'Não informada'}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </div>
                         )}
-                      </div>
-                    </article>
+                      </article>
                   );
                 })}
                 </section>

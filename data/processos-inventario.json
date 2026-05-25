@@ -1,0 +1,686 @@
+[
+  {
+    "Área": "DI",
+    "Nome do Documento": "Banco de vozes artificiais",
+    "Finalidade": "Exemplos de vozes para envio de casting",
+    "Link Atual (Drive)": "01_Casting_Voz_artificial",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DI",
+    "Nome do Documento": "Templates Roteiros",
+    "Finalidade": "Padrão de roteiros para inicio de projetos",
+    "Link Atual (Drive)": "DIs_Template_roteiros",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "Geral & Fluxo",
+    "Nome do Documento": "Portifolio de produtos DOT",
+    "Finalidade": "Arquivo com especificações de todos os produtos desenvolvidos pelo DOT",
+    "Link Atual (Drive)": "PORTFOLIO_DOT_30.12.22.xlsx",
+    "Status": "Sem informação",
+    "Dono do Processo": "Gestão",
+    "Prioridade": "2 º Trimestre"
+  },
+  {
+    "Área": "DM",
+    "Nome do Documento": "Padronização DMs",
+    "Finalidade": "Checklists de passos que os DMs devem seguir em cada etapa do desenvolvimento",
+    "Link Atual (Drive)": "DMs",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "AV",
+    "Nome do Documento": "Hub de AV",
+    "Finalidade": "Espaço onde estão centralizados os documentos de AV (internos do time e externos)",
+    "Link Atual (Drive)": "https://sites.google.com/dotgroup.com.br/fantastica-fabrica-de-videos/p%C3%A1gina-inicial",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DM",
+    "Nome do Documento": "Caixa de ferramentas",
+    "Finalidade": "Compilado de modelos, padrões e ferramentas para DMs",
+    "Link Atual (Drive)": "https://sites.google.com/dotgroup.com.br/caixa-de-ferramentas-design/introdu%C3%A7%C3%A3o",
+    "Status": "Em Revisão",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": "2 º Trimestre"
+  },
+  {
+    "Área": "DM",
+    "Nome do Documento": "Testes técnicos",
+    "Finalidade": "Documentos de processos seletivos para DMs efetivos em DevEaD",
+    "Link Atual (Drive)": "02_Documentos-teste",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DM",
+    "Nome do Documento": "Descrição da vaga e atribuições",
+    "Finalidade": "Documentos de processos seletivos para DMs efetivos em DevEaD",
+    "Link Atual (Drive)": "https://sites.google.com/dotgroup.com.br/caixa-de-ferramentas-design/processo-seletivo/educa%C3%A7%C3%A3o-desenvolvimento-ead?authuser=0",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DM",
+    "Nome do Documento": "Critérios de Avaliação técnica de perfil e portfólio",
+    "Finalidade": "Documentos de processos seletivos para DMs efetivos em DevEaD",
+    "Link Atual (Drive)": "https://sites.google.com/dotgroup.com.br/caixa-de-ferramentas-design/processo-seletivo/educa%C3%A7%C3%A3o-desenvolvimento-ead?authuser=0",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DM",
+    "Nome do Documento": "Critérios avaliativos do teste técnico",
+    "Finalidade": "Documentos de processos seletivos para DMs efetivos em DevEaD",
+    "Link Atual (Drive)": "https://sites.google.com/dotgroup.com.br/caixa-de-ferramentas-design/processo-seletivo/educa%C3%A7%C3%A3o-desenvolvimento-ead?authuser=0",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DM",
+    "Nome do Documento": "Roteiro de entrevista técnica",
+    "Finalidade": "Documentos de processos seletivos para DMs efetivos em DevEaD",
+    "Link Atual (Drive)": "https://sites.google.com/dotgroup.com.br/caixa-de-ferramentas-design/processo-seletivo/educa%C3%A7%C3%A3o-desenvolvimento-ead?authuser=0",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DM",
+    "Nome do Documento": "Roteiro de entrevista final",
+    "Finalidade": "Documentos de processos seletivos para DMs efetivos em DevEaD",
+    "Link Atual (Drive)": "https://sites.google.com/dotgroup.com.br/caixa-de-ferramentas-design/processo-seletivo/educa%C3%A7%C3%A3o-desenvolvimento-ead?authuser=0",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DM",
+    "Nome do Documento": "Testes técnicos",
+    "Finalidade": "Documentos de processos seletivos para DMs terceirizados em DevEaD",
+    "Link Atual (Drive)": "https://sites.google.com/dotgroup.com.br/caixa-de-ferramentas-design/processo-seletivo/educa%C3%A7%C3%A3o-desenvolvimento-ead?authuser=0",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DM",
+    "Nome do Documento": "Descrição da vaga e atribuições",
+    "Finalidade": "Documentos de processos seletivos para DMs terceirizados em DevEaD",
+    "Link Atual (Drive)": "https://sites.google.com/dotgroup.com.br/caixa-de-ferramentas-design/processo-seletivo/educa%C3%A7%C3%A3o-desenvolvimento-ead?authuser=0",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DM",
+    "Nome do Documento": "Critérios de Avaliação técnica de perfil e portfólio",
+    "Finalidade": "Documentos de processos seletivos para DMs terceirizados em DevEaD",
+    "Link Atual (Drive)": "https://sites.google.com/dotgroup.com.br/caixa-de-ferramentas-design/processo-seletivo/educa%C3%A7%C3%A3o-desenvolvimento-ead?authuser=0",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DM",
+    "Nome do Documento": "Critérios avaliativos do teste técnico",
+    "Finalidade": "Documentos de processos seletivos para DMs terceirizados em DevEaD",
+    "Link Atual (Drive)": "https://sites.google.com/dotgroup.com.br/caixa-de-ferramentas-design/processo-seletivo/educa%C3%A7%C3%A3o-desenvolvimento-ead?authuser=0",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DM",
+    "Nome do Documento": "Onboarding",
+    "Finalidade": "Seleção de documentos de onboarding",
+    "Link Atual (Drive)": "https://sites.google.com/dotgroup.com.br/caixa-de-ferramentas-design/onboarding?authuser=0",
+    "Status": "Defasado",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": "2 º Trimestre"
+  },
+  {
+    "Área": "DM",
+    "Nome do Documento": "Ongoing",
+    "Finalidade": "Documentos de ongoing DevEaD",
+    "Link Atual (Drive)": "https://sites.google.com/dotgroup.com.br/caixa-de-ferramentas-design/dia-a-dia/educa%C3%A7%C3%A3o-desenvolvimento?authuser=0",
+    "Status": "Defasado",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": "2 º Trimestre"
+  },
+  {
+    "Área": "DM",
+    "Nome do Documento": "Boas práticas",
+    "Finalidade": "Documentos de boas práticas de trabalho para DMs do DevEaD",
+    "Link Atual (Drive)": "https://sites.google.com/dotgroup.com.br/caixa-de-ferramentas-design/dia-a-dia/educa%C3%A7%C3%A3o-desenvolvimento?authuser=0",
+    "Status": "Defasado",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": "2 º Trimestre"
+  },
+  {
+    "Área": "DM",
+    "Nome do Documento": "Ongoing",
+    "Finalidade": "Documentos de ongoing EduCom",
+    "Link Atual (Drive)": "https://sites.google.com/dotgroup.com.br/caixa-de-ferramentas-design/dia-a-dia/educa%C3%A7%C3%A3o-educomunica%C3%A7%C3%A3o?authuser=0",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DM",
+    "Nome do Documento": "Boas práticas",
+    "Finalidade": "Documentos de boas práticas de trabalho para DMs de EduCom",
+    "Link Atual (Drive)": "https://sites.google.com/dotgroup.com.br/caixa-de-ferramentas-design/dia-a-dia/educa%C3%A7%C3%A3o-educomunica%C3%A7%C3%A3o?authuser=0",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DM",
+    "Nome do Documento": "Boas práticas",
+    "Finalidade": "Documentos de boas práticas de trabalho para DMs de Produto",
+    "Link Atual (Drive)": "https://sites.google.com/dotgroup.com.br/caixa-de-ferramentas-design/dia-a-dia/tecnologia-produto/studion-mx?authuser=0",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DM",
+    "Nome do Documento": "Materiais ricos e carreira",
+    "Finalidade": "Disponibilização de conteúdos ricos já consumidos por colegas",
+    "Link Atual (Drive)": "https://sites.google.com/dotgroup.com.br/caixa-de-ferramentas-design/carreira/conte%C3%BAdos?authuser=0",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DM",
+    "Nome do Documento": "PDI",
+    "Finalidade": "Seleção de conteúdos, cursos e livros para PDI",
+    "Link Atual (Drive)": "https://sites.google.com/dotgroup.com.br/caixa-de-ferramentas-design/carreira/desenvolvimento-individual?authuser=0",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DM",
+    "Nome do Documento": "PDC",
+    "Finalidade": "Registro dos últimos PDCs",
+    "Link Atual (Drive)": "https://sites.google.com/dotgroup.com.br/caixa-de-ferramentas-design/carreira/desenvolvimento-coletivo?authuser=0",
+    "Status": "Defasado",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": "3º Trimestre"
+  },
+  {
+    "Área": "DM",
+    "Nome do Documento": "Feedback",
+    "Finalidade": "Indicações para Feedback",
+    "Link Atual (Drive)": "https://sites.google.com/dotgroup.com.br/caixa-de-ferramentas-design/carreira/feedback?authuser=0",
+    "Status": "Em Revisão",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": "3º Trimestre"
+  },
+  {
+    "Área": "LP",
+    "Nome do Documento": "Diretrizes",
+    "Finalidade": "Diretrizes de Gestão de Projetos",
+    "Link Atual (Drive)": "Especialidade de Gestão de Projetos | Diretrizes_v1.2.docx",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "LP",
+    "Nome do Documento": "Relatório de Execução",
+    "Finalidade": "Modelo de relatórios de execução para as áreas de negócio: DevEaD, Intel e Operação",
+    "Link Atual (Drive)": "Relatórios de Execução Financeira",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "LP",
+    "Nome do Documento": "Plano de contrato",
+    "Finalidade": "Check list com ações (por fase de execução do projeto) e agenda de atribuições",
+    "Link Atual (Drive)": "20251017_CLIENTE_SOLUÇÃO_CHECKLIST_PLANO_DE_CONTRATO",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "LP",
+    "Nome do Documento": "Kickoff",
+    "Finalidade": "Modelo padrão para kickoff do projeto",
+    "Link Atual (Drive)": "20251017_CLIENTE_SOLUÇÃO_KICKOFF.pptx",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "LP",
+    "Nome do Documento": "Kickoff",
+    "Finalidade": "Modelo padrão DevEaD para kickoff do projeto",
+    "Link Atual (Drive)": "DevEaD_Projeto_Template_Cliente_Projeto_Kickoff.pptx",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "LP",
+    "Nome do Documento": "Rubrica do contrato",
+    "Finalidade": "Modelo de gestão de rubricas e controle orçamentário",
+    "Link Atual (Drive)": "MODELO_CLIENTE | ÁREA DE NEGÓCIO [Contrato XX/XXX]",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "LP",
+    "Nome do Documento": "Matriz RACI",
+    "Finalidade": "Maper as atribuições e responsabilidades de cada interlocutor",
+    "Link Atual (Drive)": "20260116_CLIENTE_SOLUÇÃO_MATRIZ_RACI.xlsx",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "LP",
+    "Nome do Documento": "Mapeamento de riscos",
+    "Finalidade": "Template modelo para gestão de riscos",
+    "Link Atual (Drive)": "20251017_CLIENTE_SOLUÇÃO_GERENCIAMENTO_DE_RISCOS",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "LP",
+    "Nome do Documento": "Ata de Status Report",
+    "Finalidade": "Modelo de Ata para registro das ações do projeto",
+    "Link Atual (Drive)": "20251017_CLIENTE_SOLUÇÃO_ATA_STATUS_REPORT.docx",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "LP",
+    "Nome do Documento": "Repasse de projeto",
+    "Finalidade": "Template modelo para repasse ao DevEaD",
+    "Link Atual (Drive)": "Documento de Repasse_Fundação Itau Social.docx",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "LP",
+    "Nome do Documento": "Termo de Encerramento",
+    "Finalidade": "Relatório e/ou apresentação de encerramento do contrato para envio ao Cliente;",
+    "Link Atual (Drive)": "20251017_CLIENTE_SOLUÇÃO_TERMO_DE_ENCERRAMENTO.pptx",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DM",
+    "Nome do Documento": "Caixa de ferramenta",
+    "Finalidade": "Orientações para DMs no dia a dia",
+    "Link Atual (Drive)": "https://sites.google.com/dotgroup.com.br/caixa-de-ferramentas-design/introdu%C3%A7%C3%A3o",
+    "Status": "Válido",
+    "Dono do Processo": "DMs",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DM",
+    "Nome do Documento": "Templates Repasses Fornecedores",
+    "Finalidade": "Arquivos de padrões para repasses a terceiros",
+    "Link Atual (Drive)": "03_Repasses",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DM",
+    "Nome do Documento": "Formações",
+    "Finalidade": "Boas práticas e dicas para criar guias de entregáveis",
+    "Link Atual (Drive)": "01_Formacoes",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DM",
+    "Nome do Documento": "Check-list validação",
+    "Finalidade": "Check-list para",
+    "Link Atual (Drive)": "02_Checklists",
+    "Status": "",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DM",
+    "Nome do Documento": "Wireframe",
+    "Finalidade": "Instrução de uso da ferramenta",
+    "Link Atual (Drive)": "Wireframe",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "Geral & Fluxo",
+    "Nome do Documento": "Fluxo de desenvolvimento EaD",
+    "Finalidade": "Informações de fluxo de produção do desenvolvimento EaD",
+    "Link Atual (Drive)": "Fluxo_Prod_Navegavel_Editavel",
+    "Status": "Sem informação",
+    "Dono do Processo": "Gestão*",
+    "Prioridade": "1º Trimestre"
+  },
+  {
+    "Área": "PC",
+    "Nome do Documento": "Manual de Prompts Produção de Mapa de conteúdo",
+    "Finalidade": "Manual de Prompts Produção de Mapa de conteúdo com o Gemini",
+    "Link Atual (Drive)": "Geração_Mapa_Conteúdo_Gemini",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DI",
+    "Nome do Documento": "Manual de Roteirização com IA no Flow",
+    "Finalidade": "Manual de Roteirização com IA no Flow",
+    "Link Atual (Drive)": "Flows",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DI",
+    "Nome do Documento": "Manual de Prompts para Roteirização de E-learning",
+    "Finalidade": "Manual de Prompts para Roteirização de E-learning",
+    "Link Atual (Drive)": "E-l_Gemini",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "CEs",
+    "Nome do Documento": "Modelo_Repasse_CE_DeV",
+    "Finalidade": "Template modelo para repasse do CE ao DevEaD",
+    "Link Atual (Drive)": "Modelo_Repasse_CE_DeV.docx",
+    "Status": "Válido",
+    "Dono do Processo": "Consultor Educacional",
+    "Prioridade": ""
+  },
+  {
+    "Área": "Front",
+    "Nome do Documento": "Documento de boas práticas",
+    "Finalidade": "Documentar todos os processos e particularidades para desenvolver o Frontend dentro do time de Studion.mx",
+    "Link Atual (Drive)": "Documentação Técnica - SPA",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "Front",
+    "Nome do Documento": "Octopus",
+    "Finalidade": "Ferramenta e boas práticas",
+    "Link Atual (Drive)": "https://octopus.dotgroup.com.br/login",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "Front",
+    "Nome do Documento": "FrontHub",
+    "Finalidade": "Centralizar a documentaçãode todos processos que o front edtech pode se deparar durante o trabalho. Possui orientações gerais para o desenvolvimento dos projetos, boas práticas para uso com IA, documentação do LEGO e POPs",
+    "Link Atual (Drive)": "https://fronthub.hom.dotgroup.com.br/\n\n(Acesso via VPN)",
+    "Status": "Válido",
+    "Dono do Processo": "Fronts responsáveis pela documentação: Emannuel, Glauber e André",
+    "Prioridade": ""
+  },
+  {
+    "Área": "CEs",
+    "Nome do Documento": "Minuta Manifestação de Interesse DOT",
+    "Finalidade": "Template de minuta para manifestar interesse em renovação de contratos",
+    "Link Atual (Drive)": "Minuta Manifestação de Interesse DOT (1).docx",
+    "Status": "Válido",
+    "Dono do Processo": "Consultor Educacional",
+    "Prioridade": ""
+  },
+  {
+    "Área": "CEs",
+    "Nome do Documento": "20251017_CLIENTE_SOLUÇÃO_KICKOFF",
+    "Finalidade": "Template de apresentação PPT para agenda de kickoff de novos contratos/clientes",
+    "Link Atual (Drive)": "20251017_CLIENTE_SOLUÇÃO_KICKOFF.pptx",
+    "Status": "Válido",
+    "Dono do Processo": "Consultor Educacional",
+    "Prioridade": ""
+  },
+  {
+    "Área": "CEs",
+    "Nome do Documento": "20251017_CLIENTE_SOLUÇÃO_TERMO_DE_ENCERRAMENTO",
+    "Finalidade": "Template de apresentação PPT referente ao encerramento de contrato",
+    "Link Atual (Drive)": "20251017_CLIENTE_SOLUÇÃO_TERMO_DE_ENCERRAMENTO.pptx",
+    "Status": "Válido",
+    "Dono do Processo": "Consultor Educacional",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DI",
+    "Nome do Documento": "Teste técnico DI",
+    "Finalidade": "Teste técnico aplicado a para vaga de DIs",
+    "Link Atual (Drive)": "1_Correcao de prova tecnica",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DI",
+    "Nome do Documento": "Guia de entrevista inicial vaga DI",
+    "Finalidade": "Material para guiar a conversa com candidato a vaga de DI",
+    "Link Atual (Drive)": "Guia para entrevistatécnica_DI",
+    "Status": "Defasado",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DI",
+    "Nome do Documento": "Guia de avaliador DI",
+    "Finalidade": "Material para guiar o DI avaliador do processo seletivo de novos DIs",
+    "Link Atual (Drive)": "Boas-vindas, avaliador!",
+    "Status": "Defasado",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "Geral & Fluxo",
+    "Nome do Documento": "Fábrica de vídeos",
+    "Finalidade": "Orientações sobre o AV DOT",
+    "Link Atual (Drive)": "https://sites.google.com/dotgroup.com.br/fantastica-fabrica-de-videos",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "Terceiros",
+    "Nome do Documento": "Casting Freela DOT",
+    "Finalidade": "Planilha com a disponibilização de diferentes parceiros para atuação no DOT",
+    "Link Atual (Drive)": "Casting | Freelas Sob Demanda - DOT",
+    "Status": "Válido",
+    "Dono do Processo": "Compras",
+    "Prioridade": ""
+  },
+  {
+    "Área": "Terceiros",
+    "Nome do Documento": "Disponibilidade RTs parceiros",
+    "Finalidade": "Planilha com a disponibilidade atualizada dos RTs parceiros",
+    "Link Atual (Drive)": "Disponibilidade Fornecedores RT",
+    "Status": "Válido",
+    "Dono do Processo": "RT Camilla Medeiros",
+    "Prioridade": ""
+  },
+  {
+    "Área": "Geral & Fluxo",
+    "Nome do Documento": "Guia de apontamento de horas",
+    "Finalidade": "Orientações sobre o apontamento integral das horas",
+    "Link Atual (Drive)": "DOT-GuiaApontamentos_v3.pdf",
+    "Status": "Válido",
+    "Dono do Processo": "Heads Gestão Ágil",
+    "Prioridade": ""
+  },
+  {
+    "Área": "PC",
+    "Nome do Documento": "Manual de Prompts Produção de Conteúdo DesenEAD",
+    "Finalidade": "Manual de Prompts Produção de Conteúdo com IA no Gemini",
+    "Link Atual (Drive)": "Manual",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DI",
+    "Nome do Documento": "Manual de direitos autorais e recursos didáticos",
+    "Finalidade": "Manual de direitos autorais e recursos didáticos",
+    "Link Atual (Drive)": "Direito autoral e recursos didáticos.pdf",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DI",
+    "Nome do Documento": "Template Checklist SESCOOP NA",
+    "Finalidade": "Checklists de processos e padrões para entrega de SESCOOP NA",
+    "Link Atual (Drive)": "11.Checklists",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DI",
+    "Nome do Documento": "Template Capacitação Conteúdista",
+    "Finalidade": "Template padrão para capacitação de conteudista terceiro",
+    "Link Atual (Drive)": "10.Template_Capacitacao_Conteudista",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DI",
+    "Nome do Documento": "Templaetes Kickoff",
+    "Finalidade": "Template padrão para reunião de kickoff e modelo de repasse do CE para DEV.",
+    "Link Atual (Drive)": "09.Template_Kickoff_Briefing",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DI",
+    "Nome do Documento": "Template Validações Entregáveis",
+    "Finalidade": "Template padrão para envio a clientes e para uso interno de validação dos entregáveis",
+    "Link Atual (Drive)": "08.Documentos_validacao",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DI",
+    "Nome do Documento": "Template Repasse Interno",
+    "Finalidade": "Template padrão de repasse de demandas internas entre os times",
+    "Link Atual (Drive)": "07.Repasse_demanda",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DI",
+    "Nome do Documento": "Templaetes treinamentos presenciais",
+    "Finalidade": "Template padrão para criação de documentação para apresentações de treinamentos presenciais",
+    "Link Atual (Drive)": "06.Cursos_presenciais",
+    "Status": "Sem informação",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DI",
+    "Nome do Documento": "Template Mídias | Videos e Podcasts",
+    "Finalidade": "Templates padrão para criação vídeos e podcasts",
+    "Link Atual (Drive)": "05.Midias",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DI",
+    "Nome do Documento": "Template E-BOOK",
+    "Finalidade": "Template padrão para criação de e-books em pdf",
+    "Link Atual (Drive)": "04.EB_PDF",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DI",
+    "Nome do Documento": "Template Roteiro DodcFlex",
+    "Finalidade": "Template padrão para criação de roteiro dentro do DocFlex",
+    "Link Atual (Drive)": "03.Template_EL_Docflex",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DI",
+    "Nome do Documento": "Template PMV",
+    "Finalidade": "Template padrão para criação de PMV",
+    "Link Atual (Drive)": "02.PMV",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DI",
+    "Nome do Documento": "Template Conteúdo Bruto",
+    "Finalidade": "Template padrão para criação de conteúdo bruto.",
+    "Link Atual (Drive)": "01.Conteudo_Bruto",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "DI",
+    "Nome do Documento": "Modelo de Pasta Drive",
+    "Finalidade": "Estrutura de modelos para criação de pastas de novos projetos",
+    "Link Atual (Drive)": "00.Modelo_pasta_projeto",
+    "Status": "Válido",
+    "Dono do Processo": "Líder Especialidade",
+    "Prioridade": ""
+  },
+  {
+    "Área": "Geral & Fluxo",
+    "Nome do Documento": "Banco de PMV",
+    "Finalidade": "Plataforma centralizada de gestão e consulta de PMVs. .",
+    "Link Atual (Drive)": "https://banco-pmvs-dot-317500236403.us-west1.run.app/",
+    "Status": "Válido",
+    "Dono do Processo": "Sidnei Barros",
+    "Prioridade": ""
+  },
+  {
+    "Área": "Geral & Fluxo",
+    "Nome do Documento": "Biblioteca Dot",
+    "Finalidade": "Organizar entregas Dot para acesso de todos",
+    "Link Atual (Drive)": "https://lookerstudio.google.com/u/0/reporting/3da7575a-c566-4e2e-abe7-da7a4d96d20b/page/vOGzB?s=lhDfoHd4s60",
+    "Status": "Defasado",
+    "Dono do Processo": "\"sem dono\"",
+    "Prioridade": ""
+  }
+]

@@ -1,15 +1,18 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Header from '../components/Header';
 import MobileFooterNav from '../components/MobileFooterNav';
+import NeutralThumb from '../components/NeutralThumb';
 import Pagination from '../components/Pagination';
 import PageFilterActions from '../components/PageFilterActions';
 import SearchBar from '../components/SearchBar';
 import { useLocalCardInteractions } from '../hooks/useLocalCardInteractions';
-import type { PortfolioItem } from '../types';
+import type { KRsItem } from '../data/krsItems';
 import { krsItems } from '../data/krsItems';
-import { FEEDBACK_COPY_ERROR, FEEDBACK_COPY_SUCCESS, FEEDBACK_TIMEOUT_ERROR, FEEDBACK_TIMEOUT_SUCCESS } from '../constants/feedbackMessages';
+import { KR_META_AREA_OPTIONS, KR_PERIOD_OPTIONS, KR_STATUS_OPTIONS, KR_SYNERGY_OPTIONS, KR_FUNCAO_OPTIONS, KR_TIME_OPTIONS } from '../data/krsConfig';
+import { Bar, BarChart, CartesianGrid, Cell, LabelList, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import {
   ArrowRight,
+  BookMarked,
   BookOpen,
   ChevronDown,
   Eye,
@@ -19,14 +22,15 @@ import {
   Home,
   Heart,
   LayoutGrid,
-  BookMarked,
-  Link2,
   MessageSquareMore,
   ShieldCheck,
   Bookmark,
   Share2,
+  TrendingUp,
+  Users,
 } from 'lucide-react';
 import type { User } from 'firebase/auth';
+import { FEEDBACK_COPY_ERROR, FEEDBACK_COPY_SUCCESS, FEEDBACK_TIMEOUT_ERROR, FEEDBACK_TIMEOUT_SUCCESS } from '../constants/feedbackMessages';
 
 type SortMode = 'recentes' | 'a-z' | 'z-a';
 
@@ -44,19 +48,24 @@ interface KRsScreenProps {
   offlineMode?: boolean;
 }
 
-const compareByDateDesc = (a: PortfolioItem, b: PortfolioItem) => {
-  const dateA = Date.parse(a.ultimaRevisao || a.Data || '');
-  const dateB = Date.parse(b.ultimaRevisao || b.Data || '');
-  if (dateA !== dateB) return dateB - dateA;
-  return a.Projeto.localeCompare(b.Projeto, 'pt-BR');
-};
-
 const cardAccent = '#EEC137';
+const krConfig = {
+  metaAreas: KR_META_AREA_OPTIONS,
+  statuses: KR_STATUS_OPTIONS,
+  sinergias: KR_SYNERGY_OPTIONS,
+  periodos: KR_PERIOD_OPTIONS,
+  funcoes: KR_FUNCAO_OPTIONS,
+  times: KR_TIME_OPTIONS,
+} as const;
 
 const statusTone: Record<string, { dark: string; light: string }> = {
-  Ativo: {
+  'No prazo': {
     dark: 'border-[#4CD07D]/30 bg-[#4CD07D]/10 text-[#c8ffe0]',
     light: 'border-[#4CD07D]/40 bg-[#4CD07D]/16 text-[#166a41]',
+  },
+  'Em Risco': {
+    dark: 'border-[#F2A43A]/30 bg-[#F2A43A]/10 text-[#ffe6bf]',
+    light: 'border-[#F2A43A]/45 bg-[#F2A43A]/16 text-[#8b4d06]',
   },
   'Em andamento': {
     dark: 'border-[#4CD07D]/30 bg-[#4CD07D]/10 text-[#c8ffe0]',
@@ -70,68 +79,202 @@ const statusTone: Record<string, { dark: string; light: string }> = {
     dark: 'border-[#EEC137]/30 bg-[#EEC137]/10 text-[#fff0c7]',
     light: 'border-[#EEC137]/45 bg-[#EEC137]/18 text-[#7f5b07]',
   },
+  Concluído: {
+    dark: 'border-[#4CD07D]/30 bg-[#4CD07D]/10 text-[#c8ffe0]',
+    light: 'border-[#4CD07D]/40 bg-[#4CD07D]/16 text-[#166a41]',
+  },
+  'A iniciar': {
+    dark: 'border-white/10 bg-white/6 text-white/72',
+    light: 'border-zinc-300 bg-zinc-100 text-zinc-700',
+  },
+  Atrasado: {
+    dark: 'border-[#F78E43]/30 bg-[#F78E43]/10 text-[#ffe0c7]',
+    light: 'border-[#F78E43]/45 bg-[#F78E43]/16 text-[#8a3f06]',
+  },
   Pendente: {
     dark: 'border-white/10 bg-white/6 text-white/72',
     light: 'border-zinc-300 bg-zinc-100 text-zinc-700',
   },
 };
 
-const getKrLinks = (item: PortfolioItem) => {
-  if (item.krLinks?.length) return item.krLinks;
+const getString = (...values: Array<string | undefined | null>) =>
+  values.find((value) => typeof value === 'string' && value.trim().length > 0)?.trim() || '';
 
-  return [
-    { label: 'Abrir KR', href: item.Link_PMV, hint: 'Documento principal' },
-    { label: 'Painel', href: `${item.Link_PMV}/painel`, hint: 'Indicadores' },
-    { label: 'Plano', href: `${item.Link_PMV}/acao`, hint: 'Execução' },
-  ];
+const lower = (value: string) => value.toLowerCase();
+
+const displayValue = (value: string, fallback = '—') => (value.trim().length ? value : fallback);
+
+const parseNumericValue = (value: string) => {
+  const normalized = value.replace(/\s/g, '').replace('%', '').replace(/\./g, '').replace(',', '.').replace(/[^\d.-]/g, '');
+  if (!normalized) return null;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
 };
 
-const MetaBlock: React.FC<{ label: string; value: string; accent?: string; theme: 'light' | 'dark' }> = ({
-  label,
-  value,
-  accent,
-  theme: blockTheme,
-}) => {
-  const blockLight = blockTheme === 'light';
-  const valueClass = accent || (blockLight ? 'text-zinc-700' : 'text-white/78');
+const getKrMetaArea = (item: KRsItem) => getString(item.metaArea, item.Cliente, item.indicador);
+const getKrKeyResult = (item: KRsItem) => getString(item.keyResult, item.Projeto, item.Assunto_especifico);
+const getKrObjective = (item: KRsItem) => getString(item.objetivo, item.Assunto_geral, item.Outros_recursos);
+const getKrResponsavel = (item: KRsItem) => getString(item.responsavelKR, item.responsavel, item.Time);
+const getKrFuncao = (item: KRsItem) => getString(item.funcao, item.DI, item.DM);
+const getKrTeam = (item: KRsItem) => getString(item.timeSquad, item.Time, item.Publico_alvo);
+const getKrPeriod = (item: KRsItem) => getString(item.periodo, item.ciclo, item.Data, item.ultimaRevisao);
+const getKrStatus = (item: KRsItem) => getString(item.status, item.statusKR, item.integridade, item.Metodologias);
+const getKrSinergy = (item: KRsItem) => getString(item.sinergia, item.Publico_alvo);
+const getKrPartner = (item: KRsItem) => getString(item.frenteParceira);
+const getKrPlan = (item: KRsItem) => getString(item.planoAcao, item.Outros_recursos);
+const getKrNotes = (item: KRsItem) => getString(item.observacoes, item.observacoesResumo);
+const getKrBase = (item: KRsItem) => getString(item.valorBase);
+const getKrGoal = (item: KRsItem) => getString(item.valorAlvo, item.meta);
+const getKrCurrent = (item: KRsItem) => getString(item.valorAtual, item.resultado);
+const getKrEvolution = (item: KRsItem) => getString(item.evolucao);
+const getKrUpdatedAt = (item: KRsItem) => getString(item.ultimaAtualizacao, item.ultimaRevisao);
+const getKrEntries = (item: KRsItem) =>
+  item.inventoryEntries?.length
+    ? item.inventoryEntries
+    : [
+        {
+          id: item.id,
+          sourceIndex: item.sourceIndex,
+          metaArea: getKrMetaArea(item),
+          keyResult: getKrKeyResult(item),
+          responsavelKR: getKrResponsavel(item),
+          funcao: getKrFuncao(item),
+          timeSquad: getKrTeam(item),
+          periodo: getKrPeriod(item),
+          valorBase: getKrBase(item),
+          valorAlvo: getKrGoal(item),
+          valorAtual: getKrCurrent(item),
+          evolucao: getKrEvolution(item),
+          status: getKrStatus(item),
+          sinergia: getKrSinergy(item),
+          frenteParceira: getKrPartner(item),
+          planoAcao: getKrPlan(item),
+          ultimaAtualizacao: getKrUpdatedAt(item),
+          observacoes: getKrNotes(item),
+          objetivo: getKrObjective(item),
+          sourceSheetRow: item.sourceSheetRow,
+          pinned: Boolean(item.pinned),
+        },
+      ];
+
+const compareRecent = (a: KRsItem, b: KRsItem) => {
+  const dateA = Date.parse(getKrUpdatedAt(a));
+  const dateB = Date.parse(getKrUpdatedAt(b));
+
+  if (Number.isFinite(dateA) && Number.isFinite(dateB) && dateA !== dateB) {
+    return dateB - dateA;
+  }
+
+  if (a.sourceIndex !== b.sourceIndex) {
+    return a.sourceIndex - b.sourceIndex;
+  }
+
+  return getKrKeyResult(a).localeCompare(getKrKeyResult(b), 'pt-BR');
+};
+
+const getCompletionPercent = (item: KRsItem) => {
+  const status = getKrStatus(item);
+  const statusMap: Record<string, number> = {
+    Concluído: 100,
+    'No prazo': 82,
+    'Em andamento': 62,
+    'Sob revisão': 42,
+    'Em atenção': 28,
+    'A iniciar': 18,
+  };
+
+  const current = parseNumericValue(getKrCurrent(item));
+  const goal = parseNumericValue(getKrGoal(item));
+
+  if (current !== null && goal !== null && goal > 0) {
+    return Math.max(0, Math.min(100, Math.round((current / goal) * 100)));
+  }
+
+  if (current !== null && goal === null && current <= 100) {
+    return Math.max(0, Math.min(100, Math.round(current)));
+  }
+
+  return statusMap[status] ?? 35;
+};
+
+const accentByMetaArea = (value: string) => {
+  const key = lower(value);
+  if (key.includes('lead time')) return '#EEC137';
+  if (key.includes('redução de custo')) return '#F78E43';
+  if (key.includes('aumento de receita')) return '#4CD07D';
+  if (key.includes('satisfação')) return '#88C125';
+  return '#EEC137';
+};
+
+const MetaBlock: React.FC<{
+  label: string;
+  value: string;
+  accent?: string;
+  theme: 'light' | 'dark';
+}> = ({ label, value, accent, theme: blockTheme }) => {
+  const isLightMode = blockTheme === 'light';
 
   return (
-    <div className={`rounded-2xl border p-3 ${blockLight ? 'border-zinc-200 bg-white shadow-sm' : 'border-white/8 bg-white/5'}`}>
-      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${blockLight ? 'text-zinc-500' : 'text-white/40'}`}>{label}</p>
-      <p className={`mt-2 text-sm font-semibold leading-6 ${valueClass}`}>{value}</p>
+    <div className={`rounded-2xl border p-3 ${isLightMode ? 'border-zinc-200 bg-white shadow-sm' : 'border-white/8 bg-white/5'}`}>
+      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/40'}`}>{label}</p>
+      <p className={`mt-2 text-sm font-semibold leading-6 ${accent || (isLightMode ? 'text-zinc-700' : 'text-white/78')}`}>{value}</p>
     </div>
   );
 };
 
-const KrLink: React.FC<{
+const MetricCard: React.FC<{
   label: string;
-  href: string;
-  hint?: string;
-  onOpen: (href: string) => void;
+  value: string;
   theme: 'light' | 'dark';
-}> = ({ label, href, hint, onOpen, theme }) => {
-  const isLightMode = theme === 'light';
+  accent: string;
+  subdued?: boolean;
+}> = ({ label, value, theme: blockTheme, accent, subdued = false }) => {
+  const isLightMode = blockTheme === 'light';
+  const isEmpty = !value || value === '—';
+
   return (
-  <button
-    type="button"
-    onClick={() => onOpen(href)}
-    className={`group inline-flex items-center gap-2 rounded-full border px-4 py-2 text-left text-xs font-semibold transition-colors ${
-      isLightMode
-        ? 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
-        : 'border-white/10 bg-white/5 text-white/82 hover:bg-white/10'
-    }`}
-  >
-    <Link2 className="h-3.5 w-3.5 shrink-0 text-[#EEC137]" />
-    <span className="flex flex-col">
-      <span>{label}</span>
-      {hint && (
-        <span className={`text-[10px] font-medium uppercase tracking-[0.22em] ${isLightMode ? 'text-zinc-400' : 'text-white/40'}`}>
-          {hint}
-        </span>
-      )}
+    <div
+      className={`rounded-2xl border px-4 py-4 shadow-sm ${
+        isLightMode
+          ? subdued
+            ? 'border-zinc-200 bg-zinc-50'
+            : 'border-zinc-200 bg-gradient-to-br from-white via-[#fbfbf8] to-[#f6f7ef]'
+          : subdued
+            ? 'border-white/8 bg-white/5'
+            : 'border-white/10 bg-gradient-to-br from-white/8 via-white/6 to-white/3'
+      }`}
+    >
+      <div className={`mb-3 h-1.5 w-12 rounded-full bg-zinc-300/70 dark:bg-white/20 ${subdued ? 'opacity-60' : ''}`} />
+      <p className={`text-[10px] font-semibold uppercase tracking-[0.32em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>{label}</p>
+      <p
+        className={`mt-2 leading-none ${
+          isEmpty
+            ? `text-lg font-semibold ${isLightMode ? 'text-zinc-400' : 'text-white/45'}`
+            : `text-2xl font-black ${isLightMode ? 'text-zinc-900' : 'text-white'}`
+        }`}
+      >
+        {value}
+      </p>
+    </div>
+  );
+};
+
+const InfoChip: React.FC<{
+  label: string;
+  value: string;
+  theme: 'light' | 'dark';
+}> = ({ label, value, theme: chipTheme }) => {
+  const isLightMode = chipTheme === 'light';
+  return (
+    <span
+      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${
+        isLightMode ? 'border-zinc-200 bg-white text-zinc-700 shadow-sm' : 'border-white/10 bg-white/6 text-white/80'
+      }`}
+    >
+      <span className={`uppercase tracking-[0.22em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>{label}</span>
+      <span className="truncate max-w-[12rem]">{value}</span>
     </span>
-  </button>
-);
+  );
 };
 
 const KRsScreen: React.FC<KRsScreenProps> = ({
@@ -155,10 +298,15 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [shareFeedback, setShareFeedback] = useState('');
   const [expandedKrId, setExpandedKrId] = useState<string | null>(null);
+  const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const { interactions, getState, incrementViews, toggleLike, toggleFavorite, registerShare } = useLocalCardInteractions('krs');
+  const cardRefs = useRef<Record<string, HTMLElement | null>>({});
   const isLightMode = theme === 'light';
-  const pageClass = isLightMode ? 'min-h-screen bg-gray-100 text-zinc-900 transition-colors duration-300' : 'min-h-screen bg-[#111114] text-white transition-colors duration-300';
+
+  const pageClass = isLightMode
+    ? 'min-h-screen bg-gray-100 text-zinc-900 transition-colors duration-300'
+    : 'min-h-screen bg-[#111114] text-white transition-colors duration-300';
   const sidebarClass = isLightMode
     ? 'sticky top-24 rounded-[30px] border border-zinc-200 bg-white p-6 text-zinc-900 shadow-[0_30px_80px_rgba(15,23,42,0.08)]'
     : 'sticky top-24 rounded-[30px] border border-white/10 bg-[#151517] p-6 text-white shadow-[0_30px_80px_rgba(0,0,0,0.28)]';
@@ -168,10 +316,12 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
   const heroOverlayClass = isLightMode
     ? 'absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(238,193,55,0.12),transparent_36%),radial-gradient(circle_at_bottom_left,rgba(15,23,42,0.05),transparent_26%)]'
     : 'absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(238,193,55,0.12),transparent_36%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.05),transparent_26%)]';
-  const heroStatClass = isLightMode ? 'min-h-[112px] rounded-3xl border border-zinc-200 bg-white p-4 shadow-sm backdrop-blur-sm' : 'min-h-[112px] rounded-3xl border border-white/10 bg-white/8 p-4 backdrop-blur-sm';
+  const heroStatClass = isLightMode
+    ? 'min-h-[108px] rounded-3xl border border-zinc-200 bg-white p-3.5 shadow-sm backdrop-blur-sm'
+    : 'min-h-[108px] rounded-3xl border border-white/10 bg-white/8 p-3.5 backdrop-blur-sm';
   const filtersClass = isLightMode
-    ? 'relative z-40 space-y-4 rounded-[30px] border border-zinc-200 bg-white p-5 shadow-[0_25px_60px_rgba(15,23,42,0.08)] sm:p-6'
-    : 'relative z-40 space-y-4 rounded-[30px] border border-white/10 bg-[#151517] p-5 shadow-[0_25px_60px_rgba(0,0,0,0.2)] sm:p-6';
+    ? 'relative z-40 space-y-4 rounded-[30px] border border-zinc-200 bg-white p-4 shadow-[0_25px_60px_rgba(15,23,42,0.08)] sm:p-5'
+    : 'relative z-40 space-y-4 rounded-[30px] border border-white/10 bg-[#151517] p-4 shadow-[0_25px_60px_rgba(0,0,0,0.2)] sm:p-5';
   const filtersButtonClass = isLightMode
     ? 'inline-flex h-[52px] w-full items-center justify-between gap-3 rounded-full border border-zinc-200 bg-zinc-50 px-5 text-sm font-semibold text-zinc-800 transition-colors hover:bg-zinc-100 xl:w-48'
     : 'inline-flex h-[52px] w-full items-center justify-between gap-3 rounded-full border border-white/10 bg-white/6 px-5 text-sm font-semibold text-white/90 transition-colors hover:bg-white/10 xl:w-48';
@@ -194,54 +344,89 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
   const emptyStateClass = isLightMode
     ? 'rounded-[28px] border border-zinc-200 bg-white px-6 py-12 text-center shadow-sm'
     : 'rounded-[28px] border border-white/10 bg-[#16161a] px-6 py-12 text-center';
+  const cardBodyClass = isLightMode
+    ? 'border-t border-zinc-200 bg-zinc-50/70 px-4 py-4 sm:px-5 sm:py-5'
+    : 'border-t border-white/8 bg-black/20 px-4 py-4 sm:px-5 sm:py-5';
+
+  const allSourceEntries = useMemo(() => krsItems.flatMap((item) => getKrEntries(item)), []);
 
   const categories = useMemo(
-    () => Array.from(new Set(krsItems.map((item) => item.Cliente))).sort((a, b) => a.localeCompare(b, 'pt-BR')),
-    []
+    () =>
+      Array.from(new Set([...krConfig.metaAreas, ...allSourceEntries.map((entry) => entry.metaArea).filter(Boolean)])).sort((a, b) =>
+        a.localeCompare(b, 'pt-BR')
+      ),
+    [allSourceEntries]
   );
+
   const areas = useMemo(
-    () => Array.from(new Set(krsItems.map((item) => item.Time))).sort((a, b) => a.localeCompare(b, 'pt-BR')),
-    []
+    () =>
+      Array.from(new Set([...krConfig.times, ...allSourceEntries.map((entry) => entry.timeSquad).filter(Boolean)])).sort((a, b) =>
+        a.localeCompare(b, 'pt-BR')
+      ),
+    [allSourceEntries]
   );
 
   const filteredItems = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
-
     const items = krsItems.filter((item) => {
-      const matchesSearch =
-        !term ||
-        [
-          item.Projeto,
-          item.Cliente,
-          item.Time,
-          item.objetivo,
-          item.indicador,
-          item.meta,
-          item.resultado,
-          item.ciclo,
-          item.responsavel,
-          item.statusKR,
-          item.Assunto_geral,
-          item.Assunto_especifico,
-          item.Publico_alvo,
-        ]
-          .filter(Boolean)
-          .some((value) => String(value).toLowerCase().includes(term));
+      const entries = getKrEntries(item);
+      const searchableValues = [
+        item.id,
+        getKrMetaArea(item),
+        getKrObjective(item),
+        getKrKeyResult(item),
+        getKrResponsavel(item),
+        getKrFuncao(item),
+        getKrTeam(item),
+        getKrPeriod(item),
+        getKrStatus(item),
+        getKrSinergy(item),
+        getKrPartner(item),
+        getKrPlan(item),
+        getKrNotes(item),
+        getKrBase(item),
+        getKrGoal(item),
+        getKrCurrent(item),
+        getKrEvolution(item),
+        ...entries.flatMap((entry) => [
+          entry.id,
+          entry.metaArea,
+          entry.objetivo,
+          entry.keyResult,
+          entry.responsavelKR,
+          entry.funcao,
+          entry.timeSquad,
+          entry.periodo,
+          entry.valorBase,
+          entry.valorAlvo,
+          entry.valorAtual,
+          entry.evolucao,
+          entry.status,
+          entry.sinergia,
+          entry.frenteParceira,
+          entry.planoAcao,
+          entry.ultimaAtualizacao,
+          entry.observacoes,
+          entry.objetivo,
+        ]),
+      ];
 
-      const matchesCategory = !categoryFilter || item.Cliente === categoryFilter;
-      const matchesArea = !areaFilter || item.Time === areaFilter;
+      const matchesSearch = !term || searchableValues.some((value) => value.toLowerCase().includes(term));
+      const matchesCategory = !categoryFilter || entries.some((entry) => entry.metaArea === categoryFilter) || getKrMetaArea(item) === categoryFilter;
+      const matchesArea = !areaFilter || entries.some((entry) => entry.timeSquad === areaFilter) || getKrTeam(item) === areaFilter;
       const localState = getState(item.id, item.views ?? 0, item.likes ?? 0, Boolean(item.pinned));
       const matchesFavorites = !showFavoritesOnly || localState.favorited;
+
       return matchesSearch && matchesCategory && matchesArea && matchesFavorites;
     });
 
     const sorted = [...items];
     if (sortMode === 'a-z') {
-      sorted.sort((a, b) => a.Projeto.localeCompare(b.Projeto, 'pt-BR'));
+      sorted.sort((a, b) => getKrKeyResult(a).localeCompare(getKrKeyResult(b), 'pt-BR'));
     } else if (sortMode === 'z-a') {
-      sorted.sort((a, b) => b.Projeto.localeCompare(a.Projeto, 'pt-BR'));
+      sorted.sort((a, b) => getKrKeyResult(b).localeCompare(getKrKeyResult(a), 'pt-BR'));
     } else {
-      sorted.sort(compareByDateDesc);
+      sorted.sort((a, b) => compareRecent(a, b));
     }
 
     return sorted;
@@ -249,10 +434,7 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
 
   const pageSize = 6;
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
-  const paginatedItems = useMemo(
-    () => filteredItems.slice((currentPage - 1) * pageSize, currentPage * pageSize),
-    [filteredItems, currentPage]
-  );
+  const paginatedItems = useMemo(() => filteredItems.slice((currentPage - 1) * pageSize, currentPage * pageSize), [filteredItems, currentPage]);
 
   const buildShareUrl = () => {
     const url = new URL(window.location.href);
@@ -298,17 +480,25 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
     }
   }, [filteredItems, expandedKrId]);
 
-  const openDirectLink = (href: string) => {
-    window.open(href, '_blank', 'noopener,noreferrer');
+  const openItemDetails = (item: KRsItem) => {
+    setExpandedKrId(item.id);
+    window.requestAnimationFrame(() => {
+      cardRefs.current[item.id]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
   };
 
-  const openAccess = (item: PortfolioItem) => {
-    window.open(item.Link_PMV, '_blank', 'noopener,noreferrer');
+  const toggleEntryDetails = (itemId: string, entryId: string) => {
+    const nextId = `${itemId}:${entryId}`;
+    setExpandedEntryId((current) => (current === nextId ? null : nextId));
   };
 
-  const handleShareItem = async (item: PortfolioItem) => {
+  const openAccess = (item: KRsItem) => {
+    openItemDetails(item);
+  };
+
+  const handleShareItem = async (item: KRsItem) => {
     try {
-      await navigator.clipboard.writeText(item.Link_PMV);
+      await navigator.clipboard.writeText(item.Link_PMV || buildShareUrl());
       registerShare(item.id, item.views ?? 0, item.likes ?? 0, Boolean(item.pinned));
       setShareFeedback(FEEDBACK_COPY_SUCCESS);
       window.setTimeout(() => setShareFeedback(''), FEEDBACK_TIMEOUT_SUCCESS);
@@ -319,37 +509,81 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
   };
 
   const summaryStats = [
-    { label: 'KR’s', value: krsItems.length },
-    { label: 'Categorias', value: categories.length },
-    { label: 'Áreas', value: areas.length },
-    { label: 'Ciclos', value: new Set(krsItems.map((item) => item.ciclo)).size },
+    { label: 'KRs únicos', value: krsItems.length },
+    { label: 'Entradas', value: allSourceEntries.length },
+    { label: 'Meta áreas', value: categories.length },
+    { label: 'Times/Squads', value: areas.length },
   ];
 
   const krByCycle = useMemo(() => {
     const grouped = filteredItems.reduce<Record<string, number>>((acc, item) => {
-      const cycle = item.ciclo || 'Sem ciclo';
+      const cycle = getKrPeriod(item) || 'Sem período';
       acc[cycle] = (acc[cycle] || 0) + 1;
       return acc;
     }, {});
 
-    return Object.entries(grouped)
-      .map(([cycle, total]) => ({ cycle, total }))
-      .sort((a, b) => b.total - a.total);
+    const ordered = krConfig.periodos
+      .filter((period) => grouped[period] !== undefined)
+      .map((period) => ({ cycle: period, total: grouped[period] }));
+    const extras = Object.entries(grouped)
+      .filter(([cycle]) => !krConfig.periodos.includes(cycle as (typeof krConfig.periodos)[number]))
+      .map(([cycle, total]) => ({ cycle, total }));
+
+    return [...ordered, ...extras].sort((a, b) => {
+        const indexA = krConfig.periodos.indexOf(a.cycle as (typeof krConfig.periodos)[number]);
+        const indexB = krConfig.periodos.indexOf(b.cycle as (typeof krConfig.periodos)[number]);
+        if (indexA !== -1 && indexB !== -1 && indexA !== indexB) return indexA - indexB;
+        if (indexA !== -1) return -1;
+        if (indexB !== -1) return 1;
+        return b.total - a.total;
+      });
   }, [filteredItems]);
 
-  const concludedPercent = useMemo(() => {
-    if (!filteredItems.length) return 0;
-    const progressByStatus: Record<string, number> = {
-      Ativo: 100,
-      'Em andamento': 65,
-      'Sob revisão': 45,
-      'Em atenção': 30,
-    };
-    const total = filteredItems.reduce((sum, item) => sum + (progressByStatus[item.statusKR || ''] ?? 40), 0);
-    return Math.round(total / filteredItems.length);
+  const krByMetaArea = useMemo(() => {
+    const grouped = filteredItems.reduce<Record<string, number>>((acc, item) => {
+      const metaArea = getKrMetaArea(item) || 'Sem meta';
+      acc[metaArea] = (acc[metaArea] || 0) + 1;
+      return acc;
+    }, {});
+
+    const ordered = krConfig.metaAreas
+      .filter((metaArea) => grouped[metaArea] !== undefined)
+      .map((metaArea) => ({ name: metaArea, value: grouped[metaArea] }));
+    const extras = Object.entries(grouped)
+      .filter(([metaArea]) => !krConfig.metaAreas.includes(metaArea as (typeof krConfig.metaAreas)[number]))
+      .map(([metaArea, value]) => ({ name: metaArea, value }));
+
+    return [...ordered, ...extras].sort((a, b) => b.value - a.value);
+  }, [filteredItems]);
+
+  const krByStatus = useMemo(() => {
+    const grouped = filteredItems.reduce<Record<string, number>>((acc, item) => {
+      const status = getKrStatus(item) || 'Sem status';
+      acc[status] = (acc[status] || 0) + 1;
+      return acc;
+    }, {});
+
+    const ordered = krConfig.statuses
+      .filter((status) => grouped[status] !== undefined)
+      .map((status) => ({ name: status, value: grouped[status] }));
+    const extras = Object.entries(grouped)
+      .filter(([status]) => !krConfig.statuses.includes(status as (typeof krConfig.statuses)[number]))
+      .map(([name, value]) => ({ name, value }));
+
+    return [...ordered, ...extras].sort((a, b) => b.value - a.value);
   }, [filteredItems]);
 
   const maxCycleCount = Math.max(1, ...krByCycle.map((item) => item.total));
+  const completedCount = useMemo(
+    () =>
+      filteredItems.filter((item) => {
+        const status = lower(getKrStatus(item));
+        const progress = getCompletionPercent(item);
+        return status.includes('conclu') || progress >= 100;
+      }).length,
+    [filteredItems]
+  );
+  const completedPercent = filteredItems.length ? Math.round((completedCount / filteredItems.length) * 100) : 0;
 
   const menuItems = [
     { label: 'Home', icon: Home, active: false, action: onNavigateToPortfolio },
@@ -372,7 +606,7 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
         onLogout={onLogout}
       />
 
-      <main className="container mx-auto px-4 py-6 pb-28 sm:px-6 sm:py-8 sm:pb-8 lg:px-8">
+      <main className="container mx-auto px-4 py-6 pb-44 sm:px-6 sm:py-8 sm:pb-8 lg:px-8">
         <section className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
           <aside className="hidden xl:block">
             <div className={sidebarClass}>
@@ -409,11 +643,11 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
               <div className="relative z-10 grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.38em] text-[#EEC137]">Banco de KR's</p>
-                  <h1 className={`mt-3 max-w-4xl text-3xl font-black leading-tight sm:text-4xl lg:text-5xl ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>
+                  <h1 className={`mt-3 max-w-4xl text-2xl font-black leading-tight sm:text-3xl lg:text-4xl ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>
                     Objetivos vivos para orientar o time e acelerar resultados.
                   </h1>
                   <p className={`mt-4 max-w-2xl text-sm leading-7 sm:text-base ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>
-                    KR’s organizados com foco em meta, indicador, ciclo e resultado, usando a mesma navegação dos processos.
+                    KR’s organizados com foco em meta área, período, responsável, evolução e alinhamento com a planilha conectada ao sistema.
                   </p>
                   <div className="mt-6 flex flex-wrap gap-3">
                     {['Objetivos', 'Indicadores', 'Metas', 'Ciclos'].map((chip) => (
@@ -432,10 +666,7 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
                 <div className="grid grid-cols-2 gap-3">
                   {summaryStats.map((item) => (
                     <div key={item.label} className={heroStatClass}>
-                      <div
-                        className="mb-3 h-1.5 w-16 rounded-full"
-                        style={{ backgroundColor: cardAccent }}
-                      />
+                      <div className="mb-3 h-1.5 w-16 rounded-full bg-zinc-300/70 dark:bg-white/20" />
                       <p className={`text-xs font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/50'}`}>{item.label}</p>
                       <p className={`mt-2 text-3xl font-black ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>{item.value}</p>
                     </div>
@@ -445,13 +676,13 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
             </section>
 
             <section className={filtersClass}>
-              <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(240px,0.85fr)]">
+              <div className="grid gap-4 xl:grid-cols-3">
                 <article className={`rounded-3xl border p-5 ${isLightMode ? 'border-zinc-200 bg-white' : 'border-white/10 bg-white/5'}`}>
                   <div className="flex items-center justify-between gap-3">
                     <p className={`text-xs font-semibold uppercase tracking-[0.3em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Quantidade por período</p>
                     <span className={`text-xs font-semibold ${isLightMode ? 'text-zinc-500' : 'text-white/60'}`}>{filteredItems.length} KR’s</span>
                   </div>
-                  <div className="mt-4 space-y-3">
+                  <div className="mt-5 space-y-3">
                     {krByCycle.map((item, index) => {
                       const width = Math.max(12, Math.round((item.total / maxCycleCount) * 100));
                       return (
@@ -476,24 +707,118 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
                 </article>
 
                 <article className={`rounded-3xl border p-5 ${isLightMode ? 'border-zinc-200 bg-white' : 'border-white/10 bg-white/5'}`}>
-                  <p className={`text-xs font-semibold uppercase tracking-[0.3em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>% concluída</p>
-                  <div className="mt-4 flex items-center gap-4">
-                    <div
-                      className="relative h-24 w-24 rounded-full"
-                      style={{
-                        background: `conic-gradient(#88C125 ${concludedPercent * 3.6}deg, ${isLightMode ? '#e4e4e7' : 'rgba(255,255,255,0.14)'} 0deg)`,
-                      }}
-                    >
-                      <div className={`absolute inset-2 grid place-items-center rounded-full ${isLightMode ? 'bg-white' : 'bg-[#17171b]'}`}>
-                        <span className={`text-lg font-black ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>{concludedPercent}%</span>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className={`text-xs font-semibold uppercase tracking-[0.3em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Quantidade por meta</p>
+                    <span className={`text-xs font-semibold ${isLightMode ? 'text-zinc-500' : 'text-white/60'}`}>{filteredItems.length} KR’s</span>
+                  </div>
+                  <div className="mt-5 h-72">
+                    {krByMetaArea.length ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={krByMetaArea} layout="vertical" margin={{ top: 8, right: 24, left: 8, bottom: 0 }} barCategoryGap={14}>
+                          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={isLightMode ? '#e5e7eb' : '#3f3f46'} />
+                          <XAxis
+                            type="number"
+                            tick={{ fontSize: 10, fill: isLightMode ? '#71717a' : '#a1a1aa' }}
+                            axisLine={false}
+                            tickLine={false}
+                            tickMargin={10}
+                          />
+                          <YAxis
+                            dataKey="name"
+                            type="category"
+                            width={132}
+                            tick={{ fontSize: 10, fill: isLightMode ? '#71717a' : '#a1a1aa' }}
+                            axisLine={false}
+                            tickLine={false}
+                            tickMargin={10}
+                          />
+                          <Tooltip
+                            cursor={{ fill: isLightMode ? 'rgba(15, 23, 42, 0.04)' : 'rgba(255,255,255,0.04)' }}
+                            contentStyle={{
+                              backgroundColor: isLightMode ? '#ffffff' : '#18181b',
+                              borderColor: isLightMode ? '#e5e7eb' : '#3f3f46',
+                              color: isLightMode ? '#000000' : '#ffffff',
+                            }}
+                            itemStyle={{ color: '#99cc00' }}
+                          />
+                          <Bar dataKey="value" radius={[0, 10, 10, 0]} barSize={18}>
+                            {krByMetaArea.map((entry, index) => (
+                              <Cell
+                                key={`meta-cell-${entry.name}-${index}`}
+                                fill={['#88C125', '#EEC137', '#4CD07D', '#F78E43'][index % 4]}
+                              />
+                            ))}
+                            <LabelList dataKey="value" position="right" fill={isLightMode ? '#52525b' : '#d4d4d8'} fontSize={10} />
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className={`grid h-full place-items-center rounded-2xl border ${isLightMode ? 'border-zinc-200 bg-zinc-50 text-zinc-500' : 'border-white/10 bg-black/20 text-white/55'}`}>
+                        Sem dados para esse filtro
                       </div>
-                    </div>
-                    <div>
-                      <p className={`text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/90'}`}>Conclusão estimada</p>
-                      <p className={`mt-1 text-xs leading-5 ${isLightMode ? 'text-zinc-500' : 'text-white/60'}`}>
-                        Cálculo visual com base no status dos KR’s filtrados e distribuição por período.
-                      </p>
-                    </div>
+                    )}
+                  </div>
+                </article>
+
+                <article className={`rounded-3xl border p-5 ${isLightMode ? 'border-zinc-200 bg-white' : 'border-white/10 bg-white/5'}`}>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className={`text-xs font-semibold uppercase tracking-[0.3em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Distribuição por status</p>
+                    <span className={`text-xs font-semibold ${isLightMode ? 'text-zinc-500' : 'text-white/60'}`}>{filteredItems.length} KR’s</span>
+                  </div>
+                  <div className="relative mt-5 h-72">
+                    {krByStatus.length ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: isLightMode ? '#ffffff' : '#18181b',
+                              borderColor: isLightMode ? '#e5e7eb' : '#3f3f46',
+                              color: isLightMode ? '#000000' : '#ffffff',
+                            }}
+                            itemStyle={{ color: '#99cc00' }}
+                          />
+                          <Pie
+                            data={krByStatus}
+                            dataKey="value"
+                            nameKey="name"
+                            innerRadius={46}
+                            outerRadius={88}
+                            paddingAngle={3}
+                            stroke={isLightMode ? '#fff' : '#18181b'}
+                            strokeWidth={2}
+                          >
+                            {krByStatus.map((entry, index) => (
+                            <Cell
+                              key={`status-cell-${entry.name}-${index}`}
+                              fill={['#88C125', '#4CD07D', '#F78E43', '#EEC137', '#7C8AA5', '#A855F7'][index % 6]}
+                            />
+                          ))}
+                          </Pie>
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : null}
+                    {krByStatus.length ? (
+                      <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-center">
+                        <span className={`text-4xl font-black ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>{completedPercent}%</span>
+                      </div>
+                    ) : (
+                      <div className={`grid h-full place-items-center rounded-2xl border ${isLightMode ? 'border-zinc-200 bg-zinc-50 text-zinc-500' : 'border-white/10 bg-black/20 text-white/55'}`}>
+                        Sem dados para esse filtro
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    {krByStatus.slice(0, 4).map((item, index) => (
+                      <div
+                        key={item.name}
+                        className={`rounded-2xl border px-3 py-2 text-xs font-semibold ${
+                          isLightMode ? 'border-zinc-200 bg-zinc-50 text-zinc-700' : 'border-white/10 bg-white/5 text-white/75'
+                        }`}
+                        >
+                        <span className="mr-2 inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: ['#88C125', '#4CD07D', '#F78E43', '#EEC137'][index % 4] }} />
+                        {item.name} · {item.value}
+                      </div>
+                    ))}
                   </div>
                 </article>
               </div>
@@ -513,12 +838,12 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
                 </div>
 
                 <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setOpenMenu(openMenu === 'categoria' ? null : 'categoria')}
-                    className={filtersButtonClass}
-                  >
-                    <span>{categoryFilter || 'Categoria'}</span>
+                    <button
+                      type="button"
+                      onClick={() => setOpenMenu(openMenu === 'categoria' ? null : 'categoria')}
+                      className={filtersButtonClass}
+                    >
+                    <span>{categoryFilter || 'Meta área'}</span>
                     <ChevronDown className="h-4 w-4" />
                   </button>
                   {openMenu === 'categoria' && (
@@ -531,7 +856,7 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
                         }}
                         className={filtersMenuItemClass}
                       >
-                        Todas as categorias
+                        Todas as meta áreas
                       </button>
                       {categories.map((category) => (
                         <button
@@ -591,7 +916,7 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
                 />
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -633,123 +958,316 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
             {filteredItems.length > 0 ? (
               <>
                 <section className="grid gap-4">
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  {paginatedItems.map((item) => {
-                    const links = getKrLinks(item);
-                    const tone = (statusTone[item.statusKR || 'Pendente'] || statusTone.Pendente)[isLightMode ? 'light' : 'dark'];
-                    const isExpanded = expandedKrId === item.id;
-                    const localState = getState(item.id, item.views ?? 0, item.likes ?? 0, Boolean(item.pinned));
+                  <div className="grid gap-4">
+                    {paginatedItems.map((item) => {
+                      const isExpanded = expandedKrId === item.id;
+                      const localState = getState(item.id, item.views ?? 0, item.likes ?? 0, Boolean(item.pinned));
+                      const status = getKrStatus(item) || 'Pendente';
+                      const tone = (statusTone[status] || statusTone.Pendente)[isLightMode ? 'light' : 'dark'];
+                      const accent = accentByMetaArea(getKrMetaArea(item));
+                      const progress = getCompletionPercent(item);
+                      const hasCoverImage = Boolean(item.Imagem_capa);
+                      const cardId = `kr-card-${item.id}`;
+                      const entryGroups = getKrEntries(item);
 
-                    return (
-                      <article
-                        key={item.id}
-                        className={cardClass}
-                      >
-                        <div
-                          className="h-2 w-full"
-                          style={{ background: `linear-gradient(90deg, ${cardAccent} 0%, rgba(255,255,255,0.08) 100%)` }}
-                        />
+                      return (
+                          <article
+                            key={item.id}
+                            id={cardId}
+                            ref={(el) => {
+                              cardRefs.current[item.id] = el;
+                            }}
+                          className={`${cardClass} relative`}
+                        >
+                          <div
+                            className="absolute inset-y-0 left-0 z-10 w-2 rounded-r-full bg-gradient-to-b from-[#F4D86A] via-[#EEC137] to-[#EEC137]/30"
+                            aria-hidden="true"
+                          />
+                          <div
+                            className="grid cursor-pointer gap-4 p-4 md:grid-cols-[220px_minmax(0,1fr)] md:items-start"
+                            onClick={(event) => {
+                              const target = event.target as HTMLElement;
+                              if (target.closest('button, a, input, select, textarea, [role="button"]')) return;
+                              if (isExpanded) {
+                                setExpandedKrId(null);
+                              } else {
+                                openItemDetails(item);
+                              }
+                            }}
+                          >
+                            <div className={`relative h-44 w-full shrink-0 overflow-hidden rounded-[24px] border md:h-[180px] ${isLightMode ? 'border-zinc-200 bg-zinc-100' : 'border-white/10 bg-[#111114]'}`}>
+                              {hasCoverImage ? (
+                                <>
+                                  <img
+                                    src={item.Imagem_capa}
+                                    alt={getKrKeyResult(item)}
+                                    className={`h-full w-full object-cover ${isLightMode ? 'grayscale-[0.95] brightness-[1.02] contrast-75 opacity-70' : ''}`}
+                                  />
+                                  {isLightMode ? (
+                                    <div className="absolute inset-0 bg-gradient-to-br from-zinc-100/65 via-zinc-200/45 to-zinc-300/25 mix-blend-multiply" />
+                                  ) : (
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                                  )}
+                                </>
+                              ) : (
+                                <NeutralThumb theme={theme} />
+                              )}
 
-                        <div className="flex flex-1 flex-col p-5">
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="min-w-0">
-                              <p className="text-[10px] font-semibold uppercase tracking-[0.36em] text-[#EEC137]">{item.Time}</p>
-                              <h2 className={`mt-2 text-2xl font-black leading-tight line-clamp-2 ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>{item.Projeto}</h2>
+                              <div className="absolute left-3 right-3 top-3 flex items-center justify-end gap-2">
+                                <span className={`rounded-full border px-2 py-0.5 text-[8px] font-medium uppercase tracking-[0.14em] ${
+                                  isLightMode ? 'border-zinc-300 bg-zinc-100 text-zinc-700' : 'border-white/25 bg-black/65 text-white/90'
+                                }`}>
+                                  {displayValue(getKrPeriod(item), 'Sem período')}
+                                </span>
+                              </div>
                             </div>
-                            <span className={`shrink-0 rounded-full border px-3 py-1 text-[11px] font-semibold ${isLightMode ? 'border-zinc-200 bg-white text-zinc-600' : 'border-white/10 bg-white/6 text-white/76'}`}>
-                              {item.ciclo || item.Data}
-                            </span>
-                          </div>
 
-                          <div className={`mt-4 inline-flex w-fit items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${tone}`}>
-                            <ShieldCheck className="h-3.5 w-3.5" />
-                            {item.statusKR || 'Pendente'}
-                          </div>
+                            <div className="flex min-w-0 flex-1 flex-col justify-between md:py-1">
+                              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-4">
+                                <div className="min-w-0">
+                                  <p className="whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.3em]" style={{ color: accent }}>
+                                    {displayValue(getKrMetaArea(item), 'Meta área')}
+                                  </p>
+                                  <h2
+                                    className={`mt-2 text-[1.15rem] font-black leading-tight break-words [hyphens:auto] [text-wrap:balance] line-clamp-3 sm:text-[1.35rem] sm:line-clamp-2 lg:text-[1.45rem] ${
+                                      isLightMode ? 'text-zinc-900' : 'text-white'
+                                    }`}
+                                  >
+                                    {displayValue(getKrKeyResult(item), 'Key Result')}
+                                  </h2>
+                                  {item.groupCount && item.groupCount > 1 && (
+                                    <p className={`mt-2 text-xs font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>
+                                      {item.groupCount} entradas consolidadas por título
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="shrink-0 flex flex-wrap items-center gap-2 md:justify-end">
+                                  <div className={`inline-flex h-9 items-center gap-2 rounded-full border px-3 text-xs font-semibold ${tone}`}>
+                                    <ShieldCheck className="h-3.5 w-3.5" />
+                                    {status}
+                                  </div>
+                                  <span
+                                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-semibold ${
+                                      isLightMode
+                                        ? 'border-[#88C125]/45 bg-[#88C125]/22 text-[#245b08] shadow-[0_4px_14px_rgba(136,193,37,0.15)]'
+                                        : 'border-[#88C125]/55 bg-[#88C125]/20 text-[#e1ff9e] shadow-[0_4px_14px_rgba(136,193,37,0.18)]'
+                                    } h-9`}
+                                  >
+                                    <TrendingUp className="h-3.5 w-3.5" />
+                                    <span className="text-[10px] uppercase tracking-[0.18em]">Evolução</span>
+                                    <span className="text-sm font-black">{displayValue(getKrEvolution(item), `${progress}%`)}</span>
+                                  </span>
+                                </div>
+                              </div>
 
-                          <p className={`mt-4 text-sm leading-7 line-clamp-3 ${cardTextClass}`}>{item.Assunto_geral}</p>
-                          <div className={`mt-3 flex flex-wrap items-center gap-2 text-xs ${isLightMode ? 'text-zinc-500' : 'text-white/55'}`}>
-                            <button
-                              type="button"
-                              onClick={() => incrementViews(item.id, item.views ?? 0, item.likes ?? 0, Boolean(item.pinned))}
-                              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 ${isLightMode ? 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
-                            >
-                              <Eye className="h-3.5 w-3.5" /> {localState.views}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => toggleLike(item.id, item.views ?? 0, item.likes ?? 0, Boolean(item.pinned))}
-                              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 ${isLightMode ? 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
-                            >
-                              <Heart className={`h-3.5 w-3.5 ${localState.liked ? 'fill-current' : ''}`} /> {localState.likes}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => toggleFavorite(item.id, item.views ?? 0, item.likes ?? 0, Boolean(item.pinned))}
-                              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 ${isLightMode ? 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
-                            >
-                              <Bookmark className={`h-3.5 w-3.5 ${localState.favorited ? 'fill-current' : ''}`} /> {localState.favorited ? 'Favoritado' : 'Favorito'}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleShareItem(item)}
-                              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 ${isLightMode ? 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
-                            >
-                              <Share2 className="h-3.5 w-3.5" /> Compartilhar
-                            </button>
-                          </div>
+                              <p className={`mt-3 max-w-3xl text-sm leading-6 line-clamp-2 ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>
+                                {displayValue(getKrObjective(item), 'KR sem objetivo definido no momento.')}
+                              </p>
 
-                          <div className="mt-5 flex items-center gap-3">
-                            <button
-                              type="button"
-                              onClick={() => setExpandedKrId((current) => (current === item.id ? null : item.id))}
-                              className={`inline-flex flex-1 items-center justify-center gap-2 rounded-full border px-4 py-3 text-sm font-semibold transition-colors ${
-                                isLightMode ? 'border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50' : 'border-white/10 bg-white/6 text-white hover:bg-white/10'
-                              }`}
-                            >
-                              {isExpanded ? 'Fechar detalhes' : 'Ver detalhes'}
-                              <ArrowRight className="h-4 w-4" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => openAccess(item)}
-                              className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-[#88C125] px-4 py-3 text-sm font-bold text-white transition-colors hover:brightness-95"
-                            >
-                              Abrir KR
-                              <ExternalLink className="h-4 w-4" />
-                            </button>
+                              <div className={`mt-3 flex flex-wrap items-center gap-2 text-xs ${isLightMode ? 'text-zinc-500' : 'text-white/55'}`}>
+                                <span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 ${isLightMode ? 'border-zinc-200 bg-zinc-50' : 'border-white/10 bg-white/5'}`}>
+                                  <Users className="h-3.5 w-3.5" />
+                                  {displayValue(getKrTeam(item), 'Time/Squad')}
+                                </span>
+                              </div>
+
+                              <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
+                                <button
+                                  type="button"
+                                  onClick={() => incrementViews(item.id, item.views ?? 0, item.likes ?? 0, Boolean(item.pinned))}
+                                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 ${isLightMode ? 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
+                                >
+                                  <Eye className="h-3.5 w-3.5" /> {localState.views}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleLike(item.id, item.views ?? 0, item.likes ?? 0, Boolean(item.pinned))}
+                                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 ${isLightMode ? 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
+                                >
+                                  <Heart className={`h-3.5 w-3.5 ${localState.liked ? 'fill-current' : ''}`} /> {localState.likes}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleFavorite(item.id, item.views ?? 0, item.likes ?? 0, Boolean(item.pinned))}
+                                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 ${isLightMode ? 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
+                                >
+                                  <Bookmark className={`h-3.5 w-3.5 ${localState.favorited ? 'fill-current' : ''}`} /> {localState.favorited ? 'Favoritado' : 'Favorito'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleShareItem(item)}
+                                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 ${isLightMode ? 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
+                                >
+                                  <Share2 className="h-3.5 w-3.5" /> Compartilhar
+                                </button>
+                              </div>
+
+                              <div className="mt-4 flex flex-wrap items-center gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (isExpanded) {
+                                      setExpandedKrId(null);
+                                      return;
+                                    }
+                                    openItemDetails(item);
+                                  }}
+                                  className={`inline-flex items-center gap-2 rounded-full border px-4 py-3 text-sm font-semibold transition-colors ${
+                                    isLightMode ? 'border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50' : 'border-white/10 bg-white/6 text-white hover:bg-white/10'
+                                  }`}
+                                >
+                                  {isExpanded ? 'Fechar detalhes' : 'Ver detalhes'}
+                                  <ArrowRight className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => openAccess(item)}
+                                  className="inline-flex items-center gap-2 rounded-full bg-[#88C125] px-4 py-3 text-sm font-bold text-white transition-colors hover:brightness-95"
+                                >
+                                  Abrir KR
+                                  <ExternalLink className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </div>
                           </div>
 
                           {isExpanded && (
-                            <>
-                              <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                                <MetaBlock label="Indicador" value={item.indicador || 'Não definido'} theme={theme} />
-                                <MetaBlock label="Meta" value={item.meta || 'Não definida'} theme={theme} />
-                                <MetaBlock label="Resultado" value={item.resultado || 'Sem registro'} theme={theme} />
-                                <MetaBlock label="Responsável" value={item.responsavel || 'Não definido'} theme={theme} />
-                              </div>
+                            <div className={cardBodyClass}>
+                              <div className="space-y-4">
+                                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                                  <MetricCard label="Valor base" value={displayValue(getKrBase(item))} theme={theme} accent="#EEC137" />
+                                  <MetricCard label="Valor alvo" value={displayValue(getKrGoal(item))} theme={theme} accent="#88C125" />
+                                  <MetricCard label="Valor atual" value={displayValue(getKrCurrent(item))} theme={theme} accent="#4CD07D" />
+                                  <MetricCard label="Evolução" value={displayValue(getKrEvolution(item), `${progress}%`)} theme={theme} accent="#F78E43" />
+                                </div>
 
-                              <div className={`mt-5 rounded-[24px] border p-4 ${isLightMode ? 'border-zinc-200 bg-white shadow-sm' : 'border-white/8 bg-black/20'}`}>
-                                <div className="flex items-center justify-between gap-4">
-                                  <div>
-                                    <p className={`text-[10px] font-semibold uppercase tracking-[0.3em] ${isLightMode ? 'text-zinc-500' : 'text-white/40'}`}>Acesso direto</p>
-                                    <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>Links rápidos para consulta e ação.</p>
+                                <div className={`rounded-[24px] border p-4 ${isLightMode ? 'border-zinc-200 bg-white shadow-sm' : 'border-white/8 bg-black/20'}`}>
+                                  <div className="flex items-center justify-between gap-4">
+                                    <div>
+                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.3em] ${isLightMode ? 'text-zinc-500' : 'text-white/40'}`}>Resumo da linha</p>
+                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>Metadados principais para identificar a entrada.</p>
+                                    </div>
+                                    <FileText className="h-5 w-5 shrink-0 text-[#EEC137]" />
                                   </div>
-                                  <FileText className="h-5 w-5 shrink-0 text-[#EEC137]" />
+
+                                  <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                                    <InfoChip label="ID" value={displayValue(item.id, '—')} theme={theme} />
+                                    <InfoChip label="Meta" value={displayValue(getKrMetaArea(item), '—')} theme={theme} />
+                                    <InfoChip label="Time" value={displayValue(getKrTeam(item), '—')} theme={theme} />
+                                    <InfoChip label="Período" value={displayValue(getKrPeriod(item), '—')} theme={theme} />
+                                    <InfoChip label="Status" value={displayValue(getKrStatus(item), 'Pendente')} theme={theme} />
+                                    <InfoChip label="Atualização" value={displayValue(getKrUpdatedAt(item), '—')} theme={theme} />
+                                  </div>
                                 </div>
-                                <div className="mt-4 flex flex-wrap gap-2">
-                                  {links.map((link) => (
-                                    <KrLink key={link.label} label={link.label} href={link.href} hint={link.hint} onOpen={openDirectLink} theme={theme} />
+
+                                <div className="mt-4">
+                                  <div className="mb-3 flex items-center justify-between gap-3">
+                                    <div>
+                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.3em] ${isLightMode ? 'text-zinc-500' : 'text-white/40'}`}>Responsáveis desta KR</p>
+                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>Abra cada responsável para ver números, plano e observações.</p>
+                                    </div>
+                                    <span className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${isLightMode ? 'border-zinc-200 bg-white text-zinc-600' : 'border-white/10 bg-white/6 text-white/70'}`}>
+                                      {entryGroups.length} linhas
+                                    </span>
+                                  </div>
+
+                                  <div className="space-y-3">
+                                  {entryGroups.map((entry, entryIndex) => (
+                                    (() => {
+                                      const entryId = `${entry.id || entryIndex}`;
+                                      const entryKey = `${item.id}:${entryId}`;
+                                      const entryOpen = expandedEntryId === entryKey;
+                                      return (
+                                        <div
+                                          key={`${item.id}-${entryId}`}
+                                          className={`overflow-hidden rounded-[22px] border ${isLightMode ? 'border-zinc-200 bg-white' : 'border-white/8 bg-white/5'} ${entryOpen ? 'ring-1 ring-[#88C125]/20' : ''}`}
+                                        >
+                                          <button
+                                            type="button"
+                                            onClick={() => toggleEntryDetails(item.id, entryId)}
+                                            className={`flex w-full items-start justify-between gap-3 border-l-4 p-4 text-left transition-colors ${
+                                              isLightMode ? 'border-l-[#88C125]/70 hover:bg-zinc-50' : 'border-l-[#88C125]/80 hover:bg-white/5'
+                                            }`}
+                                          >
+                                            <div className="min-w-0">
+                                              <p className={`text-sm font-bold ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>
+                                                {displayValue(entry.responsavelKR, 'Sem responsável')}
+                                              </p>
+                                              <p className={`mt-1 text-sm leading-6 ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>
+                                                {displayValue(entry.funcao, 'Função não definida')}
+                                              </p>
+                                              <p className={`mt-1 text-[11px] font-semibold uppercase tracking-[0.22em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>
+                                                {displayValue(entry.id, 'Sem ID')}
+                                              </p>
+                                            </div>
+                                            <div className="flex shrink-0 flex-col items-end gap-2">
+                                              <span
+                                                className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${
+                                                  (entry.status || '').toLowerCase().includes('conclu')
+                                                    ? isLightMode
+                                                      ? 'border-[#4CD07D]/40 bg-[#4CD07D]/12 text-[#166a41]'
+                                                      : 'border-[#4CD07D]/30 bg-[#4CD07D]/10 text-[#c8ffe0]'
+                                                    : (entry.status || '').toLowerCase().includes('risco')
+                                                      ? isLightMode
+                                                        ? 'border-[#F2A43A]/45 bg-[#F2A43A]/16 text-[#8b4d06]'
+                                                        : 'border-[#F2A43A]/30 bg-[#F2A43A]/10 text-[#ffe6bf]'
+                                                      : isLightMode
+                                                        ? 'border-zinc-200 bg-zinc-100 text-zinc-700'
+                                                        : 'border-white/10 bg-white/6 text-white/70'
+                                                }`}
+                                              >
+                                                {displayValue(entry.status, 'Pendente')}
+                                              </span>
+                                              <span className={`text-[10px] font-semibold uppercase tracking-[0.24em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>
+                                                {entryOpen ? 'Fechar' : 'Abrir'}
+                                              </span>
+                                              <ChevronDown className={`h-4 w-4 transition-transform ${entryOpen ? 'rotate-180' : ''} ${isLightMode ? 'text-zinc-500' : 'text-white/50'}`} />
+                                            </div>
+                                          </button>
+
+                                          {entryOpen && (
+                                            <div className={`border-t px-4 py-4 ${isLightMode ? 'border-zinc-200 bg-zinc-50/70' : 'border-white/8 bg-black/15'}`}>
+                                              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                                                <MetricCard label="Valor base" value={displayValue(entry.valorBase, '—')} theme={theme} accent="#EEC137" subdued />
+                                                <MetricCard label="Valor alvo" value={displayValue(entry.valorAlvo, '—')} theme={theme} accent="#88C125" subdued />
+                                                <MetricCard label="Valor atual" value={displayValue(entry.valorAtual, '—')} theme={theme} accent="#4CD07D" subdued />
+                                                <MetricCard label="Evolução" value={displayValue(entry.evolucao, '—')} theme={theme} accent="#F78E43" subdued />
+                                              </div>
+
+                                              <div className="mt-3 flex flex-wrap gap-2">
+                                                <InfoChip label="Última atualização" value={displayValue(entry.ultimaAtualizacao, '—')} theme={theme} />
+                                                <InfoChip label="Sinergia" value={displayValue(entry.sinergia, 'Não informado')} theme={theme} />
+                                                <InfoChip label="Frente parceira" value={displayValue(entry.frenteParceira, 'Sem frente associada')} theme={theme} />
+                                              </div>
+
+                                              <div className="mt-3 grid gap-3 xl:grid-cols-2">
+                                                <div className={`rounded-2xl border p-3 ${isLightMode ? 'border-zinc-200 bg-white' : 'border-white/8 bg-white/5'}`}>
+                                                  <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/40'}`}>Plano de ação</p>
+                                                  <p className={`mt-2 whitespace-pre-wrap text-sm leading-6 ${isLightMode ? 'text-zinc-700' : 'text-white/76'}`}>{displayValue(entry.planoAcao, 'Sem plano de ação registrado.')}</p>
+                                                </div>
+                                                <div className={`rounded-2xl border p-3 ${isLightMode ? 'border-zinc-200 bg-white' : 'border-white/8 bg-white/5'}`}>
+                                                  <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/40'}`}>Observações</p>
+                                                  <p className={`mt-2 whitespace-pre-wrap text-sm leading-6 ${isLightMode ? 'text-zinc-700' : 'text-white/76'}`}>{displayValue(entry.observacoes, 'Sem observações.')}</p>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })()
                                   ))}
+                                  </div>
                                 </div>
                               </div>
-                            </>
-                          )}
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
+                          </div>
+                        )}
+
+                        </article>
+                      );
+                    })}
+                  </div>
                 </section>
+
                 <Pagination
                   currentPage={currentPage}
                   totalPages={totalPages}
@@ -780,5 +1298,7 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
     </div>
   );
 };
+
+const UserRoundIcon = () => <Users className="h-3.5 w-3.5" />;
 
 export default KRsScreen;
