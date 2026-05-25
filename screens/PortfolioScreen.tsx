@@ -17,8 +17,9 @@ import {
   Check,
   ChevronDown,
   Copy,
-  FolderKanban,
+  Home,
   LayoutGrid,
+  BookOpen,
   BookMarked,
   MessageSquareMore,
   PencilLine,
@@ -31,6 +32,7 @@ import {
 } from 'lucide-react';
 import type { PortfolioItem } from '../types';
 import { processosItems } from '../data/processosItems';
+import { krsItems } from '../data/krsItems';
 import { portfolioItems as localPortfolioItems } from '../data/portfolioItems';
 import { db } from '../firebase';
 import { addDoc, collection, query, onSnapshot, doc, updateDoc, increment, getDoc, Timestamp } from 'firebase/firestore';
@@ -215,6 +217,40 @@ const comparePortfolioItemsByDateDesc = (a: PortfolioItem, b: PortfolioItem) => 
   }
 
   return String(b.Projeto || '').localeCompare(String(a.Projeto || ''), 'pt-BR');
+};
+
+type HomeFeedKind = 'processos' | 'krs' | 'conteudo';
+
+const getHomeFeedKind = (item: PortfolioItem): HomeFeedKind => {
+  const id = String(item.id || '');
+
+  if (id.startsWith('inventario-')) return 'processos';
+  if (id.startsWith('kr-') || id.startsWith('okr-')) return 'krs';
+  return 'conteudo';
+};
+
+const getHomeFeedLabel = (item: PortfolioItem) => {
+  const kind = getHomeFeedKind(item);
+
+  if (kind === 'processos') return 'Processos';
+  if (kind === 'krs') return "Banco de KR's";
+  return item.Cliente || 'Conteúdo';
+};
+
+const getHomeFeedMeta = (item: PortfolioItem) => {
+  const kind = getHomeFeedKind(item);
+
+  if (kind === 'processos') return item.Time || item.Metodologias || 'Processos';
+  if (kind === 'krs') return item.Cliente || item.Time || "Banco de KR's";
+  return item.Time || 'Conteúdo';
+};
+
+const getHomeFeedAccent = (item: PortfolioItem) => {
+  const kind = getHomeFeedKind(item);
+
+  if (kind === 'processos') return 'bg-[#88C125] text-zinc-900';
+  if (kind === 'krs') return 'bg-[#EEC137] text-zinc-900';
+  return 'bg-[#99cc00] text-zinc-900';
 };
 
 const encodeFilterValueForUrl = (value: string) => slugify(value);
@@ -1232,10 +1268,15 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
     await copyTextToClipboard(shareUrl);
   };
 
-  const featuredItem = useMemo(() => portfolioItems[0] || null, [portfolioItems]);
+  const homeHubItems = useMemo(
+    () => [...processosItems, ...krsItems].sort(comparePortfolioItemsByDateDesc),
+    []
+  );
+
+  const featuredItem = useMemo(() => homeHubItems[0] || null, [homeHubItems]);
   const recentItems = useMemo(
-    () => [...portfolioItems].sort(comparePortfolioItemsByDateDesc).slice(0, 6),
-    [portfolioItems]
+    () => homeHubItems.slice(0, 6),
+    [homeHubItems]
   );
 
   // FIX: Added robust type guards and string conversions to prevent runtime errors during filtering.
@@ -1331,7 +1372,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
         onLogout={onLogout}
       />
       
-      <main className="container mx-auto px-4 py-6 pb-28 sm:px-6 sm:py-8 sm:pb-8 lg:px-8">
+      <main className="container mx-auto px-4 py-6 pb-44 sm:px-6 sm:py-8 sm:pb-8 lg:px-8">
         <section className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)] mb-8">
           <aside className="hidden xl:block">
             <div
@@ -1343,9 +1384,9 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
             >
               <div className="space-y-2">
                 {[
-                  { label: 'Home', icon: LayoutGrid, action: () => window.scrollTo({ top: 0, behavior: 'smooth' }), active: true },
-                  { label: 'Processos', icon: FolderKanban, action: onNavigateToProcessos, active: false },
-                  { label: 'Treinamentos', icon: Sparkles, action: onNavigateToTreinamentos, active: false },
+                  { label: 'Home', icon: Home, action: () => window.scrollTo({ top: 0, behavior: 'smooth' }), active: true },
+                  { label: 'Processos', icon: LayoutGrid, action: onNavigateToProcessos, active: false },
+                  { label: 'Treinamentos', icon: BookOpen, action: onNavigateToTreinamentos, active: false },
                   { label: "Banco de KR's", icon: BookMarked, action: onNavigateToKRs, active: false },
                   { label: 'Fórum', icon: MessageSquareMore, action: onNavigateToForum, active: false },
                 ].map((item) => {
@@ -1395,7 +1436,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
                   <p className={`text-xs font-semibold uppercase tracking-[0.38em] ${isLightMode ? 'text-[#88C125]' : 'text-[#99cc00]'}`}>
                     DOT SPACE
                   </p>
-                  <h1 className={`mt-3 max-w-4xl text-3xl font-black leading-tight sm:text-4xl lg:text-5xl ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>
+                  <h1 className={`mt-3 max-w-4xl text-2xl font-black leading-tight sm:text-3xl lg:text-4xl ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>
                     {randomPhrase}
                   </h1>
                   <p className={`mt-4 max-w-2xl text-sm leading-7 sm:text-base ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>
@@ -1408,7 +1449,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
                   {[
                     { label: 'Processos', value: processosItems.length, accent: 'bg-[#88C125]' },
                     { label: 'Treinamentos', value: portfolioItems.length, accent: 'bg-[#4CD07D]' },
-                    { label: "Banco de KR's", value: 12, accent: 'bg-[#F78E43]' },
+                    { label: "Banco de KR's", value: krsItems.length, accent: 'bg-[#F78E43]' },
                     {
                       label: 'Fórum',
                       value: 5,
@@ -1441,7 +1482,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[#88c125]">Novidades</p>
-                    <h2 className="mt-2 text-3xl font-black tracking-tight text-zinc-900 dark:text-white">Conteúdos recentes</h2>
+                    <h2 className="mt-2 text-2xl font-black tracking-tight text-zinc-900 dark:text-white">Conteúdos recentes</h2>
                   </div>
                   <button
                     type="button"
@@ -1452,8 +1493,8 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
                   </button>
                 </div>
                 <p className="mt-3 max-w-2xl text-sm leading-7 text-zinc-500 dark:text-zinc-400">
-                  O que acabou de entrar no hub aparece primeiro aqui. A área tem mais destaque porque concentra os
-                  materiais mais quentes do dia.
+                  Os processos e KR&apos;s mais recentes aparecem primeiro aqui, criando uma leitura rápida do que entrou
+                  no sistema e do que merece acompanhamento agora.
                 </p>
                 <div className="mt-6 grid gap-4 md:grid-cols-2 xl:max-w-[760px]">
                   {recentItems.slice(0, 2).map((item) => (
@@ -1466,12 +1507,12 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
                       <div className="relative h-48 overflow-hidden">
                         <img src={item.Imagem_capa} alt={item.Projeto} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-transparent to-transparent" />
-                        <span className="absolute left-4 top-4 rounded-full bg-[#99cc00] px-3 py-1 text-[10px] font-black uppercase tracking-[0.25em] text-zinc-900">
-                          {item.Cliente}
+                        <span className={`absolute left-4 top-4 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.25em] ${getHomeFeedAccent(item)}`}>
+                          {getHomeFeedLabel(item)}
                         </span>
                       </div>
                       <div className="p-5">
-                        <p className="text-sm font-black uppercase tracking-[0.2em] text-[#88c125]">{item.Time}</p>
+                        <p className="text-sm font-black uppercase tracking-[0.2em] text-[#88c125]">{getHomeFeedMeta(item)}</p>
                         <h3 className="mt-2 text-xl font-bold leading-tight text-zinc-900 dark:text-white">{item.Projeto}</h3>
                         <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">{item.Assunto_geral}</p>
                       </div>
@@ -1484,7 +1525,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
                 <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-5 dark:border-zinc-800">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[#88c125]">Continuar fazendo</p>
-                    <h2 className="mt-2 text-2xl font-black tracking-tight text-zinc-900 dark:text-white">Destaque da casa</h2>
+                    <h2 className="mt-2 text-xl font-black tracking-tight text-zinc-900 dark:text-white">Destaque da casa</h2>
                   </div>
                   <span className="rounded-full bg-[#88C125]/15 px-3 py-1 text-xs font-bold uppercase tracking-[0.22em] text-[#88C125]">
                     Último acesso
@@ -1499,21 +1540,21 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
                         className="h-full w-full object-cover"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
-                      <div className="absolute left-4 top-4 rounded-full bg-black/70 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-white">
-                        {featuredItem.Cliente}
+                      <div className={`absolute left-4 top-4 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] ${getHomeFeedAccent(featuredItem)}`}>
+                        {getHomeFeedLabel(featuredItem)}
                       </div>
                     </div>
                     <div className="flex flex-col gap-4 p-5">
                       <div>
                         <div className="flex flex-wrap gap-2">
                           <span className="rounded-full bg-[#4CD07D] px-3 py-1 text-[10px] font-black uppercase tracking-[0.28em] text-white">
-                            {featuredItem.Time || 'Conteúdo'}
+                            {getHomeFeedMeta(featuredItem)}
                           </span>
                           <span className="rounded-full bg-zinc-100 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
                             {featuredItem.Data}
                           </span>
                         </div>
-                        <h3 className="mt-3 text-[1.6rem] font-black leading-tight text-zinc-900 dark:text-white">
+                        <h3 className="mt-3 text-[1.45rem] font-black leading-tight text-zinc-900 dark:text-white">
                           {featuredItem.Projeto}
                         </h3>
                         <p className="mt-2 max-w-xl text-sm leading-6 text-zinc-600 dark:text-zinc-300">
@@ -1544,7 +1585,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
                         <Sparkles className="h-4 w-4" />
                         IA em alta
                       </div>
-                      <h2 className="mt-3 max-w-2xl text-3xl font-black leading-tight text-zinc-900 dark:text-white sm:text-4xl">
+                      <h2 className="mt-3 max-w-2xl text-2xl font-black leading-tight text-zinc-900 dark:text-white sm:text-3xl">
                         Inteligência Artificial aplicada a processos e treinamentos.
                       </h2>
                       <p className="mt-4 max-w-2xl text-sm leading-7 text-zinc-600 dark:text-zinc-300 sm:text-base">
@@ -1593,9 +1634,9 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
       <MobileFooterNav
         theme={theme}
         items={[
-          { label: 'Home', icon: LayoutGrid, onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }), active: true },
-          { label: 'Processos', icon: FolderKanban, onClick: onNavigateToProcessos },
-          { label: 'Treinamentos', icon: Sparkles, onClick: onNavigateToTreinamentos },
+          { label: 'Home', icon: Home, onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }), active: true },
+          { label: 'Processos', icon: LayoutGrid, onClick: onNavigateToProcessos },
+          { label: 'Treinamentos', icon: BookOpen, onClick: onNavigateToTreinamentos },
           { label: "Banco de KR's", icon: BookMarked, onClick: onNavigateToKRs },
           { label: 'Fórum', icon: MessageSquareMore, onClick: onNavigateToForum },
         ]}

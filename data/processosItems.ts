@@ -1,157 +1,226 @@
 import type { PortfolioItem } from '../types';
+import inventario from './processos-inventario.json';
 
-export const processosItems: PortfolioItem[] = [
-  {
-    id: 'processo-aprovacao-campanha',
-    Projeto: 'Aprovação de campanha institucional',
-    Cliente: 'Comercial',
-    Time: 'P&C',
-    Data: '2026-01-05',
-    Imagem_capa: 'https://picsum.photos/seed/processo-campanha/900/700',
-    Link_PMV: 'https://example.com/processo/aprovacao-campanha',
-    versao: 'v2.4.0',
-    integridade: 'Atualizado',
-    ultimaRevisao: '2026-01-05',
-    pinned: true,
-    Assunto_geral: 'Fluxo de revisão, validação e publicação de campanhas com governança centralizada.',
-    Assunto_especifico: 'Briefing, validação jurídica e agendamento de publicação',
-    Publico_alvo: 'Times de marketing e operação',
-    Metodologias: 'Checklist, aprovação por etapas',
-    Mídias: 'PDF, Drive, Links seguros',
-    Outros_recursos: 'Template de briefing e matriz de responsáveis',
-    DI: '',
-    DM: '',
-    links: [
-      { label: 'Abrir documento', href: 'https://example.com/processo/aprovacao-campanha', hint: 'Versão publicada' },
-      { label: 'Fluxo seguro', href: 'https://example.com/processo/aprovacao-campanha/fluxo', hint: 'Trilha de validação' },
-      { label: 'Histórico', href: 'https://example.com/processo/aprovacao-campanha/historico', hint: 'Auditoria' },
-    ],
-  },
-  {
-    id: 'processo-onboarding',
-    Projeto: 'Onboarding de novos colaboradores',
-    Cliente: 'RH',
-    Time: 'People',
-    Data: '2025-12-22',
-    Imagem_capa: 'https://picsum.photos/seed/processo-onboarding/900/700',
-    Link_PMV: 'https://example.com/processo/onboarding',
-    versao: 'v1.9.2',
-    integridade: 'Em revisão',
-    ultimaRevisao: '2025-12-22',
-    pinned: true,
-    Assunto_geral: 'Sequência de acolhimento, envio de acessos e trilha inicial de integração.',
-    Assunto_especifico: 'Credenciais, primeira semana e mentorias',
-    Publico_alvo: 'Novos colaboradores e lideranças',
-    Metodologias: 'Trilha guiada, acompanhamento',
-    Mídias: 'Vídeo, PDF e formulários',
-    Outros_recursos: 'Checklist de admissão',
-    DI: '',
-    DM: '',
-    links: [
-      { label: 'Abrir documento', href: 'https://example.com/processo/onboarding', hint: 'Guia de entrada' },
-      { label: 'Checklist', href: 'https://example.com/processo/onboarding/checklist', hint: 'Primeira semana' },
-      { label: 'Mentoria', href: 'https://example.com/processo/onboarding/mentoria', hint: 'Apoio direto' },
-    ],
-  },
-  {
-    id: 'processo-fluxo-financeiro',
-    Projeto: 'Fluxo de solicitação financeira',
-    Cliente: 'Financeiro',
-    Time: 'Controladoria',
-    Data: '2025-12-10',
-    Imagem_capa: 'https://picsum.photos/seed/processo-financeiro/900/700',
-    Link_PMV: 'https://example.com/processo/financeiro',
-    versao: 'v3.1.0',
-    integridade: 'Atualizado',
-    ultimaRevisao: '2025-12-10',
-    pinned: true,
-    Assunto_geral: 'Solicitações, conferência e aprovação de despesas com rastreabilidade completa.',
-    Assunto_especifico: 'Reembolso, adiantamento e prestação de contas',
-    Publico_alvo: 'Gestores e operação',
-    Metodologias: 'Fluxo auditável, SLA definido',
-    Mídias: 'Planilha, PDF e links internos',
-    Outros_recursos: 'Modelo de solicitação',
-    DI: '',
-    DM: '',
-    links: [
-      { label: 'Abrir documento', href: 'https://example.com/processo/financeiro', hint: 'Versão aprovada' },
-      { label: 'Planilha base', href: 'https://example.com/processo/financeiro/planilha', hint: 'Acompanhamento' },
-      { label: 'SLA', href: 'https://example.com/processo/financeiro/sla', hint: 'Prazo e alerta' },
-    ],
-  },
-  {
-    id: 'processo-juridico-lgpd',
-    Projeto: 'Revisão jurídica e LGPD',
-    Cliente: 'Jurídico',
-    Time: 'Compliance',
-    Data: '2025-11-28',
-    Imagem_capa: 'https://picsum.photos/seed/processo-juridico/900/700',
-    Link_PMV: 'https://example.com/processo/juridico-lgpd',
-    versao: 'v2.0.4',
-    integridade: 'Sob revisão',
-    ultimaRevisao: '2025-11-28',
-    Assunto_geral: 'Fluxo para validação de materiais, contratos e conteúdos com sensibilidade regulatória.',
-    Assunto_especifico: 'Análise de risco, parecer e aprovação final',
-    Publico_alvo: 'Editoras, gestores e jurídico',
-    Metodologias: 'Parecer, checklist e aprovação',
-    Mídias: 'PDF, e-mail e registros',
-    Outros_recursos: 'Matriz de risco',
-    DI: '',
-    DM: '',
-    links: [
-      { label: 'Abrir documento', href: 'https://example.com/processo/juridico-lgpd', hint: 'Fluxo regulatório' },
-      { label: 'Parecer', href: 'https://example.com/processo/juridico-lgpd/parecer', hint: 'Validação final' },
-      { label: 'Risco', href: 'https://example.com/processo/juridico-lgpd/risco', hint: 'Classificação' },
-    ],
-  },
-  {
-    id: 'processo-ti-acessos',
-    Projeto: 'Solicitação de acessos de sistemas',
-    Cliente: 'TI',
-    Time: 'Infraestrutura',
-    Data: '2025-11-15',
-    Imagem_capa: 'https://picsum.photos/seed/processo-ti/900/700',
-    Link_PMV: 'https://example.com/processo/ti-acessos',
-    versao: 'v4.0.1',
-    integridade: 'Atualizado',
-    ultimaRevisao: '2025-11-15',
-    Assunto_geral: 'Processo para abertura, alteração e encerramento de acessos corporativos.',
-    Assunto_especifico: 'Perfis, privilégios e revogação',
-    Publico_alvo: 'Lideranças e suporte',
-    Metodologias: 'Fila priorizada e evidências',
-    Mídias: 'Links seguros e documentação',
-    Outros_recursos: 'Formulário de requisição',
-    DI: '',
-    DM: '',
-    links: [
-      { label: 'Abrir documento', href: 'https://example.com/processo/ti-acessos', hint: 'Requisição principal' },
-      { label: 'Formulário', href: 'https://example.com/processo/ti-acessos/formulario', hint: 'Solicitação' },
-      { label: 'Revogar acesso', href: 'https://example.com/processo/ti-acessos/revogacao', hint: 'Encerramento' },
-    ],
-  },
-  {
-    id: 'processo-operacoes-sla',
-    Projeto: 'Gestão de SLA operacional',
-    Cliente: 'Operações',
-    Time: 'Serviços',
-    Data: '2025-10-30',
-    Imagem_capa: 'https://picsum.photos/seed/processo-operacoes/900/700',
-    Link_PMV: 'https://example.com/processo/operacoes-sla',
-    versao: 'v1.4.7',
-    integridade: 'Atualizado',
-    ultimaRevisao: '2025-10-30',
-    Assunto_geral: 'Padronização de acompanhamento de prazos, responsáveis e escalonamento.',
-    Assunto_especifico: 'Monitoramento, alertas e escalada',
-    Publico_alvo: 'Operação e PMO',
-    Metodologias: 'Kanban, SLAs e relatórios',
-    Mídias: 'Painel, planilha e PDF',
-    Outros_recursos: 'Template de acompanhamento',
-    DI: '',
-    DM: '',
-    links: [
-      { label: 'Abrir documento', href: 'https://example.com/processo/operacoes-sla', hint: 'Painel operacional' },
-      { label: 'Relatório', href: 'https://example.com/processo/operacoes-sla/relatorio', hint: 'Status' },
-      { label: 'Escalada', href: 'https://example.com/processo/operacoes-sla/escalada', hint: 'Ação rápida' },
-    ],
-  },
-];
+const INVENTORY_DATE = '2026-05-23';
+
+const driveSearchUrl = (query: string) =>
+  `https://drive.google.com/drive/search?q=${encodeURIComponent(query)}`;
+
+const isHttpUrl = (value: string) => /^https?:\/\//i.test(value.trim());
+
+const normalizeLink = (value: string, fallbackQuery: string) => {
+  const cleaned = value.trim();
+  if (!cleaned) return driveSearchUrl(fallbackQuery);
+  return isHttpUrl(cleaned) ? cleaned.replace(/\s+/g, '') : driveSearchUrl(cleaned);
+};
+
+const slugify = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase();
+
+const normalizeText = (value: string) =>
+  value
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+
+const inferSquad = (row: InventarioRow) => {
+  const haystack = normalizeText(
+    [row['Nome do Documento'], row['Finalidade'], row['Link Atual (Drive)'], row['Dono do Processo']]
+      .filter(Boolean)
+      .join(' ')
+  );
+
+  const knownSquads = [
+    'DevEaD',
+    'EduCom',
+    'Produto',
+    'Studion.mx',
+    'Beyoncedo',
+    'Bon Job',
+    'Pink Flow',
+    'Nos Alcione',
+    'Engenheiros do Validaí',
+    'Time AVengers',
+    'Barões da Tarefinha',
+    'Geral & Fluxo',
+    'Gestão Ágil',
+    'Governança de dados',
+    'DOT ForHub',
+    'Intel',
+    'Operação',
+  ];
+
+  const matchedKnownSquads = knownSquads.filter((squad) => haystack.includes(normalizeText(squad)));
+  if (matchedKnownSquads.length > 0) {
+    return Array.from(new Set(matchedKnownSquads)).join(' • ');
+  }
+
+  const explicitMatches = [
+    /time de ([^.,;()]+)/i,
+    /equipe de ([^.,;()]+)/i,
+    /para ([^.,;()]+)/i,
+    /de ([^.,;()]+?)(?:\s+(?:do|da|dos|das|em|para)|[.,;()]|$)/i,
+  ];
+
+  for (const pattern of explicitMatches) {
+    const match = haystack.match(pattern);
+    if (match?.[1]) {
+      const candidate = match[1].trim();
+      if (candidate.length >= 2) return candidate;
+    }
+  }
+
+  return row['Área']?.trim() || 'Geral';
+};
+
+const mapIntegridade = (status: string) => {
+  const normalized = normalizeText(status);
+  if (normalized === 'válido' || normalized === 'valido') return 'Atualizado';
+  if (normalized === 'em revisão' || normalized === 'em revisao') return 'Em revisão';
+  if (normalized === 'defasado') return 'Sob revisão';
+  return 'Pendente';
+};
+
+const summarizeIntegrity = (statuses: string[]) => {
+  const normalized = statuses.map((status) => normalizeText(status));
+  if (normalized.every((status) => status === 'válido' || status === 'valido')) return 'Atualizado';
+  if (normalized.some((status) => status === 'defasado')) return 'Sob revisão';
+  if (normalized.some((status) => status === 'em revisão' || status === 'em revisao')) return 'Em revisão';
+  return 'Pendente';
+};
+
+const formatStatusSummary = (statuses: string[]) => {
+  const unique = Array.from(new Set(statuses.map((status) => status.trim()).filter(Boolean)));
+  if (unique.length === 0) return 'Sem informação';
+  if (unique.length === 1) return unique[0];
+  return `Misto (${unique.length})`;
+};
+
+type InventarioRow = {
+  Área: string;
+  'Nome do Documento': string;
+  Finalidade: string;
+  'Link Atual (Drive)': string;
+  Status: string;
+  'Dono do Processo': string;
+  Prioridade: string;
+};
+
+type GroupedInventory = {
+  title: string;
+  entries: Array<{
+    area: string;
+    squad: string;
+    responsavel: string;
+    funcao: string;
+    status: string;
+    prioridade: string;
+    link: string;
+    titulo: string;
+  }>;
+};
+
+const rawRows = inventario as InventarioRow[];
+const groupedByTitle = new Map<string, GroupedInventory>();
+
+for (const row of rawRows) {
+  const title = (row['Nome do Documento'] || 'Documento sem título').trim();
+  const key = normalizeText(title);
+  const area = (row['Área'] || 'Geral').trim();
+  const squad = inferSquad(row);
+  const responsavel = (row['Dono do Processo'] || 'Sem responsável').trim();
+  const funcao = area;
+  const status = (row['Status'] || 'Sem informação').trim();
+  const prioridade = (row['Prioridade'] || '').trim();
+  const link = normalizeLink(row['Link Atual (Drive)'] || title, `${area} ${title}`);
+
+  const entry = {
+    area,
+    squad,
+    responsavel,
+    funcao,
+    status,
+    prioridade,
+    link,
+    titulo: title,
+  };
+
+  const existing = groupedByTitle.get(key);
+  if (existing) {
+    existing.entries.push(entry);
+  } else {
+    groupedByTitle.set(key, { title, entries: [entry] });
+  }
+}
+
+const entriesForItem = (group: GroupedInventory) => {
+  const uniqueAreas = Array.from(new Set(group.entries.map((entry) => entry.area)));
+  const uniqueSquads = Array.from(new Set(group.entries.map((entry) => entry.squad)));
+  const uniqueResponsaveis = Array.from(new Set(group.entries.map((entry) => entry.responsavel)));
+  const uniqueFuncoes = Array.from(new Set(group.entries.map((entry) => entry.funcao)));
+  const statuses = group.entries.map((entry) => entry.status);
+  const priority = group.entries.find((entry) => entry.prioridade)?.prioridade || '';
+  const primaryEntry = group.entries[0];
+
+  return {
+    primaryEntry,
+    uniqueAreas,
+    uniqueSquads,
+    uniqueResponsaveis,
+    uniqueFuncoes,
+    statuses,
+    priority,
+  };
+};
+
+export const processosItems: PortfolioItem[] = Array.from(groupedByTitle.values())
+  .sort((a, b) => a.title.localeCompare(b.title, 'pt-BR'))
+  .map((group, index) => {
+    const { primaryEntry, uniqueAreas, uniqueSquads, uniqueResponsaveis, uniqueFuncoes, statuses, priority } = entriesForItem(group);
+    const isMulti = group.entries.length > 1;
+    const titleSeed = `${slugify(group.title)}-${index + 1}`;
+    const primaryLink = primaryEntry.link;
+    const statusSummary = formatStatusSummary(statuses);
+    const areaSummary = uniqueAreas.join(' • ');
+    const compactAreaSummary = uniqueAreas.length > 1 ? `${uniqueAreas[0]} +${uniqueAreas.length - 1}` : uniqueAreas[0];
+    const squadSummary = uniqueSquads.join(' • ');
+    const compactSquadSummary = uniqueSquads.length > 1 ? `${uniqueSquads[0]} +${uniqueSquads.length - 1}` : uniqueSquads[0];
+    const responsavelSummary = uniqueResponsaveis.join(' • ');
+    const funcaoSummary = uniqueFuncoes.join(' • ');
+
+    return {
+      id: `inventario-${titleSeed}`,
+      Projeto: group.title,
+      Cliente: statusSummary,
+      Time: compactSquadSummary,
+      Data: INVENTORY_DATE,
+      Imagem_capa: `https://picsum.photos/seed/${encodeURIComponent(titleSeed)}/900/700`,
+      Link_PMV: primaryLink,
+      versao: 'v1.0.0',
+      integridade: summarizeIntegrity(statuses),
+      ultimaRevisao: INVENTORY_DATE,
+      pinned: isMulti || Boolean(priority) || uniqueAreas.includes('Front'),
+      Assunto_geral: isMulti
+        ? `${group.entries.length} entradas consolidadas para este título no inventário.`
+        : primaryEntry.funcao,
+      Assunto_especifico: `Responsável: ${responsavelSummary}`,
+      Publico_alvo: responsavelSummary,
+      Metodologias: funcaoSummary,
+      Mídias: primaryLink.startsWith('https://') ? 'Drive, sites e links seguros' : 'Drive',
+      Outros_recursos: priority ? `Prioridade: ${priority}` : `Time/Squad: ${squadSummary || areaSummary}`,
+      DI: '',
+      DM: '',
+      groupCount: group.entries.length,
+      inventoryEntries: group.entries,
+      links: [
+        { label: 'Abrir documento', href: primaryLink, hint: 'Fonte oficial' },
+        { label: 'Buscar no Drive', href: driveSearchUrl(group.title), hint: 'Pesquisa rápida' },
+        { label: 'Inventário', href: driveSearchUrl(`${areaSummary} ${group.title}`), hint: 'Base catalogada' },
+      ],
+    };
+  });

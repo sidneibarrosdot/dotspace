@@ -1,4 +1,34 @@
 
+export interface InventoryEntryLike {
+  area?: string;
+  squad?: string;
+  responsavel?: string;
+  funcao?: string;
+  status?: string;
+  prioridade?: string;
+  link?: string;
+  titulo?: string;
+  id?: string;
+  metaArea?: string;
+  objetivo?: string;
+  keyResult?: string;
+  responsavelKR?: string;
+  timeSquad?: string;
+  periodo?: string;
+  valorBase?: string;
+  valorAlvo?: string;
+  valorAtual?: string;
+  evolucao?: string;
+  sinergia?: string;
+  frenteParceira?: string;
+  planoAcao?: string;
+  ultimaAtualizacao?: string;
+  observacoes?: string;
+  sourceSheetRow?: number;
+  sourceIndex?: number;
+  pinned?: boolean;
+}
+
 export interface PortfolioItem {
   id: string;
   Imagem_capa: string;
@@ -39,6 +69,8 @@ export interface PortfolioItem {
     href: string;
     hint?: string;
   }>;
+  inventoryEntries?: InventoryEntryLike[];
+  groupCount?: number;
 }
 
 export interface Favorite {

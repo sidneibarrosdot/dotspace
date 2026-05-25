@@ -20,7 +20,7 @@ const PageFilterActions: React.FC<PageFilterActionsProps> = ({ showFavoritesOnly
           showFavoritesOnly
             ? 'border-[#88C125] bg-[#88C125]/15 text-[#88C125]'
             : isLightMode
-              ? 'border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50'
+              ? 'border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-50'
               : 'border-white/10 bg-white/6 text-white/90 hover:bg-white/10'
         }`}
       >
@@ -33,7 +33,7 @@ const PageFilterActions: React.FC<PageFilterActionsProps> = ({ showFavoritesOnly
         onClick={onShare}
         className={`inline-flex h-[52px] items-center gap-2 rounded-full border px-5 text-sm font-semibold transition-colors ${
           isLightMode
-            ? 'border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50'
+            ? 'border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-50'
             : 'border-white/10 bg-white/6 text-white/90 hover:bg-white/10'
         }`}
       >
@@ -41,7 +41,7 @@ const PageFilterActions: React.FC<PageFilterActionsProps> = ({ showFavoritesOnly
         Compartilhar
       </button>
 
-      {feedback ? <span className={`text-xs font-medium ${isLightMode ? 'text-zinc-500' : 'text-white/55'}`}>{feedback}</span> : null}
+      {feedback ? <span className={`text-xs font-medium ${isLightMode ? 'text-zinc-600' : 'text-white/55'}`}>{feedback}</span> : null}
     </div>
   );
 };
