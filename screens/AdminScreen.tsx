@@ -6,6 +6,10 @@ import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, writeBatc
 import { User } from 'firebase/auth';
 import type { PortfolioItem } from '../types';
 import { portfolioItems as localPortfolioItems } from '../data/portfolioItems';
+import { processosItems } from '../data/processosItems';
+import { treinamentosItems } from '../data/treinamentosItems';
+import { krsItems } from '../data/krsItems';
+import { forumItems } from '../data/forumItems';
 
 enum OperationType {
   CREATE = 'create',
@@ -98,30 +102,10 @@ interface UploadLog {
     details?: string;
 }
 
-interface AccessLog {
-    id: string;
-    timestamp: {
-        seconds: number;
-        nanoseconds: number;
-    } | null;
-    userEmail: string;
-    action?: string;
-    details?: string;
-    version?: string;
-}
-
 interface PortfolioStats {
     totalProjects: number;
     lastUpdated: string | null;
     activeUsers: number;
-}
-
-interface AdminAccessProfile {
-  name: string;
-  role: string;
-  area: string;
-  status: 'ativo' | 'pendente' | 'restrito';
-  lastAccess: string;
 }
 
 interface AdminAlert {
@@ -138,6 +122,49 @@ interface AdminPermissionRule {
   gestor: boolean;
   admin: boolean;
 }
+
+type PermissionRole = 'colaborador' | 'editor' | 'gestor' | 'admin';
+
+const PERMISSION_MATRIX_STORAGE_KEY = 'dotspace:admin-permission-matrix';
+const SHEET_SYNC_EMAIL = 'sheets-sync@example.com';
+const SHEET_SYNC_FILENAME = 'SYNC PLANILHA';
+
+const BASE_PERMISSION_MATRIX: AdminPermissionRule[] = [
+  { module: 'Processos', colaborador: true, editor: true, gestor: true, admin: true },
+  { module: 'Treinamentos', colaborador: true, editor: true, gestor: true, admin: true },
+  { module: "Banco de OKR's", colaborador: true, editor: true, gestor: true, admin: true },
+  { module: 'Fórum', colaborador: true, editor: true, gestor: true, admin: true },
+  { module: 'Painel administrativo', colaborador: false, editor: false, gestor: true, admin: true },
+  { module: 'Configurações globais', colaborador: false, editor: false, gestor: false, admin: true },
+];
+
+const readPermissionMatrix = (): AdminPermissionRule[] => {
+  if (typeof window === 'undefined') {
+    return BASE_PERMISSION_MATRIX;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(PERMISSION_MATRIX_STORAGE_KEY);
+    if (!raw) return BASE_PERMISSION_MATRIX;
+
+    const parsed = JSON.parse(raw) as AdminPermissionRule[];
+    if (!Array.isArray(parsed)) return BASE_PERMISSION_MATRIX;
+
+    return BASE_PERMISSION_MATRIX.map((baseRule) => {
+      const storedRule = parsed.find((rule) => rule?.module === baseRule.module);
+      if (!storedRule) return baseRule;
+      return {
+        module: baseRule.module,
+        colaborador: typeof storedRule.colaborador === 'boolean' ? storedRule.colaborador : baseRule.colaborador,
+        editor: typeof storedRule.editor === 'boolean' ? storedRule.editor : baseRule.editor,
+        gestor: typeof storedRule.gestor === 'boolean' ? storedRule.gestor : baseRule.gestor,
+        admin: typeof storedRule.admin === 'boolean' ? storedRule.admin : baseRule.admin,
+      };
+    });
+  } catch {
+    return BASE_PERMISSION_MATRIX;
+  }
+};
 
 const PT_BR_MONTHS = [
     'janeiro',
@@ -208,6 +235,37 @@ const parseProjectPeriod = (value: unknown): { year: number; month: number; key:
     return null;
 };
 
+const buildPeriodSeries = (dates: string[]) => {
+  const periodCounts = dates.reduce<Record<string, number>>((acc, value) => {
+    const period = parseProjectPeriod(value);
+    if (!period) return acc;
+    acc[period.key] = (acc[period.key] || 0) + 1;
+    return acc;
+  }, {});
+
+  return Object.entries(periodCounts)
+    .map(([name, value]) => {
+      const [year, month] = name.split('-');
+      const monthName = new Date(parseInt(year), parseInt(month) - 1).toLocaleString('pt-BR', { month: 'short' });
+      return { name: `${monthName}/${year.slice(2)}`, value, originalDate: name };
+    })
+    .sort((a, b) => a.originalDate.localeCompare(b.originalDate));
+};
+
+const ADMIN_PAGE_BREAKDOWN = [
+  { name: 'Processos', value: processosItems.length },
+  { name: 'Treinamentos', value: treinamentosItems.length },
+  { name: "Banco de OKR's", value: krsItems.length },
+  { name: 'Fórum', value: forumItems.length },
+];
+
+const ADMIN_PERIOD_SERIES = buildPeriodSeries([
+  ...processosItems.map((item) => item.Data),
+  ...treinamentosItems.map((item) => item.Data),
+  ...krsItems.map((item) => item.ultimaAtualizacao || item.Data),
+  ...forumItems.map((item) => item.lastActivity),
+]);
+
 const getGoogleSlidesPreviewUrl = (url: string): string | null => {
     if (typeof url !== 'string' || !url.includes('docs.google.com/presentation/d/')) {
         return null;
@@ -258,29 +316,36 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
   const [uploadLogs, setUploadLogs] = useState<UploadLog[]>([]);
-  const [accessLogs, setAccessLogs] = useState<AccessLog[]>([]);
   const [logsError, setLogsError] = useState<string | null>(null);
   const [stats, setStats] = useState<PortfolioStats>({ totalProjects: 0, lastUpdated: null, activeUsers: 0 });
   const [statsLoading, setStatsLoading] = useState(true);
-  const [isLogsVisible, setIsLogsVisible] = useState(false);
-  const [isAccessLogsVisible, setIsAccessLogsVisible] = useState(false);
   const [chartData, setChartData] = useState<any[]>([]);
   const [periodChartData, setPeriodChartData] = useState<any[]>([]);
-  const [ssoRequired, setSsoRequired] = useState(true);
-  const [domainRestrictionEnabled, setDomainRestrictionEnabled] = useState(true);
-  const [auditExportEnabled, setAuditExportEnabled] = useState(true);
-  const [ipRestrictionEnabled, setIpRestrictionEnabled] = useState(false);
   const [chartFilter, setChartFilter] = useState<'client' | 'team' | 'methodology' | 'media'>('client');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [qualityAudit, setQualityAudit] = useState<{ id: string, name: string, issues: string[] }[]>([]);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [chartsReady, setChartsReady] = useState(false);
+  const [permissionMatrix, setPermissionMatrix] = useState<AdminPermissionRule[]>(() => readPermissionMatrix());
 
   useEffect(() => {
     const rafId = window.requestAnimationFrame(() => setChartsReady(true));
     return () => window.cancelAnimationFrame(rafId);
   }, []);
+
+  useEffect(() => {
+    const uniqueUsers = new Set(uploadLogs.map((log) => log.userEmail || log.fileName).filter(Boolean)).size;
+    setStats((prev) => ({ ...prev, activeUsers: uniqueUsers }));
+  }, [uploadLogs]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(PERMISSION_MATRIX_STORAGE_KEY, JSON.stringify(permissionMatrix));
+    } catch {
+      // ignore storage errors in local simulation mode
+    }
+  }, [permissionMatrix]);
 
   useEffect(() => {
     if (!offlineMode) return;
@@ -298,7 +363,6 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
     });
     setStatsLoading(false);
     setUploadLogs([]);
-    setAccessLogs([]);
     setQualityAudit(localPortfolioItems.slice(0, 5).map((item) => ({
       id: item.id,
       name: item.Projeto,
@@ -336,50 +400,6 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
 
     setChartsReady(true);
   }, [offlineMode]);
-
-  const fetchAuditLogs = async () => {
-    const path = 'auditLogs';
-    try {
-      const logsCollection = collection(db, path);
-      const q = query(logsCollection, orderBy('timestamp', 'desc'));
-
-      const snapshot = await getDocs(q);
-      const allowedActions = ['LOGIN'];
-      const logList = snapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() } as AccessLog))
-        .filter(log => allowedActions.includes(log.action));
-      setAccessLogs(logList);
-      setLogsError(null);
-
-      const uniqueUsers = new Set(logList.map(l => l.userEmail)).size;
-      setStats(prev => ({ ...prev, activeUsers: uniqueUsers }));
-
-      // Setup real-time listener after initial fetch
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        const logList = snapshot.docs
-          .map(doc => ({ id: doc.id, ...doc.data() } as AccessLog))
-          .filter(log => allowedActions.includes(log.action));
-        setAccessLogs(logList);
-        setLogsError(null);
-        const uniqueUsers = new Set(logList.map(l => l.userEmail)).size;
-        setStats(prev => ({ ...prev, activeUsers: uniqueUsers }));
-      }, (error) => {
-        console.error("Error in audit logs snapshot:", error);
-        // Don't set logsError here if we already have data
-      });
-
-      return unsubscribe;
-    } catch (error) {
-      console.error("Error fetching audit logs:", error);
-      setLogsError("Erro de permissão ao carregar logs de auditoria.");
-      const errInfo = {
-        error: error instanceof Error ? error.message : String(error),
-        operationType: OperationType.LIST,
-        path
-      };
-      console.error('Firestore Fetch Error: ', JSON.stringify(errInfo));
-    }
-  };
 
   const fetchStats = () => {
     setStatsLoading(true);
@@ -544,12 +564,10 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
     if (offlineMode) {
       return;
     }
-    let unsubscribeAudit: any;
     let unsubscribeUpload: any;
     let unsubscribeStats: any;
 
     const setupListeners = async () => {
-      unsubscribeAudit = await fetchAuditLogs();
       unsubscribeUpload = await fetchLogs();
       unsubscribeStats = await fetchStats();
     };
@@ -557,7 +575,6 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
     setupListeners();
 
     return () => {
-        if (unsubscribeAudit) unsubscribeAudit();
         if (unsubscribeUpload) unsubscribeUpload();
         if (unsubscribeStats) unsubscribeStats();
     };
@@ -929,6 +946,12 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
     return date.toLocaleString('pt-BR');
   };
 
+  const formatIsoTimestamp = (timestamp: string) => {
+    const parsed = Date.parse(timestamp);
+    if (!Number.isFinite(parsed)) return 'Data indisponível';
+    return new Date(parsed).toLocaleString('pt-BR');
+  };
+
   const renderStat = (label: string, value: string | number | null) => (
     <div className="min-w-0 p-4 bg-gray-50 dark:bg-zinc-700/50 rounded-lg">
       <p className="text-sm text-gray-500 dark:text-gray-400">{label}</p>
@@ -936,95 +959,67 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
     </div>
   );
 
-  const getAuditActionLabel = (action?: string) => {
-    const labels: Record<string, string> = {
-      CREATE: 'CRIAÇÃO',
-      UPDATE: 'EDIÇÃO',
-      DELETE: 'EXCLUSÃO',
-      UPLOAD: 'UPLOAD',
-      LOGIN: 'LOGIN',
-      CLEAR_ALL: 'LIMPEZA',
-      SYNC_SHEETS_SMART: 'SYNC PLANILHA',
-      SYNC_API_SMART: 'SYNC API'
-    };
+  const latestSheetSyncLog = uploadLogs.find((log) =>
+    log.userEmail === SHEET_SYNC_EMAIL || log.fileName === SHEET_SYNC_FILENAME
+  );
+  const getUploadDisplayTitle = (log: UploadLog) => {
+    if (log.userEmail === SHEET_SYNC_EMAIL || log.fileName === SHEET_SYNC_FILENAME) {
+      return `Sincronização Inteligente: ${log.details || 'Atualização concluída.'}`;
+    }
 
-    return labels[action || ''] || action || 'ACCESS';
+    return log.fileName;
   };
+  const getUploadTypeLabel = (log: UploadLog) => (
+    log.userEmail === SHEET_SYNC_EMAIL || log.fileName === SHEET_SYNC_FILENAME
+      ? 'Sincronização'
+      : 'Importação'
+  );
 
-  const downloadAuditLogs = async () => {
-    const headers = ['Usuário', 'Data/Hora', 'Ação', 'Detalhes', 'Versão'];
+  const downloadSheetChangeLogs = async () => {
+    const headers = ['Arquivo', 'Tipo', 'Usuário', 'Data/Hora', 'Detalhe'];
     const csvContent = [
-        headers.join(','),
-        ...accessLogs.map(log => `"${log.userEmail}","${formatTimestamp(log.timestamp)}","${log.action || 'ACCESS'}","${(log.details || 'Visualizou Painel Admin').replace(/"/g, '""')}","${log.version || 'N/A'}"`)
+      headers.join(','),
+      ...uploadLogs.map((log) => {
+        const fileName = getUploadDisplayTitle(log).replace(/"/g, '""');
+        const typeLabel = getUploadTypeLabel(log).replace(/"/g, '""');
+        const userLabel = (log.userEmail || 'Sistema').replace(/"/g, '""');
+        const details = (log.details || '').replace(/"/g, '""');
+        return `"${fileName}","${typeLabel}","${userLabel}","${formatTimestamp(log.timestamp)}","${details}"`;
+      }),
     ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', `auditoria_acessos_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `alteracoes_planilha_${new Date().toISOString().split('T')[0]}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  const latestSheetSyncLog = uploadLogs.find((log) =>
-    log.userEmail === 'sheets-sync@dotgroup.com.br' || log.fileName === 'SYNC PLANILHA'
-  );
-  const getUploadDisplayTitle = (log: UploadLog) => {
-    if (log.userEmail === 'sheets-sync@dotgroup.com.br' || log.fileName === 'SYNC PLANILHA') {
-      return `Sincronização Inteligente: ${log.details || 'Atualização concluída.'}`;
-    }
-
-    return log.fileName;
-  };
-
   const adminLogoClassName = 'shrink-0';
-  const monitoredAreas = [
-    { area: 'Processos', total: 24, review: 5, audit: 12 },
-    { area: 'Treinamentos', total: 18, review: 3, audit: 9 },
-    { area: "Banco de KR's", total: 16, review: 4, audit: 10 },
-    { area: 'Fórum', total: 28, review: 2, audit: 7 },
-  ];
-  const accessProfiles: AdminAccessProfile[] = [
-    { name: 'Sidnei Barros', role: 'ADMIN', area: 'Governança', status: 'ativo', lastAccess: 'Hoje, 08:42' },
-    { name: 'Time People Ops', role: 'GESTOR', area: 'Treinamentos', status: 'ativo', lastAccess: 'Hoje, 08:10' },
-    { name: 'Equipe Compliance', role: 'EDITOR', area: 'Processos', status: 'pendente', lastAccess: 'Ontem, 17:36' },
-    { name: 'Finance Squad', role: 'COLABORADOR', area: "Banco de KR's", status: 'restrito', lastAccess: 'Ontem, 16:21' },
-  ];
-  const permissionMatrix: AdminPermissionRule[] = [
-    { module: 'Processos', colaborador: true, editor: true, gestor: true, admin: true },
-    { module: 'Treinamentos', colaborador: true, editor: true, gestor: true, admin: true },
-    { module: "Banco de KR's", colaborador: true, editor: true, gestor: true, admin: true },
-    { module: 'Fórum', colaborador: true, editor: true, gestor: true, admin: true },
-    { module: 'Painel administrativo', colaborador: false, editor: false, gestor: true, admin: true },
-    { module: 'Configurações globais', colaborador: false, editor: false, gestor: false, admin: true },
-  ];
-  const adminAlerts: AdminAlert[] = [
-    { id: 'a1', title: 'Fila de revisão crescendo', detail: '5 itens aguardando aprovação em Processos.', level: 'atencao' },
-    { id: 'a2', title: 'Sincronização estável', detail: 'Último pull da base sem inconsistências.', level: 'ok' },
-    { id: 'a3', title: 'Permissão divergente detectada', detail: '1 perfil com escopo fora da área padrão.', level: 'critico' },
-  ];
-  const governanceChecklist = [
-    { label: 'Versionamento semântico obrigatório', status: true },
-    { label: 'Justificativa para mudanças críticas', status: true },
-    { label: 'Auditoria de acesso em tempo real', status: true },
-    { label: 'Validação de links externos ativos', status: false },
+  const monitoredAreas = ADMIN_PAGE_BREAKDOWN.map((item) => ({
+    area: item.name,
+    total: item.value,
+    review: Math.max(1, Math.ceil(item.value * 0.4)),
+    audit: Math.max(1, Math.ceil(item.value * 0.6)),
+  }));
+  const permissionRoles: Array<{ key: PermissionRole; label: string }> = [
+    { key: 'colaborador', label: 'Colaborador' },
+    { key: 'editor', label: 'Editor' },
+    { key: 'gestor', label: 'Gestor' },
+    { key: 'admin', label: 'Admin' },
   ];
 
-  const statusBadgeClass = (status: AdminAccessProfile['status']) => {
-    if (status === 'ativo') return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300';
-    if (status === 'pendente') return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300';
-    return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300';
+  const togglePermission = (module: string, role: PermissionRole) => {
+    setPermissionMatrix((current) =>
+      current.map((rule) =>
+        rule.module === module ? { ...rule, [role]: !rule[role] } : rule,
+      ),
+    );
   };
-
-  const alertBadgeClass = (level: AdminAlert['level']) => {
-    if (level === 'ok') return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300';
-    if (level === 'atencao') return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300';
-    return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300';
-  };
-
   return (
       offlineMode ? (
         <div className="min-h-screen bg-gray-100 dark:bg-zinc-900">
@@ -1060,29 +1055,21 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
             <div className="max-w-6xl mx-auto space-y-6">
               <div className="rounded-2xl border border-emerald-300 bg-emerald-50 p-6 text-emerald-900 shadow-sm dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200">
                 <p className="text-sm font-semibold uppercase tracking-[0.2em]">Administração central</p>
-                <h1 className="mt-2 text-2xl font-bold">Gestão de acessos, auditoria e governança</h1>
+                <h1 className="mt-2 text-2xl font-bold">Gestão de conteúdo, auditoria e governança</h1>
                 <p className="mt-2 text-sm leading-relaxed">
-                  Controle operacional completo para monitorar conteúdo, revisar permissões e acompanhar a integridade das áreas do sistema.
+                  Controle operacional completo para monitorar conteúdo, revisar interações dos cards e acompanhar a integridade das áreas do sistema.
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {renderStat('Projetos monitorados', stats.totalProjects)}
-                {renderStat('Última Data', stats.lastUpdated)}
-                {renderStat('Usuário ativo', user.displayName || user.email || '—')}
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-                {renderStat('Perfis monitorados', accessProfiles.length)}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {renderStat('Alterações registradas', uploadLogs.length)}
                 {renderStat('Itens em revisão', monitoredAreas.reduce((acc, item) => acc + item.review, 0))}
-                {renderStat('Eventos auditoria (7d)', monitoredAreas.reduce((acc, item) => acc + item.audit, 0))}
-                {renderStat('Alertas ativos', adminAlerts.filter((alert) => alert.level !== 'ok').length)}
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="rounded-2xl bg-white p-6 shadow-lg border border-gray-200 dark:bg-zinc-800 dark:border-zinc-700/50">
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Projetos por Cliente</h2>
+                    <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Conteúdo por página</h2>
                     <span className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700 bg-emerald-100 px-2 py-1 rounded-full">Atualizado</span>
                   </div>
                   <div className="h-64 overflow-x-auto">
@@ -1091,7 +1078,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                         Carregando gráfico...
                       </div>
                     ) : (
-                      <BarChart width={720} height={256} data={chartData}>
+                      <BarChart width={720} height={256} data={ADMIN_PAGE_BREAKDOWN}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme === 'dark' ? '#3f3f46' : '#e5e7eb'} />
                         <XAxis dataKey="name" tick={{ fontSize: 10, fill: theme === 'dark' ? '#a1a1aa' : '#71717a' }} axisLine={false} tickLine={false} />
                         <YAxis tick={{ fontSize: 10, fill: theme === 'dark' ? '#a1a1aa' : '#71717a' }} axisLine={false} tickLine={false} />
@@ -1104,7 +1091,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                           itemStyle={{ color: '#99cc00' }}
                         />
                         <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                          {chartData.map((entry, index) => (
+                          {ADMIN_PAGE_BREAKDOWN.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={index % 2 === 0 ? '#99cc00' : '#86b300'} />
                           ))}
                         </Bar>
@@ -1115,7 +1102,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
 
                 <div className="rounded-2xl bg-white p-6 shadow-lg border border-gray-200 dark:bg-zinc-800 dark:border-zinc-700/50">
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Projetos por Período</h2>
+                    <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Atualizações por mês</h2>
                     <span className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700 bg-emerald-100 px-2 py-1 rounded-full">Atualizado</span>
                   </div>
                   <div className="h-64 overflow-x-auto">
@@ -1124,7 +1111,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                         Carregando gráfico...
                       </div>
                     ) : (
-                      <BarChart width={720} height={256} data={periodChartData}>
+                      <BarChart width={720} height={256} data={ADMIN_PERIOD_SERIES}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme === 'dark' ? '#3f3f46' : '#e5e7eb'} />
                         <XAxis dataKey="name" tick={{ fontSize: 10, fill: theme === 'dark' ? '#a1a1aa' : '#71717a' }} axisLine={false} tickLine={false} />
                         <YAxis tick={{ fontSize: 10, fill: theme === 'dark' ? '#a1a1aa' : '#71717a' }} axisLine={false} tickLine={false} />
@@ -1143,109 +1130,113 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="rounded-2xl bg-white p-6 shadow-lg border border-gray-200 dark:bg-zinc-800 dark:border-zinc-700/50">
-                  <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Operações</h2>
-                  <ul className="mt-4 space-y-2 text-sm text-gray-600 dark:text-gray-300">
-                    <li>• Revisar governança de processos e treinamentos</li>
-                    <li>• Monitorar indicadores por área</li>
-                    <li>• Auditar alterações críticas</li>
-                    <li>• Gerenciar políticas de acesso</li>
-                  </ul>
-                </div>
-                <div className="rounded-2xl bg-white p-6 shadow-lg border border-gray-200 dark:bg-zinc-800 dark:border-zinc-700/50">
-                  <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Política de segurança</h2>
-                  <p className="mt-4 text-sm text-gray-600 dark:text-gray-300">
-                    Todas as ações administrativas são rastreadas por auditoria e seguem controle por perfil de acesso.
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-                <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-zinc-700/50 dark:bg-zinc-800 xl:col-span-2">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Acessos e perfis</h2>
-                    <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-accent">Controle RBAC</span>
+              <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-zinc-700/50 dark:bg-zinc-800">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="min-w-0">
+                      <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Alterações da planilha</h2>
+                      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                        Registros das alterações importadas e sincronizações vindas da planilha.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={downloadSheetChangeLogs}
+                        className="rounded-full border border-gray-200 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-gray-600 transition-colors hover:bg-gray-50 dark:border-zinc-700 dark:text-gray-300 dark:hover:bg-zinc-700/40"
+                      >
+                        Exportar CSV
+                      </button>
+                      <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-accent">
+                        {uploadLogs.length} alterações
+                      </span>
+                    </div>
                   </div>
+                  {latestSheetSyncLog && (
+                    <div className="mt-5 rounded-2xl border border-emerald-500/20 bg-emerald-50 p-4 text-sm dark:border-emerald-900/40 dark:bg-emerald-950/20">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">
+                        Última sincronização
+                      </p>
+                      <p className="mt-1 text-zinc-900 dark:text-white font-semibold">
+                        {latestSheetSyncLog.details || latestSheetSyncLog.fileName}
+                      </p>
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        {formatTimestamp(latestSheetSyncLog.timestamp)}
+                      </p>
+                    </div>
+                  )}
                   <div className="mt-5 overflow-x-auto">
                     <table className="min-w-full text-sm">
                       <thead>
                         <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-[0.16em] text-gray-500 dark:border-zinc-700 dark:text-gray-400">
-                          <th className="pb-2 pr-4">Usuário/Time</th>
-                          <th className="pb-2 pr-4">Perfil</th>
-                          <th className="pb-2 pr-4">Área</th>
-                          <th className="pb-2 pr-4">Status</th>
-                          <th className="pb-2">Último acesso</th>
+                          <th className="pb-2 pr-4">Arquivo</th>
+                          <th className="pb-2 pr-4">Tipo</th>
+                          <th className="pb-2 pr-4">Usuário</th>
+                          <th className="pb-2">Data/Hora</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {accessProfiles.map((profile) => (
-                          <tr key={profile.name} className="border-b border-gray-100 dark:border-zinc-700/60">
-                            <td className="py-3 pr-4 font-semibold text-zinc-900 dark:text-white">{profile.name}</td>
-                            <td className="py-3 pr-4 text-gray-600 dark:text-gray-300">{profile.role}</td>
-                            <td className="py-3 pr-4 text-gray-600 dark:text-gray-300">{profile.area}</td>
-                            <td className="py-3 pr-4">
-                              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${statusBadgeClass(profile.status)}`}>
-                                {profile.status}
-                              </span>
+                        {uploadLogs.length > 0 ? (
+                          uploadLogs.slice(0, 8).map((log) => (
+                            <tr key={log.id} className="border-b border-gray-100 dark:border-zinc-700/60">
+                              <td className="py-3 pr-4 font-semibold text-zinc-900 dark:text-white">
+                                <p className="break-words">{getUploadDisplayTitle(log)}</p>
+                                {log.details && (
+                                  <p className="mt-1 text-xs font-normal text-gray-500 dark:text-gray-400 break-words">
+                                    {log.details}
+                                  </p>
+                                )}
+                              </td>
+                              <td className="py-3 pr-4">
+                                <span className="rounded-full bg-accent/10 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-accent">
+                                  {getUploadTypeLabel(log)}
+                                </span>
+                              </td>
+                              <td className="py-3 pr-4 text-gray-600 dark:text-gray-300">{log.userEmail || 'Sistema'}</td>
+                              <td className="py-3 text-gray-500 dark:text-gray-400">{formatTimestamp(log.timestamp)}</td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={4} className="py-8 text-center text-gray-500 dark:text-gray-400">
+                              Nenhuma alteração de planilha registrada ainda.
                             </td>
-                            <td className="py-3 text-gray-500 dark:text-gray-400">{profile.lastAccess}</td>
                           </tr>
-                        ))}
+                        )}
                       </tbody>
                     </table>
                   </div>
                 </section>
 
-                <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-zinc-700/50 dark:bg-zinc-800">
-                  <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Alertas operacionais</h2>
-                  <div className="mt-4 space-y-3">
-                    {adminAlerts.map((alert) => (
-                      <div key={alert.id} className="rounded-xl border border-gray-200 p-3 dark:border-zinc-700">
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="font-semibold text-zinc-900 dark:text-white">{alert.title}</p>
-                          <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase ${alertBadgeClass(alert.level)}`}>{alert.level}</span>
-                        </div>
-                        <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">{alert.detail}</p>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              </div>
-
               <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-                <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-zinc-700/50 dark:bg-zinc-800">
-                  <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Governança e conformidade</h2>
-                  <div className="mt-4 space-y-3">
-                    {governanceChecklist.map((item) => (
-                      <div key={item.label} className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 dark:border-zinc-700">
-                        <span className="text-sm text-gray-700 dark:text-gray-200">{item.label}</span>
-                        <span
-                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                            item.status
-                              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
-                              : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
-                          }`}
-                        >
-                          {item.status ? 'OK' : 'Pendente'}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-
-                <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-zinc-700/50 dark:bg-zinc-800">
+                <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-zinc-700/50 dark:bg-zinc-800 xl:col-span-2">
                   <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Monitoramento por área</h2>
-                  <div className="mt-4 space-y-3">
+                  <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-4">
                     {monitoredAreas.map((item) => (
-                      <div key={item.area} className="rounded-xl border border-gray-200 p-3 dark:border-zinc-700">
-                        <div className="flex items-center justify-between">
-                          <p className="font-semibold text-zinc-900 dark:text-white">{item.area}</p>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">{item.total} itens</span>
+                      <div key={item.area} className="rounded-2xl border border-gray-200 p-4 dark:border-zinc-700/70">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="font-semibold text-zinc-900 dark:text-white">{item.area}</p>
+                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{item.total} itens</p>
+                          </div>
+                          <span className="rounded-full bg-accent/10 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-accent">
+                            Atualizado
+                          </span>
                         </div>
-                        <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                          <div className="rounded-md bg-gray-100 px-2 py-1.5 text-gray-700 dark:bg-zinc-700/60 dark:text-gray-200">Revisão: {item.review}</div>
-                          <div className="rounded-md bg-gray-100 px-2 py-1.5 text-gray-700 dark:bg-zinc-700/60 dark:text-gray-200">Auditoria: {item.audit}</div>
+                        <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
+                          <div className="rounded-xl bg-gray-100 px-3 py-2 text-gray-700 dark:bg-zinc-700/60 dark:text-gray-200">
+                            <span className="block text-[10px] uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Revisão</span>
+                            <span className="mt-1 block text-sm font-semibold">{item.review}</span>
+                          </div>
+                          <div className="rounded-xl bg-gray-100 px-3 py-2 text-gray-700 dark:bg-zinc-700/60 dark:text-gray-200">
+                            <span className="block text-[10px] uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Auditoria</span>
+                            <span className="mt-1 block text-sm font-semibold">{item.audit}</span>
+                          </div>
+                        </div>
+                        <div className="mt-4 h-2 w-full rounded-full bg-gray-100 dark:bg-zinc-700/60">
+                          <div
+                            className="h-2 rounded-full bg-gradient-to-r from-accent via-emerald-400 to-lime-400"
+                            style={{ width: `${Math.max(20, Math.min(100, Math.round((item.review + item.audit) / Math.max(item.total, 1) * 100)))}%` }}
+                          />
                         </div>
                       </div>
                     ))}
@@ -1253,59 +1244,60 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                 </section>
               </div>
 
-              <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+              <div className="grid grid-cols-1 gap-6 xl:grid-cols-1">
                 <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-zinc-700/50 dark:bg-zinc-800">
-                  <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Matriz de permissões</h2>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="min-w-0">
+                      <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Matriz de permissões</h2>
+                      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                        Clique nas células para alternar permissões por perfil. As mudanças ficam salvas localmente.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setPermissionMatrix(readPermissionMatrix())}
+                      className="rounded-full border border-gray-200 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-gray-600 transition-colors hover:bg-gray-50 dark:border-zinc-700 dark:text-gray-300 dark:hover:bg-zinc-700/40"
+                    >
+                      Restaurar padrão
+                    </button>
+                  </div>
                   <div className="mt-4 overflow-x-auto">
                     <table className="min-w-full text-sm">
                       <thead>
                         <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-[0.16em] text-gray-500 dark:border-zinc-700 dark:text-gray-400">
                           <th className="pb-2 pr-4">Módulo</th>
-                          <th className="pb-2 pr-4">Colaborador</th>
-                          <th className="pb-2 pr-4">Editor</th>
-                          <th className="pb-2 pr-4">Gestor</th>
-                          <th className="pb-2">Admin</th>
+                          {permissionRoles.map((role) => (
+                            <th key={role.key} className="pb-2 pr-4">{role.label}</th>
+                          ))}
                         </tr>
                       </thead>
                       <tbody>
                         {permissionMatrix.map((rule) => (
                           <tr key={rule.module} className="border-b border-gray-100 dark:border-zinc-700/60">
                             <td className="py-3 pr-4 font-semibold text-zinc-900 dark:text-white">{rule.module}</td>
-                            {[rule.colaborador, rule.editor, rule.gestor, rule.admin].map((allowed, index) => (
-                              <td key={`${rule.module}-${index}`} className="py-3 pr-4">
-                                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${allowed ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-700/50 dark:text-zinc-300'}`}>
-                                  {allowed ? 'Permitido' : 'Bloqueado'}
-                                </span>
-                              </td>
-                            ))}
+                            {permissionRoles.map((role) => {
+                              const allowed = rule[role.key];
+                              return (
+                                <td key={`${rule.module}-${role.key}`} className="py-3 pr-4">
+                                  <button
+                                    type="button"
+                                    onClick={() => togglePermission(rule.module, role.key)}
+                                    aria-pressed={allowed}
+                                    className={`rounded-full px-2.5 py-1 text-xs font-semibold transition-colors ${
+                                      allowed
+                                        ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:hover:bg-emerald-900/50'
+                                        : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200 dark:bg-zinc-700/50 dark:text-zinc-300 dark:hover:bg-zinc-700/80'
+                                    }`}
+                                  >
+                                    {allowed ? 'Permitido' : 'Bloqueado'}
+                                  </button>
+                                </td>
+                              );
+                            })}
                           </tr>
                         ))}
                       </tbody>
                     </table>
-                  </div>
-                </section>
-
-                <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-zinc-700/50 dark:bg-zinc-800">
-                  <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Controles de acesso</h2>
-                  <div className="mt-4 space-y-3">
-                    {[
-                      { label: 'SSO obrigatório', value: ssoRequired, toggle: setSsoRequired },
-                      { label: 'Restrição por domínio (@dotgroup.com.br)', value: domainRestrictionEnabled, toggle: setDomainRestrictionEnabled },
-                      { label: 'Exportação de auditoria habilitada', value: auditExportEnabled, toggle: setAuditExportEnabled },
-                      { label: 'Restrição por IP corporativo', value: ipRestrictionEnabled, toggle: setIpRestrictionEnabled },
-                    ].map((control) => (
-                      <button
-                        key={control.label}
-                        type="button"
-                        onClick={() => control.toggle((current) => !current)}
-                        className="flex w-full items-center justify-between rounded-xl border border-gray-200 px-3 py-3 text-left transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-700/30"
-                      >
-                        <span className="text-sm font-medium text-zinc-800 dark:text-zinc-100">{control.label}</span>
-                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${control.value ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-700/60 dark:text-zinc-300'}`}>
-                          {control.value ? 'Ativo' : 'Inativo'}
-                        </span>
-                      </button>
-                    ))}
                   </div>
                 </section>
               </div>
@@ -1524,7 +1516,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                               <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-2">
                                   <p className="font-semibold text-sm text-zinc-800 dark:text-gray-200">{getUploadDisplayTitle(log)}</p>
-                                  {(log.userEmail === 'sheets-sync@dotgroup.com.br' || log.fileName === 'SYNC PLANILHA') && (
+                                  {(log.userEmail === SHEET_SYNC_EMAIL || log.fileName === SHEET_SYNC_FILENAME) && (
                                     <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-green-700 dark:bg-green-900/30 dark:text-green-300">
                                       Sync Planilha
                                     </span>
@@ -1533,7 +1525,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                                 {log.userEmail && (
                                   <p className="text-xs text-gray-500 dark:text-gray-400 break-all">{log.userEmail}</p>
                                 )}
-                                {log.details && !(log.userEmail === 'sheets-sync@dotgroup.com.br' || log.fileName === 'SYNC PLANILHA') && (
+                                {log.details && !(log.userEmail === SHEET_SYNC_EMAIL || log.fileName === SHEET_SYNC_FILENAME) && (
                                   <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 leading-snug break-words">
                                     <span className="font-semibold text-accent">Detalhe:</span> {log.details}
                                   </p>
@@ -1713,48 +1705,55 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                 </div>
               </div>
 
-              <div id="audit-logs-section" className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-4 sm:p-8 border border-gray-200 dark:border-zinc-700/50 hover:border-accent/30 transition-all duration-300 h-[28rem] sm:h-[34rem] overflow-hidden flex flex-col">
+              <div id="audit-logs-section" className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-4 sm:p-8 border border-gray-200 dark:border-zinc-700/50 hover:border-accent/30 transition-all duration-300 min-h-[28rem] sm:min-h-[34rem] overflow-hidden flex flex-col">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
-                    <h2 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-white">Auditoria de Login</h2>
+                    <div>
+                      <h2 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-white">Histórico recente da planilha</h2>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Importações e sincronizações registradas a partir dos arquivos enviados.</p>
+                    </div>
                     <button
-                        onClick={downloadAuditLogs}
+                        onClick={downloadSheetChangeLogs}
                         className="flex items-center gap-2 text-xs font-bold bg-accent/10 text-accent px-3 py-1.5 rounded-md hover:bg-accent/20 transition-colors"
-                        title="Download Auditoria"
+                        title="Download alterações da planilha"
                     >
                         <UploadIcon className="w-4 h-4 transform rotate-180" />
-                        Download Auditoria
+                        Download
                     </button>
                 </div>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Registro de acessos autorizados ao painel.</p>
 
-                {logsError && (
-                    <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-xs rounded-md border border-red-200 dark:border-red-800">
-                        {logsError}
-                    </div>
-                )}
-
-                <div className="space-y-4 flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-2">
-                    {accessLogs.length > 0 ? (
-                        accessLogs.map(log => (
-                            <div key={log.id} className="p-3 sm:p-4 bg-gray-50 dark:bg-zinc-700/30 rounded-lg border-l-4 border-accent min-w-0">
-                                <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start min-w-0">
-                                    <div className="min-w-0">
-                                        <p className="font-bold text-sm text-zinc-800 dark:text-gray-200 break-words">{log.userEmail}</p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 break-words">
-                                            <span className="font-semibold text-accent">{getAuditActionLabel(log.action)}:</span> {log.details || 'Visualizou Painel Admin'}
-                                        </p>
-                                        {log.version && (
-                                            <p className="text-[9px] text-gray-400 mt-0.5">Versão: {log.version}</p>
-                                        )}
-                                    </div>
-                                    <span className="text-[10px] font-bold text-gray-400 uppercase whitespace-nowrap sm:text-right">
-                                        {formatTimestamp(log.timestamp)}
-                                    </span>
-                                </div>
+                <div className="space-y-3 flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-2">
+                    {uploadLogs.length > 0 ? (
+                      uploadLogs.slice(0, 12).map((log) => (
+                        <div key={log.id} className="rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-zinc-700/60 dark:bg-zinc-700/20">
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold text-zinc-900 dark:text-white break-words">{getUploadDisplayTitle(log)}</p>
+                              <p className="mt-1 text-xs uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
+                                {getUploadTypeLabel(log)}
+                              </p>
+                              {log.userEmail && (
+                                <p className="mt-2 text-sm text-gray-700 dark:text-gray-200 break-words">
+                                  <span className="font-semibold text-accent">Usuário:</span> {log.userEmail}
+                                </p>
+                              )}
+                              {log.details && (
+                                <p className="mt-2 text-sm text-gray-700 dark:text-gray-200 break-words">
+                                  <span className="font-semibold text-accent">Detalhe:</span> {log.details}
+                                </p>
+                              )}
                             </div>
-                        ))
+                            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400 whitespace-nowrap">
+                              {formatTimestamp(log.timestamp)}
+                            </span>
+                          </div>
+                        </div>
+                      ))
                     ) : (
-                        <p className="text-center text-gray-500 dark:text-gray-400 py-4">Nenhum login registrado.</p>
+                      <div className="flex flex-1 items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center dark:border-zinc-700/60 dark:bg-zinc-700/20">
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          Nenhuma alteração de planilha registrada ainda.
+                        </p>
+                      </div>
                     )}
                 </div>
               </div>

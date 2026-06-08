@@ -15,7 +15,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLocalLogin, offlineMode, gc
 
   const handleAccess = () => {
     setError('');
-    onLocalLogin('acesso@dotgroup.com.br', 'Usuário DOT');
+    onLocalLogin('acesso@example.com', 'Usuário Mock');
   };
 
   return (
@@ -101,7 +101,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLocalLogin, offlineMode, gc
               </div>
 
               <p className="mt-6 text-[11px] font-medium uppercase tracking-[0.26em] text-white/42">
-                Acesso restrito @dotgroup.com.br
+                Acesso restrito ao ambiente mock
               </p>
 
               {error && (

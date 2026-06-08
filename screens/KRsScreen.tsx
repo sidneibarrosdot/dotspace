@@ -5,11 +5,10 @@ import NeutralThumb from '../components/NeutralThumb';
 import Pagination from '../components/Pagination';
 import PageFilterActions from '../components/PageFilterActions';
 import SearchBar from '../components/SearchBar';
-import { useLocalCardInteractions } from '../hooks/useLocalCardInteractions';
+import { useLocalCardInteractions, recordLocalCardInteractionEvent } from '../hooks/useLocalCardInteractions';
 import type { KRsItem } from '../data/krsItems';
 import { krsItems } from '../data/krsItems';
 import { KR_META_AREA_OPTIONS, KR_PERIOD_OPTIONS, KR_STATUS_OPTIONS, KR_SYNERGY_OPTIONS, KR_FUNCAO_OPTIONS, KR_TIME_OPTIONS } from '../data/krsConfig';
-import { Bar, BarChart, CartesianGrid, Cell, LabelList, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import {
   ArrowRight,
   BookMarked,
@@ -29,10 +28,12 @@ import {
   TrendingUp,
   Users,
 } from 'lucide-react';
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import type { User } from 'firebase/auth';
 import { FEEDBACK_COPY_ERROR, FEEDBACK_COPY_SUCCESS, FEEDBACK_TIMEOUT_ERROR, FEEDBACK_TIMEOUT_SUCCESS } from '../constants/feedbackMessages';
 
 type SortMode = 'recentes' | 'a-z' | 'z-a';
+const PENDING_HOME_TARGET_KEY = 'dot-space.pending-home-target';
 
 interface KRsScreenProps {
   user: User | null;
@@ -298,10 +299,13 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [shareFeedback, setShareFeedback] = useState('');
   const [expandedKrId, setExpandedKrId] = useState<string | null>(null);
+  const [pendingHomeTargetId, setPendingHomeTargetId] = useState<string>('');
   const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const { interactions, getState, incrementViews, toggleLike, toggleFavorite, registerShare } = useLocalCardInteractions('krs');
   const cardRefs = useRef<Record<string, HTMLElement | null>>({});
+  const didRunInitialFilterResetRef = useRef(false);
+  const filtersRef = useRef<HTMLElement | null>(null);
   const isLightMode = theme === 'light';
 
   const pageClass = isLightMode
@@ -436,6 +440,37 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
   const paginatedItems = useMemo(() => filteredItems.slice((currentPage - 1) * pageSize, currentPage * pageSize), [filteredItems, currentPage]);
 
+  useEffect(() => {
+    if (!openMenu) return;
+
+    const closeOpenMenu = (event: PointerEvent) => {
+      if (filtersRef.current?.contains(event.target as Node)) return;
+      setOpenMenu(null);
+    };
+
+    document.addEventListener('pointerdown', closeOpenMenu);
+    return () => document.removeEventListener('pointerdown', closeOpenMenu);
+  }, [openMenu]);
+
+  useEffect(() => {
+    try {
+      const rawTarget = window.localStorage.getItem(PENDING_HOME_TARGET_KEY);
+      if (!rawTarget) return;
+      const parsed = JSON.parse(rawTarget) as { kind?: string; id?: string };
+      if (parsed.kind !== 'krs' || !parsed.id) return;
+
+      window.localStorage.removeItem(PENDING_HOME_TARGET_KEY);
+      const targetIndex = filteredItems.findIndex((item) => item.id === parsed.id);
+      if (targetIndex < 0) return;
+
+      setPendingHomeTargetId(parsed.id);
+      setExpandedKrId(parsed.id);
+      setCurrentPage(Math.floor(targetIndex / pageSize) + 1);
+    } catch {
+      window.localStorage.removeItem(PENDING_HOME_TARGET_KEY);
+    }
+  }, [filteredItems]);
+
   const buildShareUrl = () => {
     const url = new URL(window.location.href);
     url.searchParams.set('view', 'krs');
@@ -466,6 +501,11 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
   };
 
   useEffect(() => {
+    if (!didRunInitialFilterResetRef.current) {
+      didRunInitialFilterResetRef.current = true;
+      return;
+    }
+
     setCurrentPage(1);
   }, [searchTerm, categoryFilter, areaFilter, sortMode, showFavoritesOnly]);
 
@@ -480,8 +520,20 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
     }
   }, [filteredItems, expandedKrId]);
 
+  useEffect(() => {
+    if (!pendingHomeTargetId) return;
+    const target = cardRefs.current[pendingHomeTargetId];
+    if (!target) return;
+
+    window.requestAnimationFrame(() => {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setPendingHomeTargetId('');
+    });
+  }, [currentPage, pendingHomeTargetId]);
+
   const openItemDetails = (item: KRsItem) => {
     setExpandedKrId(item.id);
+    recordLocalCardInteractionEvent('krs', item.id, 'open');
     window.requestAnimationFrame(() => {
       cardRefs.current[item.id]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
@@ -509,7 +561,7 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
   };
 
   const summaryStats = [
-    { label: 'KRs únicos', value: krsItems.length },
+    { label: 'OKRs únicos', value: krsItems.length },
     { label: 'Entradas', value: allSourceEntries.length },
     { label: 'Meta áreas', value: categories.length },
     { label: 'Times/Squads', value: areas.length },
@@ -574,6 +626,10 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
   }, [filteredItems]);
 
   const maxCycleCount = Math.max(1, ...krByCycle.map((item) => item.total));
+  const maxMetaCount = Math.max(1, ...krByMetaArea.map((item) => item.value));
+  const leadingCycle = krByCycle.reduce<(typeof krByCycle)[number] | null>((leader, item) => (!leader || item.total > leader.total ? item : leader), null);
+  const leadingMeta = krByMetaArea[0] ?? null;
+  const leadingStatus = krByStatus[0] ?? null;
   const completedCount = useMemo(
     () =>
       filteredItems.filter((item) => {
@@ -584,12 +640,19 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
     [filteredItems]
   );
   const completedPercent = filteredItems.length ? Math.round((completedCount / filteredItems.length) * 100) : 0;
+  const chartPalette = ['#88C125', '#4CD07D', '#F78E43', '#EEC137', '#7C8AA5', '#A855F7'] as const;
+  const chartCardClass = `flex h-fit flex-col rounded-3xl border p-5 xl:min-h-[22rem] ${
+    isLightMode ? 'border-zinc-200 bg-white' : 'border-white/10 bg-white/5'
+  }`;
+  const chartTitleClass = `text-xs font-semibold uppercase tracking-[0.3em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`;
+  const chartCountClass = `text-xs font-semibold ${isLightMode ? 'text-zinc-500' : 'text-white/60'}`;
+  const chartInsightClass = `mt-2 text-xs font-medium leading-5 ${isLightMode ? 'text-zinc-500' : 'text-white/50'}`;
 
   const menuItems = [
     { label: 'Home', icon: Home, active: false, action: onNavigateToPortfolio },
     { label: 'Processos', icon: LayoutGrid, active: false, action: onNavigateToProcessos },
     { label: 'Treinamentos', icon: BookOpen, active: false, action: onNavigateToTreinamentos },
-    { label: "Banco de KR's", icon: BookMarked, active: true, action: undefined },
+    { label: "Banco de OKR's", icon: BookMarked, active: true, action: undefined },
     { label: 'Fórum', icon: MessageSquareMore, active: false, action: onNavigateToForum },
   ];
 
@@ -642,12 +705,12 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
               <div className={heroOverlayClass} />
               <div className="relative z-10 grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.38em] text-[#EEC137]">Banco de KR's</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.38em] text-[#EEC137]">Banco de OKR's</p>
                   <h1 className={`mt-3 max-w-4xl text-2xl font-black leading-tight sm:text-3xl lg:text-4xl ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>
                     Objetivos vivos para orientar o time e acelerar resultados.
                   </h1>
                   <p className={`mt-4 max-w-2xl text-sm leading-7 sm:text-base ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>
-                    KR’s organizados com foco em meta área, período, responsável, evolução e alinhamento com a planilha conectada ao sistema.
+                    OKR's organizados com foco em meta área, período, responsável, evolução e alinhamento com a planilha conectada ao sistema.
                   </p>
                   <div className="mt-6 flex flex-wrap gap-3">
                     {['Objetivos', 'Indicadores', 'Metas', 'Ciclos'].map((chip) => (
@@ -676,27 +739,28 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
             </section>
 
             <section className={filtersClass}>
-              <div className="grid gap-4 xl:grid-cols-3">
-                <article className={`rounded-3xl border p-5 ${isLightMode ? 'border-zinc-200 bg-white' : 'border-white/10 bg-white/5'}`}>
+              <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.12fr)_minmax(0,1fr)]">
+                <article className={chartCardClass}>
                   <div className="flex items-center justify-between gap-3">
-                    <p className={`text-xs font-semibold uppercase tracking-[0.3em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Quantidade por período</p>
-                    <span className={`text-xs font-semibold ${isLightMode ? 'text-zinc-500' : 'text-white/60'}`}>{filteredItems.length} KR’s</span>
+                    <p className={chartTitleClass}>Quantidade por período</p>
+                    <span className={chartCountClass}>{filteredItems.length} OKR's</span>
                   </div>
-                  <div className="mt-5 space-y-3">
+                  {leadingCycle && <p className={chartInsightClass}>{leadingCycle.cycle} concentra {leadingCycle.total} OKR's no recorte atual.</p>}
+                  <div className="mt-4 flex flex-col gap-3">
                     {krByCycle.map((item, index) => {
                       const width = Math.max(12, Math.round((item.total / maxCycleCount) * 100));
                       return (
                         <div key={item.cycle}>
-                          <div className="mb-1 flex items-center justify-between text-xs">
-                            <span className={isLightMode ? 'text-zinc-700' : 'text-white/80'}>{item.cycle}</span>
+                          <div className="mb-0.5 flex items-center justify-between gap-3 text-xs">
+                            <span className={`font-medium ${isLightMode ? 'text-zinc-700' : 'text-white/80'}`}>{item.cycle}</span>
                             <span className={isLightMode ? 'text-zinc-500' : 'text-white/55'}>{item.total}</span>
                           </div>
-                          <div className={`h-2.5 overflow-hidden rounded-full ${isLightMode ? 'bg-zinc-100' : 'bg-white/10'}`}>
+                          <div className={`h-3.5 overflow-hidden rounded-full ${isLightMode ? 'bg-zinc-100' : 'bg-white/10'}`}>
                             <div
                               className="h-full rounded-full"
                               style={{
                                 width: `${width}%`,
-                                backgroundColor: ['#EEC137', '#F78E43', '#4CD07D', '#88C125'][index % 4],
+                                backgroundColor: chartPalette[index % chartPalette.length],
                               }}
                             />
                           </div>
@@ -706,52 +770,39 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
                   </div>
                 </article>
 
-                <article className={`rounded-3xl border p-5 ${isLightMode ? 'border-zinc-200 bg-white' : 'border-white/10 bg-white/5'}`}>
+                <article className={chartCardClass}>
                   <div className="flex items-center justify-between gap-3">
-                    <p className={`text-xs font-semibold uppercase tracking-[0.3em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Quantidade por meta</p>
-                    <span className={`text-xs font-semibold ${isLightMode ? 'text-zinc-500' : 'text-white/60'}`}>{filteredItems.length} KR’s</span>
+                    <p className={chartTitleClass}>Quantidade por meta</p>
+                    <span className={chartCountClass}>{filteredItems.length} OKR's</span>
                   </div>
-                  <div className="mt-5 h-72">
+                  {leadingMeta && <p className={chartInsightClass}>{leadingMeta.name} lidera com {leadingMeta.value} OKR's.</p>}
+                  <div className="mt-4 flex flex-col gap-4">
                     {krByMetaArea.length ? (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={krByMetaArea} layout="vertical" margin={{ top: 8, right: 24, left: 8, bottom: 0 }} barCategoryGap={14}>
-                          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={isLightMode ? '#e5e7eb' : '#3f3f46'} />
-                          <XAxis
-                            type="number"
-                            tick={{ fontSize: 10, fill: isLightMode ? '#71717a' : '#a1a1aa' }}
-                            axisLine={false}
-                            tickLine={false}
-                            tickMargin={10}
-                          />
-                          <YAxis
-                            dataKey="name"
-                            type="category"
-                            width={132}
-                            tick={{ fontSize: 10, fill: isLightMode ? '#71717a' : '#a1a1aa' }}
-                            axisLine={false}
-                            tickLine={false}
-                            tickMargin={10}
-                          />
-                          <Tooltip
-                            cursor={{ fill: isLightMode ? 'rgba(15, 23, 42, 0.04)' : 'rgba(255,255,255,0.04)' }}
-                            contentStyle={{
-                              backgroundColor: isLightMode ? '#ffffff' : '#18181b',
-                              borderColor: isLightMode ? '#e5e7eb' : '#3f3f46',
-                              color: isLightMode ? '#000000' : '#ffffff',
-                            }}
-                            itemStyle={{ color: '#99cc00' }}
-                          />
-                          <Bar dataKey="value" radius={[0, 10, 10, 0]} barSize={18}>
-                            {krByMetaArea.map((entry, index) => (
-                              <Cell
-                                key={`meta-cell-${entry.name}-${index}`}
-                                fill={['#88C125', '#EEC137', '#4CD07D', '#F78E43'][index % 4]}
-                              />
-                            ))}
-                            <LabelList dataKey="value" position="right" fill={isLightMode ? '#52525b' : '#d4d4d8'} fontSize={10} />
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
+                      <div className="flex flex-col gap-3">
+                        {krByMetaArea.map((entry, index) => {
+                          const width = Math.max(10, Math.round((entry.value / maxMetaCount) * 100));
+                          const color = chartPalette[index % chartPalette.length];
+                          return (
+                            <div key={entry.name} className="space-y-2">
+                              <div className="flex items-start justify-between gap-3 text-xs">
+                                <span className={`min-w-0 flex-1 font-medium leading-tight ${isLightMode ? 'text-zinc-700' : 'text-white/80'}`}>{entry.name}</span>
+                                <span className={`shrink-0 font-semibold tabular-nums ${isLightMode ? 'text-zinc-500' : 'text-white/55'}`}>
+                                  {entry.value}
+                                </span>
+                              </div>
+                              <div className={`h-3 overflow-hidden rounded-full ${isLightMode ? 'bg-zinc-100' : 'bg-white/10'}`}>
+                                <div
+                                  className="h-full rounded-full"
+                                  style={{
+                                    width: `${width}%`,
+                                    background: `linear-gradient(90deg, ${color}, ${color}cc)`,
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     ) : (
                       <div className={`grid h-full place-items-center rounded-2xl border ${isLightMode ? 'border-zinc-200 bg-zinc-50 text-zinc-500' : 'border-white/10 bg-black/20 text-white/55'}`}>
                         Sem dados para esse filtro
@@ -760,84 +811,106 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
                   </div>
                 </article>
 
-                <article className={`rounded-3xl border p-5 ${isLightMode ? 'border-zinc-200 bg-white' : 'border-white/10 bg-white/5'}`}>
+                <article className={chartCardClass}>
                   <div className="flex items-center justify-between gap-3">
-                    <p className={`text-xs font-semibold uppercase tracking-[0.3em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Distribuição por status</p>
-                    <span className={`text-xs font-semibold ${isLightMode ? 'text-zinc-500' : 'text-white/60'}`}>{filteredItems.length} KR’s</span>
+                    <p className={chartTitleClass}>Distribuição por status</p>
+                    <span className={chartCountClass}>{filteredItems.length} OKR's</span>
                   </div>
-                  <div className="relative mt-5 h-72">
+                  {leadingStatus && <p className={chartInsightClass}>{leadingStatus.name} aparece em {leadingStatus.value} OKR's.</p>}
+                  <div className="mt-4 flex flex-col items-center justify-start gap-3">
                     {krByStatus.length ? (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: isLightMode ? '#ffffff' : '#18181b',
-                              borderColor: isLightMode ? '#e5e7eb' : '#3f3f46',
-                              color: isLightMode ? '#000000' : '#ffffff',
-                            }}
-                            itemStyle={{ color: '#99cc00' }}
-                          />
-                          <Pie
-                            data={krByStatus}
-                            dataKey="value"
-                            nameKey="name"
-                            innerRadius={46}
-                            outerRadius={88}
-                            paddingAngle={3}
-                            stroke={isLightMode ? '#fff' : '#18181b'}
-                            strokeWidth={2}
-                          >
+                      <>
+                        <div className="relative h-44 w-full max-w-[14.5rem] xl:h-48 xl:max-w-[15.5rem]">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Tooltip
+                                formatter={(value, name) => [`${value} OKR's`, name]}
+                                contentStyle={{
+                                  borderRadius: 16,
+                                  border: `1px solid ${isLightMode ? '#e4e4e7' : 'rgba(255,255,255,0.12)'}`,
+                                  background: isLightMode ? '#ffffff' : '#18181b',
+                                  color: isLightMode ? '#18181b' : '#ffffff',
+                                  boxShadow: '0 18px 45px rgba(0,0,0,0.18)',
+                                  fontWeight: 700,
+                                }}
+                                itemStyle={{ color: isLightMode ? '#18181b' : '#ffffff' }}
+                                labelStyle={{ display: 'none' }}
+                              />
+                              <Pie
+                                data={krByStatus}
+                                dataKey="value"
+                                nameKey="name"
+                                cx="50%"
+                                cy="50%"
+                                outerRadius="86%"
+                                paddingAngle={2}
+                                stroke={isLightMode ? '#ffffff' : '#18181b'}
+                                strokeWidth={3}
+                              >
+                                {krByStatus.map((entry, index) => (
+                                  <Cell key={entry.name} fill={chartPalette[index % chartPalette.length]} />
+                                ))}
+                              </Pie>
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </div>
+                        <div className="w-full">
+                          <div className={`mb-3 flex items-center justify-between rounded-2xl border px-4 py-3 ${isLightMode ? 'border-zinc-200 bg-zinc-50/70' : 'border-white/10 bg-white/[0.03]'}`}>
+                            <div>
+                              <p className={`text-xs font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Concluídos</p>
+                            </div>
+                            <span className={`text-2xl font-black ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>{completedPercent}%</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
                             {krByStatus.map((entry, index) => (
-                            <Cell
-                              key={`status-cell-${entry.name}-${index}`}
-                              fill={['#88C125', '#4CD07D', '#F78E43', '#EEC137', '#7C8AA5', '#A855F7'][index % 6]}
-                            />
-                          ))}
-                          </Pie>
-                        </PieChart>
-                      </ResponsiveContainer>
-                    ) : null}
-                    {krByStatus.length ? (
-                      <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-center">
-                        <span className={`text-4xl font-black ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>{completedPercent}%</span>
-                      </div>
+                              <div
+                                key={entry.name}
+                                className={`flex items-center justify-between gap-2 rounded-full border px-3 py-2 text-xs font-semibold ${isLightMode ? 'border-zinc-200 text-zinc-700' : 'border-white/10 text-white/80'}`}
+                              >
+                                <span className="flex min-w-0 items-center gap-2">
+                                  <span
+                                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                    style={{ backgroundColor: chartPalette[index % chartPalette.length] }}
+                                  />
+                                  <span className="truncate">{entry.name}</span>
+                                </span>
+                                <span className={isLightMode ? 'text-zinc-500' : 'text-white/55'}>{entry.value}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </>
                     ) : (
                       <div className={`grid h-full place-items-center rounded-2xl border ${isLightMode ? 'border-zinc-200 bg-zinc-50 text-zinc-500' : 'border-white/10 bg-black/20 text-white/55'}`}>
                         Sem dados para esse filtro
                       </div>
                     )}
-                  </div>
-                  <div className="mt-4 grid grid-cols-2 gap-2">
-                    {krByStatus.slice(0, 4).map((item, index) => (
-                      <div
-                        key={item.name}
-                        className={`rounded-2xl border px-3 py-2 text-xs font-semibold ${
-                          isLightMode ? 'border-zinc-200 bg-zinc-50 text-zinc-700' : 'border-white/10 bg-white/5 text-white/75'
-                        }`}
-                        >
-                        <span className="mr-2 inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: ['#88C125', '#4CD07D', '#F78E43', '#EEC137'][index % 4] }} />
-                        {item.name} · {item.value}
-                      </div>
-                    ))}
                   </div>
                 </article>
               </div>
             </section>
 
-            <section className={filtersClass}>
+            <section
+              ref={filtersRef}
+              className={filtersClass}
+              onPointerDownCapture={(event) => {
+                if ((event.target as HTMLElement).closest('[data-filter-dropdown]')) return;
+                setOpenMenu(null);
+              }}
+            >
               <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto_auto_auto] xl:items-center">
                 <div className="xl:pr-4">
                   <SearchBar
                     searchTerm={searchTerm}
                     setSearchTerm={setSearchTerm}
-                    placeholder="Buscar KR, área, objetivo..."
+                    placeholder="Buscar OKR, área, objetivo..."
                     suggestions={searchTerm ? filteredItems : []}
                     onSuggestionClick={(item) => setExpandedKrId(item.id)}
                     theme={theme}
                   />
                 </div>
 
-                <div className="relative">
+                <div className="relative" data-filter-dropdown>
                     <button
                       type="button"
                       onClick={() => setOpenMenu(openMenu === 'categoria' ? null : 'categoria')}
@@ -875,7 +948,7 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
                   )}
                 </div>
 
-                <div className="relative">
+                <div className="relative" data-filter-dropdown>
                   <button
                     type="button"
                     onClick={() => setOpenMenu(openMenu === 'ordem' ? null : 'ordem')}
@@ -967,7 +1040,7 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
                       const accent = accentByMetaArea(getKrMetaArea(item));
                       const progress = getCompletionPercent(item);
                       const hasCoverImage = Boolean(item.Imagem_capa);
-                      const cardId = `kr-card-${item.id}`;
+                      const cardId = `okr-card-${item.id}`;
                       const entryGroups = getKrEntries(item);
 
                       return (
@@ -1041,7 +1114,7 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
                                     </p>
                                   )}
                                 </div>
-                                <div className="shrink-0 flex flex-wrap items-center gap-2 md:justify-end">
+                                <div className="shrink-0 flex flex-nowrap items-center gap-2 md:justify-end">
                                   <div className={`inline-flex h-9 items-center gap-2 rounded-full border px-3 text-xs font-semibold ${tone}`}>
                                     <ShieldCheck className="h-3.5 w-3.5" />
                                     {status}
@@ -1061,7 +1134,7 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
                               </div>
 
                               <p className={`mt-3 max-w-3xl text-sm leading-6 line-clamp-2 ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>
-                                {displayValue(getKrObjective(item), 'KR sem objetivo definido no momento.')}
+                                {displayValue(getKrObjective(item), 'OKR sem objetivo definido no momento.')}
                               </p>
 
                               <div className={`mt-3 flex flex-wrap items-center gap-2 text-xs ${isLightMode ? 'text-zinc-500' : 'text-white/55'}`}>
@@ -1124,7 +1197,7 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
                                   onClick={() => openAccess(item)}
                                   className="inline-flex items-center gap-2 rounded-full bg-[#88C125] px-4 py-3 text-sm font-bold text-white transition-colors hover:brightness-95"
                                 >
-                                  Abrir KR
+                                  Abrir OKR
                                   <ExternalLink className="h-4 w-4" />
                                 </button>
                               </div>
@@ -1163,7 +1236,7 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
                                 <div className="mt-4">
                                   <div className="mb-3 flex items-center justify-between gap-3">
                                     <div>
-                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.3em] ${isLightMode ? 'text-zinc-500' : 'text-white/40'}`}>Responsáveis desta KR</p>
+                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.3em] ${isLightMode ? 'text-zinc-500' : 'text-white/40'}`}>Responsáveis deste OKR</p>
                                       <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>Abra cada responsável para ver números, plano e observações.</p>
                                     </div>
                                     <span className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${isLightMode ? 'border-zinc-200 bg-white text-zinc-600' : 'border-white/10 bg-white/6 text-white/70'}`}>
@@ -1196,28 +1269,37 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
                                               <p className={`mt-1 text-sm leading-6 ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>
                                                 {displayValue(entry.funcao, 'Função não definida')}
                                               </p>
+                                              <p className={`mt-1 text-xs leading-5 ${isLightMode ? 'text-zinc-500' : 'text-white/55'}`}>
+                                                {displayValue(entry.objetivo, 'Objetivo não definido')}
+                                              </p>
                                               <p className={`mt-1 text-[11px] font-semibold uppercase tracking-[0.22em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>
                                                 {displayValue(entry.id, 'Sem ID')}
                                               </p>
                                             </div>
                                             <div className="flex shrink-0 flex-col items-end gap-2">
-                                              <span
-                                                className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${
-                                                  (entry.status || '').toLowerCase().includes('conclu')
-                                                    ? isLightMode
-                                                      ? 'border-[#4CD07D]/40 bg-[#4CD07D]/12 text-[#166a41]'
-                                                      : 'border-[#4CD07D]/30 bg-[#4CD07D]/10 text-[#c8ffe0]'
-                                                    : (entry.status || '').toLowerCase().includes('risco')
+                                              <div className="flex flex-wrap items-center justify-end gap-2">
+                                                <span
+                                                  className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${
+                                                    (entry.status || '').toLowerCase().includes('conclu')
                                                       ? isLightMode
-                                                        ? 'border-[#F2A43A]/45 bg-[#F2A43A]/16 text-[#8b4d06]'
-                                                        : 'border-[#F2A43A]/30 bg-[#F2A43A]/10 text-[#ffe6bf]'
-                                                      : isLightMode
-                                                        ? 'border-zinc-200 bg-zinc-100 text-zinc-700'
-                                                        : 'border-white/10 bg-white/6 text-white/70'
-                                                }`}
-                                              >
-                                                {displayValue(entry.status, 'Pendente')}
-                                              </span>
+                                                        ? 'border-[#4CD07D]/40 bg-[#4CD07D]/12 text-[#166a41]'
+                                                        : 'border-[#4CD07D]/30 bg-[#4CD07D]/10 text-[#c8ffe0]'
+                                                      : (entry.status || '').toLowerCase().includes('risco')
+                                                        ? isLightMode
+                                                          ? 'border-[#F2A43A]/45 bg-[#F2A43A]/16 text-[#8b4d06]'
+                                                          : 'border-[#F2A43A]/30 bg-[#F2A43A]/10 text-[#ffe6bf]'
+                                                        : isLightMode
+                                                          ? 'border-zinc-200 bg-zinc-100 text-zinc-700'
+                                                          : 'border-white/10 bg-white/6 text-white/70'
+                                                  }`}
+                                                >
+                                                  {displayValue(entry.status, 'Pendente')}
+                                                </span>
+                                                <span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-[11px] font-semibold ${isLightMode ? 'border-[#88C125]/45 bg-[#88C125]/14 text-[#245b08]' : 'border-[#88C125]/35 bg-[#88C125]/10 text-[#e1ff9e]'}`}>
+                                                  <span className="uppercase tracking-[0.18em] text-[10px] opacity-80">Evolução</span>
+                                                  <span>{displayValue(entry.evolucao, '—')}</span>
+                                                </span>
+                                              </div>
                                               <span className={`text-[10px] font-semibold uppercase tracking-[0.24em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>
                                                 {entryOpen ? 'Fechar' : 'Abrir'}
                                               </span>
@@ -1231,7 +1313,6 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
                                                 <MetricCard label="Valor base" value={displayValue(entry.valorBase, '—')} theme={theme} accent="#EEC137" subdued />
                                                 <MetricCard label="Valor alvo" value={displayValue(entry.valorAlvo, '—')} theme={theme} accent="#88C125" subdued />
                                                 <MetricCard label="Valor atual" value={displayValue(entry.valorAtual, '—')} theme={theme} accent="#4CD07D" subdued />
-                                                <MetricCard label="Evolução" value={displayValue(entry.evolucao, '—')} theme={theme} accent="#F78E43" subdued />
                                               </div>
 
                                               <div className="mt-3 flex flex-wrap gap-2">
@@ -1278,7 +1359,7 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
               </>
             ) : (
               <div className={emptyStateClass}>
-                <p className={`text-lg font-semibold ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>Nenhum KR encontrado.</p>
+                <p className={`text-lg font-semibold ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>Nenhum OKR encontrado.</p>
                 <p className={`mt-2 text-sm ${isLightMode ? 'text-zinc-500' : 'text-white/60'}`}>Ajuste os filtros ou limpe a busca para ver mais resultados.</p>
               </div>
             )}

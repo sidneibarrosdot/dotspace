@@ -33,7 +33,9 @@ import {
 import type { PortfolioItem } from '../types';
 import { processosItems } from '../data/processosItems';
 import { krsItems } from '../data/krsItems';
+import { treinamentosItems } from '../data/treinamentosItems';
 import { portfolioItems as localPortfolioItems } from '../data/portfolioItems';
+import { recordLocalCardInteractionEvent } from '../hooks/useLocalCardInteractions';
 import { db } from '../firebase';
 import { addDoc, collection, query, onSnapshot, doc, updateDoc, increment, getDoc, Timestamp } from 'firebase/firestore';
 import { logAudit } from '../services/auditService';
@@ -220,12 +222,13 @@ const comparePortfolioItemsByDateDesc = (a: PortfolioItem, b: PortfolioItem) => 
 };
 
 type HomeFeedKind = 'processos' | 'krs' | 'conteudo';
+const PENDING_HOME_TARGET_KEY = 'dot-space.pending-home-target';
 
 const getHomeFeedKind = (item: PortfolioItem): HomeFeedKind => {
   const id = String(item.id || '');
 
   if (id.startsWith('inventario-')) return 'processos';
-  if (id.startsWith('kr-') || id.startsWith('okr-')) return 'krs';
+  if (id.startsWith('kr-') || id.startsWith('okr-') || id.startsWith('OKR-')) return 'krs';
   return 'conteudo';
 };
 
@@ -233,7 +236,7 @@ const getHomeFeedLabel = (item: PortfolioItem) => {
   const kind = getHomeFeedKind(item);
 
   if (kind === 'processos') return 'Processos';
-  if (kind === 'krs') return "Banco de KR's";
+  if (kind === 'krs') return "Banco de OKR's";
   return item.Cliente || 'Conteúdo';
 };
 
@@ -241,7 +244,7 @@ const getHomeFeedMeta = (item: PortfolioItem) => {
   const kind = getHomeFeedKind(item);
 
   if (kind === 'processos') return item.Time || item.Metodologias || 'Processos';
-  if (kind === 'krs') return item.Cliente || item.Time || "Banco de KR's";
+  if (kind === 'krs') return item.Cliente || item.Time || "Banco de OKR's";
   return item.Time || 'Conteúdo';
 };
 
@@ -251,6 +254,12 @@ const getHomeFeedAccent = (item: PortfolioItem) => {
   if (kind === 'processos') return 'bg-[#88C125] text-zinc-900';
   if (kind === 'krs') return 'bg-[#EEC137] text-zinc-900';
   return 'bg-[#99cc00] text-zinc-900';
+};
+
+const getHomeFeedKindLabel = (kind: HomeFeedKind) => {
+  if (kind === 'processos') return 'Processos';
+  if (kind === 'krs') return "Banco de OKR's";
+  return 'Treinamentos';
 };
 
 const encodeFilterValueForUrl = (value: string) => slugify(value);
@@ -701,6 +710,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
   const handleCardClick = async (item: PortfolioItem) => {
     setSelectedItem(item);
     setIsCreatingNewItem(false);
+    recordLocalCardInteractionEvent('portfolio', item.id, 'view');
     
     // Increment views locally in offline mode
     if (offlineMode && item.id) {
@@ -729,6 +739,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
   const handleLike = async (item: PortfolioItem) => {
     if (offlineMode || !isLoggedIn || !user || !item.id) return;
     try {
+      recordLocalCardInteractionEvent('portfolio', item.id, 'like');
       await toggleLike(user.uid, item.id);
     } catch (error) {
       console.error("Error toggling like:", error);
@@ -738,6 +749,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
   const handleToggleFavorite = async (item: PortfolioItem) => {
     if (offlineMode || !isLoggedIn || !user || !item.id || !activeFavoriteList?.id) return;
     try {
+      recordLocalCardInteractionEvent('portfolio', item.id, 'favorite');
       const isNowFavorited = await toggleProjectInFavoriteList(user.uid, activeFavoriteList.id, item.id);
 
       setFavoriteLists(prevLists =>
@@ -1265,6 +1277,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
 
   const handleShareProject = async (item: PortfolioItem) => {
     const shareUrl = buildProjectShareUrl(item);
+    recordLocalCardInteractionEvent('portfolio', item.id, 'share');
     await copyTextToClipboard(shareUrl);
   };
 
@@ -1278,6 +1291,50 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
     () => homeHubItems.slice(0, 6),
     [homeHubItems]
   );
+
+  const focusLinks = useMemo(
+    () =>
+      [
+        {
+          label: 'IA para acelerar fluxos de aprovação e busca de conhecimento',
+          item: krsItems.find((item) => /ia|autom|aprova|conhecimento/i.test(`${item.Projeto} ${item.Assunto_geral} ${item.Outros_recursos}`)) || krsItems[0],
+        },
+        {
+          label: 'Treinamentos internos com apoio de assistentes inteligentes',
+          item:
+            treinamentosItems.find((item) =>
+              /ia|assistente|treinamento|onboarding/i.test(`${item.Projeto} ${item.Assunto_geral} ${item.Assunto_especifico}`)
+            ) || treinamentosItems[0],
+        },
+        {
+          label: 'Materiais e processos preparados para uso por todos os times',
+          item: processosItems.find((item) => /material|process|time|fluxo/i.test(`${item.Projeto} ${item.Assunto_geral} ${item.Metodologias}`)) || processosItems[0],
+        },
+      ].filter((entry): entry is { label: string; item: PortfolioItem } => Boolean(entry.item)),
+    []
+  );
+
+  const navigateToItemPage = (item: PortfolioItem) => {
+    const kind = getHomeFeedKind(item);
+    recordLocalCardInteractionEvent(kind, item.id, 'open');
+
+    window.localStorage.setItem(
+      PENDING_HOME_TARGET_KEY,
+      JSON.stringify({ kind, id: item.id })
+    );
+
+    if (kind === 'processos') {
+      onNavigateToProcessos();
+      return;
+    }
+
+    if (kind === 'krs') {
+      onNavigateToKRs();
+      return;
+    }
+
+    onNavigateToTreinamentos();
+  };
 
   // FIX: Added robust type guards and string conversions to prevent runtime errors during filtering.
   // This ensures that operations like .split() or .includes() are performed on strings,
@@ -1387,7 +1444,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
                   { label: 'Home', icon: Home, action: () => window.scrollTo({ top: 0, behavior: 'smooth' }), active: true },
                   { label: 'Processos', icon: LayoutGrid, action: onNavigateToProcessos, active: false },
                   { label: 'Treinamentos', icon: BookOpen, action: onNavigateToTreinamentos, active: false },
-                  { label: "Banco de KR's", icon: BookMarked, action: onNavigateToKRs, active: false },
+                  { label: "Banco de OKR's", icon: BookMarked, action: onNavigateToKRs, active: false },
                   { label: 'Fórum', icon: MessageSquareMore, action: onNavigateToForum, active: false },
                 ].map((item) => {
                   const Icon = item.icon;
@@ -1449,7 +1506,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
                   {[
                     { label: 'Processos', value: processosItems.length, accent: 'bg-[#88C125]' },
                     { label: 'Treinamentos', value: portfolioItems.length, accent: 'bg-[#4CD07D]' },
-                    { label: "Banco de KR's", value: krsItems.length, accent: 'bg-[#F78E43]' },
+                    { label: "Banco de OKR's", value: krsItems.length, accent: 'bg-[#F78E43]' },
                     {
                       label: 'Fórum',
                       value: 5,
@@ -1501,7 +1558,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
                     <button
                       key={item.id}
                       type="button"
-                      onClick={() => handleCardClick(item)}
+                      onClick={() => navigateToItemPage(item)}
                       className="group overflow-hidden rounded-[26px] border border-zinc-200 bg-white text-left shadow-sm transition-transform hover:-translate-y-1 dark:border-zinc-800 dark:bg-zinc-950"
                     >
                       <div className="relative h-48 overflow-hidden">
@@ -1563,7 +1620,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
                       </div>
                       <button
                         type="button"
-                        onClick={() => handleCardClick(featuredItem)}
+                        onClick={() => navigateToItemPage(featuredItem)}
                         className="inline-flex items-center gap-2 self-start rounded-2xl bg-[#111111] px-5 py-3 text-sm font-bold text-white transition-transform hover:-translate-y-0.5"
                       >
                         <Play className="h-4 w-4" />
@@ -1608,14 +1665,21 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
                   <div className="border-t border-zinc-200 bg-zinc-50 p-6 dark:border-zinc-800 dark:bg-zinc-950/60 sm:p-7 lg:border-t-0 lg:border-l">
                     <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[#88C125]">O que está em foco</p>
                     <div className="mt-5 space-y-3">
-                      {[
-                        'IA para acelerar fluxos de aprovação e busca de conhecimento',
-                        'Treinamentos internos com apoio de assistentes inteligentes',
-                        'Materiais e processos preparados para uso por todos os times',
-                      ].map((item) => (
-                        <div key={item} className="rounded-3xl border border-zinc-200 bg-white px-4 py-4 dark:border-zinc-800 dark:bg-zinc-900">
-                          <p className="text-sm leading-6 text-zinc-700 dark:text-zinc-200">{item}</p>
-                        </div>
+                      {focusLinks.map(({ label, item }) => (
+                        <button
+                          key={label}
+                          type="button"
+                          onClick={() => navigateToItemPage(item)}
+                          className="group flex w-full items-center justify-between gap-3 rounded-3xl border border-zinc-200 bg-white px-4 py-4 text-left transition-colors hover:border-[#88C125]/45 hover:bg-[#88C125]/5 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-[#88C125]/35 dark:hover:bg-[#88C125]/10"
+                        >
+                          <span>
+                            <span className="block text-sm leading-6 text-zinc-700 dark:text-zinc-200">{label}</span>
+                            <span className="mt-1 block text-[10px] font-semibold uppercase tracking-[0.22em] text-[#88C125]">
+                              {getHomeFeedKindLabel(getHomeFeedKind(item))}
+                            </span>
+                          </span>
+                          <ArrowUp className="h-4 w-4 shrink-0 rotate-45 text-[#88C125] transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -1637,7 +1701,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
           { label: 'Home', icon: Home, onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }), active: true },
           { label: 'Processos', icon: LayoutGrid, onClick: onNavigateToProcessos },
           { label: 'Treinamentos', icon: BookOpen, onClick: onNavigateToTreinamentos },
-          { label: "Banco de KR's", icon: BookMarked, onClick: onNavigateToKRs },
+          { label: "Banco de OKR's", icon: BookMarked, onClick: onNavigateToKRs },
           { label: 'Fórum', icon: MessageSquareMore, onClick: onNavigateToForum },
         ]}
       />

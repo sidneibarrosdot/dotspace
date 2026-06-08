@@ -4,6 +4,7 @@ export interface InventoryEntryLike {
   squad?: string;
   responsavel?: string;
   funcao?: string;
+  finalidade?: string;
   status?: string;
   prioridade?: string;
   link?: string;
@@ -51,6 +52,11 @@ export interface PortfolioItem {
   versao?: string;
   integridade?: string;
   ultimaRevisao?: string;
+  Finalidade?: string;
+  Prioridade?: string;
+  statusConteudo?: string;
+  proximaRevisao?: string;
+  duracao?: string;
   links?: Array<{
     label: string;
     href: string;

@@ -12,7 +12,7 @@ const PostLoginLoader: React.FC<PostLoginLoaderProps> = ({ exiting = false }) =>
     () => [
       'Carregando um espaço repleto de boas ideias.',
       'Organizando processos em órbita.',
-      "Conectando treinamentos, KR's e boas práticas.",
+      "Conectando treinamentos, OKR's e boas práticas.",
       'Preparando links seguros para o time.',
       'Atualizando o hub para todos navegarem melhor.',
       'Alinhando conhecimento para decolar.',

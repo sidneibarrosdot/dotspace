@@ -17,6 +17,8 @@ export type View = 'portfolio' | 'processos' | 'treinamentos' | 'krs' | 'forum' 
 export type Theme = 'light' | 'dark';
 
 const LOCAL_SESSION_KEY = 'dot-space.local-session';
+const ADMIN_ACCESS_KEY = 'dot-space.admin-access-granted';
+const ADMIN_ACCESS_PASSWORD = import.meta.env.VITE_ADMIN_ACCESS_PASSWORD?.trim() || 'dotspace-admin';
 const GCP_LOGIN_ENABLED = false;
 
 const createLocalUser = (email: string, displayName: string): User =>
@@ -42,6 +44,89 @@ const loadLocalSession = (): User | null => {
   }
 };
 
+const loadAdminAccessGranted = (): boolean => {
+  try {
+    return window.localStorage.getItem(ADMIN_ACCESS_KEY) === 'true';
+  } catch {
+    return false;
+  }
+};
+
+const AdminAccessGate: React.FC<{
+  theme: Theme;
+  onBack: () => void;
+  onUnlock: (password: string) => void;
+  error: string | null;
+}> = ({ theme, onBack, onUnlock, error }) => {
+  const [password, setPassword] = useState('');
+
+  return (
+    <div className="min-h-screen bg-gray-100 dark:bg-zinc-900">
+      <main className="mx-auto flex min-h-screen w-full max-w-7xl items-center justify-center px-4 py-10 sm:px-6 lg:px-8">
+        <section className="w-full max-w-md rounded-3xl border border-gray-200 bg-white p-8 shadow-xl dark:border-zinc-700/50 dark:bg-zinc-800">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-accent">Acesso restrito</p>
+              <h1 className="mt-2 text-2xl font-bold text-zinc-900 dark:text-white">Painel Administrativo</h1>
+            </div>
+            <button
+              type="button"
+              onClick={onBack}
+              className="rounded-full border border-gray-200 px-3 py-1.5 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-50 dark:border-zinc-700 dark:text-gray-300 dark:hover:bg-zinc-700/40"
+            >
+              Voltar
+            </button>
+          </div>
+
+          <p className="mt-4 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
+            Informe a senha para liberar o acesso ao painel administrativo.
+          </p>
+
+          <form
+            className="mt-6 space-y-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              onUnlock(password);
+            }}
+          >
+            <div>
+              <label htmlFor="admin-password" className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Senha de acesso
+              </label>
+              <input
+                id="admin-password"
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                autoComplete="current-password"
+                placeholder="Digite a senha"
+                className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition-colors placeholder:text-gray-400 focus:border-accent focus:ring-2 focus:ring-accent/30 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+              />
+            </div>
+
+            {error && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              className="w-full rounded-xl bg-accent px-4 py-3 text-sm font-bold text-zinc-900 transition-colors hover:bg-accent-dark"
+            >
+              Entrar no painel
+            </button>
+          </form>
+
+          <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
+            Dica: se você estiver configurando localmente, a senha padrão é mantida apenas para desenvolvimento.
+          </p>
+        </section>
+      </main>
+    </div>
+  );
+};
+
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [currentView, setCurrentView] = useState<View>('login');
@@ -53,6 +138,8 @@ const App: React.FC = () => {
   const [appSettings, setAppSettings] = useState(DEFAULT_APP_SETTINGS);
   const [postLoginLoading, setPostLoginLoading] = useState(false);
   const [postLoginExiting, setPostLoginExiting] = useState(false);
+  const [adminAccessGranted, setAdminAccessGranted] = useState<boolean>(() => loadAdminAccessGranted());
+  const [adminAccessError, setAdminAccessError] = useState<string | null>(null);
   const loginTransitionPlayedRef = useRef(false);
 
   const toggleTheme = () => {
@@ -179,8 +266,11 @@ const App: React.FC = () => {
   const handleLogout = () => {
     if (!firebaseReady) {
       window.localStorage.removeItem(LOCAL_SESSION_KEY);
+      window.localStorage.removeItem(ADMIN_ACCESS_KEY);
       loginTransitionPlayedRef.current = false;
       setUser(null);
+      setAdminAccessGranted(false);
+      setAdminAccessError(null);
       setCurrentView('login');
       return;
     }
@@ -188,6 +278,9 @@ const App: React.FC = () => {
     signOut(auth)
       .then(() => {
         loginTransitionPlayedRef.current = false;
+        window.localStorage.removeItem(ADMIN_ACCESS_KEY);
+        setAdminAccessGranted(false);
+        setAdminAccessError(null);
         setCurrentView('login');
       })
       .catch((error) => console.error('Logout error:', error));
@@ -242,6 +335,29 @@ const App: React.FC = () => {
     if (!firebaseReady) {
       switch (currentView) {
         case 'admin':
+          if (!adminAccessGranted) {
+            return (
+              <AdminAccessGate
+                theme={theme}
+                onBack={() => navigateTo('portfolio')}
+                error={adminAccessError}
+                onUnlock={(password) => {
+                  if (password.trim() === ADMIN_ACCESS_PASSWORD) {
+                    try {
+                      window.localStorage.setItem(ADMIN_ACCESS_KEY, 'true');
+                    } catch {
+                      // ignore local storage errors in simulation mode
+                    }
+                    setAdminAccessGranted(true);
+                    setAdminAccessError(null);
+                    return;
+                  }
+
+                  setAdminAccessError('Senha inválida. Tente novamente.');
+                }}
+              />
+            );
+          }
           return (
             <AdminScreen
               user={user}
@@ -269,6 +385,29 @@ const App: React.FC = () => {
 
     switch (currentView) {
       case 'admin':
+        if (!adminAccessGranted) {
+          return (
+            <AdminAccessGate
+              theme={theme}
+              onBack={() => navigateTo('portfolio')}
+              error={adminAccessError}
+              onUnlock={(password) => {
+                if (password.trim() === ADMIN_ACCESS_PASSWORD) {
+                  try {
+                    window.localStorage.setItem(ADMIN_ACCESS_KEY, 'true');
+                  } catch {
+                    // ignore local storage errors in simulation mode
+                  }
+                  setAdminAccessGranted(true);
+                  setAdminAccessError(null);
+                  return;
+                }
+
+                setAdminAccessError('Senha inválida. Tente novamente.');
+              }}
+            />
+          );
+        }
         return (
           <AdminScreen
             user={user}

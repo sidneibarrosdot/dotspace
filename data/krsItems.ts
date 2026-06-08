@@ -1,9 +1,4 @@
-import Papa from 'papaparse';
 import type { PortfolioItem } from '../types';
-import baseCsv from './krs-base.csv?raw';
-import configCsv from './krs-config.csv?raw';
-
-type CsvRow = Record<string, string>;
 
 export interface KrInventoryEntry {
   id: string;
@@ -54,278 +49,215 @@ export interface KRsItem extends PortfolioItem {
   observacoesResumo?: string;
 }
 
-interface KrsSourceRow extends KrInventoryEntry {}
+export const KR_META_AREA_OPTIONS = ['Lead Time', 'Redução de Custo', 'Aumento de Receita', 'Satisfação do Cliente'];
+export const KR_STATUS_OPTIONS = ['No prazo', 'A iniciar', 'Pendente', 'Concluído', 'Misto (2)'];
+export const KR_SYNERGY_OPTIONS = ['Sim - Alimenta outro time', 'Não', 'A validar'];
+export const KR_PERIOD_OPTIONS = ['Q1 2026', 'Q2 2026', 'Q3 2026'];
+export const KR_FUNCAO_OPTIONS = ['Gestão de projetos', 'Design instrucional', 'Produto', 'Operação', 'Dados'];
+export const KR_TIME_OPTIONS = ['Time Aurora', 'Time Prisma', 'Time Atlas', 'Time Nexo', 'Time Lumen'];
 
 const createKrLinks = (id: string) => [
-  {
-    label: 'Resumo',
-    href: `#kr-card-${id}`,
-    hint: 'Campos centrais',
-  },
-  {
-    label: 'Plano',
-    href: `#kr-card-${id}-plan`,
-    hint: 'Ações',
-  },
-  {
-    label: 'Observações',
-    href: `#kr-card-${id}-notes`,
-    hint: 'Contexto',
-  },
+  { label: 'Resumo', href: `#okr-card-${id}`, hint: 'Campos centrais' },
+  { label: 'Plano', href: `#okr-card-${id}-plan`, hint: 'Ações' },
+  { label: 'Observações', href: `#okr-card-${id}-notes`, hint: 'Contexto' },
 ];
 
-const normalizeValue = (value: string | undefined | null) => (value ?? '').replace(/\r/g, '').trim();
+const buildEntry = (
+  entry: Omit<KrInventoryEntry, 'sourceIndex' | 'sourceSheetRow' | 'pinned'>,
+  sourceIndex: number,
+): KrInventoryEntry => ({
+  ...entry,
+  sourceIndex,
+  sourceSheetRow: sourceIndex + 1,
+  pinned: false,
+});
 
-const normalizeText = (value: string | undefined | null) => normalizeValue(value).replace(/\s+/g, ' ').toLowerCase();
+const buildItem = (
+  entry: KrInventoryEntry,
+  groupCount = 1,
+  extraEntries: KrInventoryEntry[] = [],
+): KRsItem => {
+  const inventoryEntries = [entry, ...extraEntries];
+  const links = createKrLinks(entry.id);
 
-const slugify = (value: string | undefined | null) =>
-  normalizeValue(value)
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .replace(/[^a-zA-Z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .toLowerCase();
-
-const uniqueValues = (values: string[]) => Array.from(new Set(values.map((value) => normalizeValue(value)).filter(Boolean)));
-
-const summarizeJoined = (values: string[], fallback = '—') => {
-  const unique = uniqueValues(values);
-  if (!unique.length) return fallback;
-  if (unique.length === 1) return unique[0];
-  return unique.join(' • ');
+  return {
+    id: entry.id,
+    sourceIndex: entry.sourceIndex,
+    Imagem_capa: '',
+    Time: entry.timeSquad,
+    Cliente: entry.metaArea,
+    Data: entry.periodo,
+    Projeto: entry.keyResult,
+    DI: entry.funcao,
+    DM: '',
+    Link_PMV: links[0].href,
+    Assunto_geral: entry.objetivo,
+    Assunto_especifico: entry.keyResult,
+    Publico_alvo: entry.responsavelKR,
+    Metodologias: entry.status,
+    Mídias: entry.periodo,
+    Outros_recursos: entry.planoAcao,
+    tags: [entry.metaArea, entry.periodo, entry.status, entry.timeSquad],
+    likes: 0,
+    views: 0,
+    versao: entry.periodo,
+    integridade: entry.status,
+    ultimaRevisao: entry.ultimaAtualizacao,
+    pinned: entry.status === 'No prazo',
+    objetivo: entry.objetivo,
+    indicador: entry.metaArea,
+    meta: entry.valorAlvo,
+    resultado: entry.valorAtual,
+    ciclo: entry.periodo,
+    responsavel: entry.responsavelKR,
+    statusKR: entry.status,
+    krLinks: links,
+    links,
+    metaArea: entry.metaArea,
+    keyResult: entry.keyResult,
+    responsavelKR: entry.responsavelKR,
+    funcao: entry.funcao,
+    timeSquad: entry.timeSquad,
+    periodo: entry.periodo,
+    valorBase: entry.valorBase,
+    valorAlvo: entry.valorAlvo,
+    valorAtual: entry.valorAtual,
+    evolucao: entry.evolucao,
+    status: entry.status,
+    sinergia: entry.sinergia,
+    frenteParceira: entry.frenteParceira,
+    planoAcao: entry.planoAcao,
+    ultimaAtualizacao: entry.ultimaAtualizacao,
+    observacoes: entry.observacoes,
+    observacoesResumo: entry.observacoes,
+    sourceSheetRow: entry.sourceSheetRow,
+    inventoryEntries,
+    groupCount,
+  };
 };
 
-const summarizeCompact = (values: string[], fallback = '—') => {
-  const unique = uniqueValues(values);
-  if (!unique.length) return fallback;
-  if (unique.length === 1) return unique[0];
-  return `${unique[0]} +${unique.length - 1}`;
-};
+const entries = [
+  buildEntry(
+    {
+      id: 'OKR-2026-MOCK-001',
+      metaArea: 'Lead Time',
+      objetivo: 'Acelerar o ciclo de entrega sem perder qualidade operacional.',
+      keyResult: 'Reduzir o tempo médio de publicação de materiais críticos.',
+      responsavelKR: 'Pessoa Mock 01',
+      funcao: 'Gestão de projetos',
+      timeSquad: 'Time Aurora',
+      periodo: 'Q1 2026',
+      valorBase: '10 dias',
+      valorAlvo: '6 dias',
+      valorAtual: '7 dias',
+      evolucao: '70%',
+      status: 'No prazo',
+      sinergia: 'Sim - Alimenta outro time',
+      frenteParceira: 'Frente Alpha',
+      planoAcao: 'Mapear gargalos, revisar checkpoints e automatizar alertas de pendência.',
+      ultimaAtualizacao: '2026-06-01',
+      observacoes: 'Indicador fictício para validação visual.',
+    },
+    1,
+  ),
+  buildEntry(
+    {
+      id: 'OKR-2026-MOCK-002',
+      metaArea: 'Redução de Custo',
+      objetivo: 'Diminuir retrabalho em processos recorrentes.',
+      keyResult: 'Reduzir horas gastas em ajustes manuais de documentação.',
+      responsavelKR: 'Pessoa Mock 02',
+      funcao: 'Operação',
+      timeSquad: 'Time Prisma',
+      periodo: 'Q2 2026',
+      valorBase: '40 horas',
+      valorAlvo: '24 horas',
+      valorAtual: '32 horas',
+      evolucao: '45%',
+      status: 'Pendente',
+      sinergia: 'A validar',
+      frenteParceira: 'Frente Beta',
+      planoAcao: 'Criar checklist preventivo e revisar templates usados em massa.',
+      ultimaAtualizacao: '2026-05-28',
+      observacoes: 'Aguardando validação do processo de medição.',
+    },
+    2,
+  ),
+  buildEntry(
+    {
+      id: 'OKR-2026-MOCK-003',
+      metaArea: 'Aumento de Receita',
+      objetivo: 'Apoiar novas oportunidades a partir de materiais reutilizáveis.',
+      keyResult: 'Criar biblioteca de propostas reaproveitáveis para novos projetos.',
+      responsavelKR: 'Pessoa Mock 03',
+      funcao: 'Produto',
+      timeSquad: 'Time Atlas',
+      periodo: 'Q2 2026',
+      valorBase: '2 modelos',
+      valorAlvo: '8 modelos',
+      valorAtual: '4 modelos',
+      evolucao: '35%',
+      status: 'A iniciar',
+      sinergia: 'Sim - Alimenta outro time',
+      frenteParceira: 'Frente Gama',
+      planoAcao: 'Selecionar casos, transformar em modelos e publicar no hub.',
+      ultimaAtualizacao: '2026-05-24',
+      observacoes: 'Base mockada para simular acompanhamento.',
+    },
+    3,
+  ),
+  buildEntry(
+    {
+      id: 'OKR-2026-MOCK-004',
+      metaArea: 'Satisfação do Cliente',
+      objetivo: 'Melhorar a clareza de entregas acompanhadas pelo cliente.',
+      keyResult: 'Aumentar a percepção de clareza nos materiais de status report.',
+      responsavelKR: 'Pessoa Mock 04',
+      funcao: 'Design instrucional',
+      timeSquad: 'Time Nexo',
+      periodo: 'Q3 2026',
+      valorBase: '72%',
+      valorAlvo: '90%',
+      valorAtual: '90%',
+      evolucao: '100%',
+      status: 'Concluído',
+      sinergia: 'Não',
+      frenteParceira: 'Frente Delta',
+      planoAcao: 'Padronizar status reports e revisar linguagem dos resumos executivos.',
+      ultimaAtualizacao: '2026-05-19',
+      observacoes: 'Exemplo concluído para validar distribuição por status.',
+    },
+    4,
+  ),
+  buildEntry(
+    {
+      id: 'OKR-2026-MOCK-005',
+      metaArea: 'Lead Time',
+      objetivo: 'Reduzir espera entre aprovação e disponibilização final.',
+      keyResult: 'Automatizar alertas de pendências em etapas críticas.',
+      responsavelKR: 'Pessoa Mock 05',
+      funcao: 'Dados',
+      timeSquad: 'Time Lumen',
+      periodo: 'Q2 2026',
+      valorBase: '5 alertas manuais',
+      valorAlvo: '1 alerta manual',
+      valorAtual: '3 alertas manuais',
+      evolucao: '50%',
+      status: 'Misto (2)',
+      sinergia: 'Sim - Alimenta outro time',
+      frenteParceira: 'Frente Épsilon',
+      planoAcao: 'Integrar planilha mockada ao painel e disparar alertas de atualização.',
+      ultimaAtualizacao: '2026-05-15',
+      observacoes: 'Status misto proposital para validar UI.',
+    },
+    5,
+  ),
+];
 
-const summarizeStatus = (values: string[]) => {
-  const unique = uniqueValues(values);
-  if (!unique.length) return 'Pendente';
-  if (unique.length === 1) return unique[0];
-  return `Misto (${unique.length})`;
-};
-
-const shortPreview = (value: string, fallback = '') => {
-  const clean = normalizeValue(value);
-  if (!clean) return fallback;
-  const firstLine = clean.split('\n', 1)[0].trim();
-  const normalized = firstLine.replace(/\s+/g, ' ');
-  if (normalized.length <= 120) return normalized;
-  const cut = normalized.slice(0, 117);
-  const lastSpace = cut.lastIndexOf(' ');
-  return `${lastSpace > 30 ? cut.slice(0, lastSpace) : cut}...`;
-};
-
-const parseCsv = (csvText: string) => {
-  const parsed = Papa.parse<CsvRow>(csvText, {
-    header: true,
-    skipEmptyLines: 'greedy',
-    transformHeader: (header) => header.trim(),
-  });
-
-  if (parsed.errors.length) {
-    console.warn('[krsItems] CSV parse warnings', parsed.errors.slice(0, 5));
-  }
-
-  return (parsed.data as CsvRow[]).filter((row) => Object.values(row).some((value) => normalizeValue(value).length > 0));
-};
-
-const cell = (row: CsvRow, ...keys: string[]) => {
-  for (const key of keys) {
-    const value = normalizeValue(row[key]);
-    if (value) return value;
-  }
-  return '';
-};
-
-const parseBaseRows = (): KrsSourceRow[] =>
-  parseCsv(baseCsv)
-    .map((row, index) => ({
-      id: cell(row, 'ID') || `OKR-${String(index + 1).padStart(3, '0')}`,
-      sourceIndex: index + 1,
-      metaArea: cell(row, 'Meta área'),
-      objetivo: cell(row, 'Objetivo'),
-      keyResult: cell(row, 'Key Result (KR)'),
-      responsavelKR: cell(row, 'Responsável'),
-      funcao: cell(row, 'Função'),
-      timeSquad: cell(row, 'Time/Squad', 'Time'),
-      periodo: cell(row, 'Período'),
-      valorBase: cell(row, 'Valor Base'),
-      valorAlvo: cell(row, 'Valor Alvo', 'Valor Alvo '),
-      valorAtual: cell(row, 'Valor Atual'),
-      evolucao: cell(row, 'Evolução'),
-      status: cell(row, 'Status'),
-      sinergia: cell(row, 'Sinergia?'),
-      frenteParceira: cell(row, 'Frente Parceira'),
-      planoAcao: cell(row, 'Plano de ação'),
-      ultimaAtualizacao: cell(row, 'Última atualização', 'Ultima atualização'),
-      observacoes: cell(row, 'Observações'),
-      sourceSheetRow: index + 2,
-      pinned: false,
-    }))
-    .filter((row) => row.metaArea && row.objetivo && row.keyResult);
-
-const parseConfigRows = (): CsvRow[] => parseCsv(configCsv);
-
-const uniqueOrdered = (values: string[]) => {
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const value of values.map((entry) => normalizeValue(entry))) {
-    if (!value || seen.has(value)) continue;
-    seen.add(value);
-    result.push(value);
-  }
-  return result;
-};
-
-const configRows = parseConfigRows();
-
-export const KR_META_AREA_OPTIONS = uniqueOrdered(configRows.map((row) => cell(row, 'Meta da área')).filter(Boolean));
-export const KR_STATUS_OPTIONS = uniqueOrdered(configRows.map((row) => cell(row, 'Status')).filter(Boolean));
-export const KR_SYNERGY_OPTIONS = uniqueOrdered(configRows.map((row) => cell(row, 'Sinergia?')).filter(Boolean));
-export const KR_PERIOD_OPTIONS = uniqueOrdered(configRows.map((row) => cell(row, 'Período')).filter(Boolean));
-export const KR_FUNCAO_OPTIONS = uniqueOrdered(configRows.map((row) => cell(row, 'Função')).filter(Boolean));
-export const KR_TIME_OPTIONS = uniqueOrdered(configRows.map((row) => cell(row, 'Time')).filter(Boolean));
-
-const sourceRows = parseBaseRows();
-
-const groupedRows = new Map<string, KrsSourceRow[]>();
-
-for (const row of sourceRows) {
-  const key = [row.metaArea, row.objetivo, row.keyResult].map(normalizeText).join('||');
-  const existing = groupedRows.get(key);
-  if (existing) existing.push(row);
-  else groupedRows.set(key, [row]);
-}
-
-const scoreRow = (row: KrsSourceRow) =>
-  [
-    row.valorBase,
-    row.valorAlvo,
-    row.valorAtual,
-    row.evolucao,
-    row.status,
-    row.sinergia,
-    row.frenteParceira,
-    row.planoAcao,
-    row.ultimaAtualizacao,
-    row.observacoes,
-  ].filter(Boolean).length;
-
-const selectSummaryRow = (rows: KrsSourceRow[]) =>
-  rows.reduce((best, row) => {
-    if (!best) return row;
-    const scoreBest = scoreRow(best);
-    const scoreCurrent = scoreRow(row);
-    if (scoreCurrent > scoreBest) return row;
-    if (scoreCurrent === scoreBest && row.sourceSheetRow < best.sourceSheetRow) return row;
-    return best;
-  }, rows[0]);
-
-const buildTags = (rows: KrsSourceRow[]) =>
-  uniqueValues([rows[0]?.metaArea ?? '', ...rows.map((row) => row.status), ...rows.map((row) => row.periodo)]);
-
-export const krsItems: KRsItem[] = Array.from(groupedRows.values())
-  .sort((a, b) => a[0].sourceIndex - b[0].sourceIndex)
-  .map((rows, index) => {
-    const primary = rows[0];
-    const summaryRow = selectSummaryRow(rows);
-    const groupId = slugify([primary.metaArea, primary.objetivo, primary.keyResult].join(' ')) || `kr-${index + 1}`;
-    const id = `kr-${groupId}-${String(index + 1).padStart(3, '0')}`;
-    const links = createKrLinks(id);
-    const metaAreaSummary = summarizeJoined(rows.map((row) => row.metaArea), primary.metaArea);
-    const objectiveSummary = primary.objetivo;
-    const keyResultSummary = primary.keyResult;
-    const responsibleSummary = summarizeJoined(rows.map((row) => row.responsavelKR), primary.responsavelKR);
-    const funcaoSummary = summarizeJoined(rows.map((row) => row.funcao), primary.funcao);
-    const timeSummary = summarizeCompact(rows.map((row) => row.timeSquad), primary.timeSquad);
-    const periodSummary = summarizeJoined(rows.map((row) => row.periodo), primary.periodo);
-    const statusSummary = summarizeStatus(rows.map((row) => row.status));
-    const sinergiaSummary = summarizeJoined(rows.map((row) => row.sinergia), primary.sinergia);
-    const partnerSummary = summarizeJoined(rows.map((row) => row.frenteParceira), primary.frenteParceira);
-    const planSummary = shortPreview(summaryRow.planoAcao || primary.planoAcao || objectiveSummary, objectiveSummary);
-    const notesSummary = shortPreview(summaryRow.observacoes || primary.observacoes, summaryRow.sinergia || '');
-    const inventoryEntries = rows.map((row) => ({
-      id: row.id,
-      sourceIndex: row.sourceIndex,
-      metaArea: row.metaArea,
-      objetivo: row.objetivo,
-      keyResult: row.keyResult,
-      responsavelKR: row.responsavelKR,
-      funcao: row.funcao,
-      timeSquad: row.timeSquad,
-      periodo: row.periodo,
-      valorBase: row.valorBase,
-      valorAlvo: row.valorAlvo,
-      valorAtual: row.valorAtual,
-      evolucao: row.evolucao,
-      status: row.status,
-      sinergia: row.sinergia,
-      frenteParceira: row.frenteParceira,
-      planoAcao: row.planoAcao,
-      ultimaAtualizacao: row.ultimaAtualizacao,
-      observacoes: row.observacoes,
-      sourceSheetRow: row.sourceSheetRow,
-      pinned: row.pinned,
-    }));
-
-    return {
-      id,
-      sourceIndex: primary.sourceIndex,
-      Imagem_capa: '',
-      Time: timeSummary,
-      Cliente: metaAreaSummary,
-      Data: periodSummary,
-      Projeto: keyResultSummary,
-      DI: funcaoSummary,
-      DM: '',
-      Link_PMV: links[0]?.href ?? `#${id}`,
-      Assunto_geral: objectiveSummary,
-      Assunto_especifico: keyResultSummary,
-      Publico_alvo: responsibleSummary,
-      Metodologias: statusSummary,
-      Mídias: periodSummary,
-      Outros_recursos: planSummary,
-      tags: buildTags(rows),
-      likes: 0,
-      views: 0,
-      versao: periodSummary || statusSummary,
-      integridade: statusSummary,
-      ultimaRevisao: summaryRow.ultimaAtualizacao || periodSummary,
-      pinned: rows.some((row) => row.pinned),
-      objetivo: objectiveSummary,
-      indicador: metaAreaSummary,
-      meta: summaryRow.valorAlvo,
-      resultado: summaryRow.valorAtual,
-      ciclo: periodSummary,
-      responsavel: responsibleSummary,
-      statusKR: statusSummary,
-      krLinks: links,
-      links,
-      metaArea: metaAreaSummary,
-      keyResult: keyResultSummary,
-      responsavelKR: responsibleSummary,
-      funcao: funcaoSummary,
-      timeSquad: timeSummary,
-      periodo: periodSummary,
-      valorBase: summaryRow.valorBase,
-      valorAlvo: summaryRow.valorAlvo,
-      valorAtual: summaryRow.valorAtual,
-      evolucao: summaryRow.evolucao,
-      status: statusSummary,
-      sinergia: sinergiaSummary,
-      frenteParceira: partnerSummary,
-      planoAcao: summaryRow.planoAcao || planSummary,
-      ultimaAtualizacao: summaryRow.ultimaAtualizacao,
-      observacoes: summaryRow.observacoes || notesSummary,
-      planoResumo: planSummary,
-      observacoesResumo: notesSummary,
-      sourceSheetRow: primary.sourceSheetRow,
-      inventoryEntries,
-      groupCount: rows.length,
-    };
-  });
+export const krsItems: KRsItem[] = [
+  buildItem(entries[0]),
+  buildItem(entries[1]),
+  buildItem(entries[2]),
+  buildItem(entries[3]),
+  buildItem(entries[4]),
+];

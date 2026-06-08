@@ -1,10 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Header from '../components/Header';
 import MobileFooterNav from '../components/MobileFooterNav';
 import Pagination from '../components/Pagination';
 import PageFilterActions from '../components/PageFilterActions';
 import SearchBar from '../components/SearchBar';
-import { useLocalCardInteractions } from '../hooks/useLocalCardInteractions';
+import { useLocalCardInteractions, recordLocalCardInteractionEvent } from '../hooks/useLocalCardInteractions';
 import type { PortfolioItem } from '../types';
 import { treinamentosItems } from '../data/treinamentosItems';
 import { FEEDBACK_COPY_ERROR, FEEDBACK_COPY_SUCCESS, FEEDBACK_TIMEOUT_ERROR, FEEDBACK_TIMEOUT_SUCCESS } from '../constants/feedbackMessages';
@@ -23,10 +23,14 @@ import {
   MessageSquareMore,
   Bookmark,
   Share2,
+  CalendarClock,
+  Clock3,
+  UserRound,
 } from 'lucide-react';
 import type { User } from 'firebase/auth';
 
 type SortMode = 'recentes' | 'a-z' | 'z-a';
+const PENDING_HOME_TARGET_KEY = 'dot-space.pending-home-target';
 
 interface TreinamentosScreenProps {
   user: User | null;
@@ -49,6 +53,35 @@ const compareByDateDesc = (a: PortfolioItem, b: PortfolioItem) => {
   return a.Projeto.localeCompare(b.Projeto, 'pt-BR');
 };
 
+const getTrainingStatusClasses = (status?: string, isLightMode = true) => {
+  const normalized = (status || '').toLowerCase();
+  if (normalized.includes('atualiza')) {
+    return isLightMode
+      ? 'border-amber-200 bg-amber-50 text-amber-700'
+      : 'border-amber-400/35 bg-amber-400/12 text-amber-200';
+  }
+  if (normalized.includes('revis')) {
+    return isLightMode
+      ? 'border-orange-200 bg-orange-50 text-orange-700'
+      : 'border-orange-400/35 bg-orange-400/12 text-orange-200';
+  }
+  if (normalized.includes('obsoleto')) {
+    return isLightMode
+      ? 'border-zinc-300 bg-zinc-100 text-zinc-600'
+      : 'border-white/15 bg-white/8 text-white/65';
+  }
+  return isLightMode
+    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+    : 'border-emerald-400/35 bg-emerald-400/12 text-emerald-200';
+};
+
+const formatShortDate = (value?: string) => {
+  if (!value) return 'Sem data';
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' }).format(date);
+};
+
 const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
   user,
   isLoggedIn,
@@ -69,8 +102,11 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [shareFeedback, setShareFeedback] = useState('');
   const [expandedTrainingId, setExpandedTrainingId] = useState<string | null>(null);
+  const [pendingHomeTargetId, setPendingHomeTargetId] = useState<string>('');
   const [currentPage, setCurrentPage] = useState(1);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const didRunInitialFilterResetRef = useRef(false);
+  const filtersRef = useRef<HTMLElement | null>(null);
   const { interactions, getState, incrementViews, toggleLike, toggleFavorite, registerShare } = useLocalCardInteractions('treinamentos');
   const isLightMode = theme === 'light';
   const pageClass = isLightMode ? 'min-h-screen bg-gray-100 text-zinc-900 transition-colors duration-300' : 'min-h-screen bg-[#111114] text-white transition-colors duration-300';
@@ -155,6 +191,42 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
   );
 
   useEffect(() => {
+    if (!openMenu) return;
+
+    const closeOpenMenu = (event: PointerEvent) => {
+      if (filtersRef.current?.contains(event.target as Node)) return;
+      setOpenMenu(null);
+    };
+
+    document.addEventListener('pointerdown', closeOpenMenu);
+    return () => document.removeEventListener('pointerdown', closeOpenMenu);
+  }, [openMenu]);
+
+  useEffect(() => {
+    try {
+      const rawTarget = window.localStorage.getItem(PENDING_HOME_TARGET_KEY);
+      if (!rawTarget) return;
+      const parsed = JSON.parse(rawTarget) as { kind?: string; id?: string };
+      if (parsed.kind !== 'conteudo' || !parsed.id) return;
+
+      window.localStorage.removeItem(PENDING_HOME_TARGET_KEY);
+      const targetIndex = filteredItems.findIndex((item) => item.id === parsed.id);
+      if (targetIndex < 0) return;
+
+      setPendingHomeTargetId(parsed.id);
+      setExpandedTrainingId(parsed.id);
+      setCurrentPage(Math.floor(targetIndex / pageSize) + 1);
+    } catch {
+      window.localStorage.removeItem(PENDING_HOME_TARGET_KEY);
+    }
+  }, [filteredItems]);
+
+  useEffect(() => {
+    if (!didRunInitialFilterResetRef.current) {
+      didRunInitialFilterResetRef.current = true;
+      return;
+    }
+
     setCurrentPage(1);
   }, [searchTerm, areaFilter, sortMode, showFavoritesOnly]);
 
@@ -172,6 +244,17 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
       setExpandedTrainingId(null);
     }
   }, [filteredItems, expandedTrainingId]);
+
+  useEffect(() => {
+    if (!pendingHomeTargetId) return;
+    const target = document.getElementById(`treinamento-card-${pendingHomeTargetId}`);
+    if (!target) return;
+
+    window.requestAnimationFrame(() => {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setPendingHomeTargetId('');
+    });
+  }, [currentPage, pendingHomeTargetId]);
 
   const buildShareUrl = () => {
     const url = new URL(window.location.href);
@@ -201,7 +284,18 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
   };
 
   const openAccess = (item: PortfolioItem) => {
+    recordLocalCardInteractionEvent('treinamentos', item.id, 'open');
     window.open(item.Link_PMV, '_blank', 'noopener,noreferrer');
+  };
+
+  const toggleTrainingDetails = (itemId: string) => {
+    setExpandedTrainingId((current) => {
+      const nextExpandedId = current === itemId ? null : itemId;
+      if (nextExpandedId) {
+        recordLocalCardInteractionEvent('treinamentos', itemId, 'open');
+      }
+      return nextExpandedId;
+    });
   };
 
   const handleShareItem = async (item: PortfolioItem) => {
@@ -227,7 +321,7 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
     { label: 'Home', icon: Home, active: false, action: onNavigateToPortfolio },
     { label: 'Processos', icon: LayoutGrid, active: false, action: onNavigateToProcessos },
     { label: 'Treinamentos', icon: BookOpen, active: true, action: undefined },
-    { label: "Banco de KR's", icon: BookMarked, active: false, action: onNavigateToKRs },
+    { label: "Banco de OKR's", icon: BookMarked, active: false, action: onNavigateToKRs },
     { label: 'Fórum', icon: MessageSquareMore, active: false, action: onNavigateToForum },
   ];
 
@@ -313,7 +407,14 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
               </div>
             </section>
 
-            <section className={filtersClass}>
+            <section
+              ref={filtersRef}
+              className={filtersClass}
+              onPointerDownCapture={(event) => {
+                if ((event.target as HTMLElement).closest('[data-filter-dropdown]')) return;
+                setOpenMenu(null);
+              }}
+            >
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto] lg:items-center">
                 <div className="lg:pr-4">
                   <SearchBar
@@ -326,7 +427,7 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                   />
                 </div>
 
-                <div className="relative">
+                <div className="relative" data-filter-dropdown>
                   <button
                     type="button"
                     onClick={() => setOpenMenu(openMenu === 'area' ? null : 'area')}
@@ -364,7 +465,7 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                   )}
                 </div>
 
-                <div className="relative">
+                <div className="relative" data-filter-dropdown>
                   <button
                     type="button"
                     onClick={() => setOpenMenu(openMenu === 'ordem' ? null : 'ordem')}
@@ -474,14 +575,15 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                     return (
                       <article
                         key={item.id}
+                        id={`treinamento-card-${item.id}`}
                         className={viewMode === 'grid' ? cardClass : listCardClass}
                         role="button"
                         tabIndex={0}
-                        onClick={() => setExpandedTrainingId((current) => (current === item.id ? null : item.id))}
+                        onClick={() => toggleTrainingDetails(item.id)}
                         onKeyDown={(event) => {
                           if (event.key === 'Enter' || event.key === ' ') {
                             event.preventDefault();
-                            setExpandedTrainingId((current) => (current === item.id ? null : item.id));
+                            toggleTrainingDetails(item.id);
                           }
                         }}
                       >
@@ -502,18 +604,44 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                             <div className={`flex flex-1 flex-col p-5 ${isLightMode ? 'border-t border-zinc-200/70 bg-white' : 'border-t border-white/10 bg-[#17171b]'}`}>
                               <div className="flex items-start justify-between gap-4">
                                 <div className="min-w-0">
-                                  <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[#F78E43]">
-                                    {item.Time}
-                                  </p>
                                   <h2 className={`mt-1.5 text-[1.1rem] font-black leading-tight ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>
                                     {item.Projeto}
                                   </h2>
+                                </div>
+                                <div className="flex shrink-0 flex-col items-end gap-1.5">
+                                  {item.versao && (
+                                    <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${isLightMode ? 'border-zinc-200 bg-zinc-50 text-zinc-600' : 'border-white/10 bg-white/6 text-white/65'}`}>
+                                      {item.versao}
+                                    </span>
+                                  )}
+                                  {item.statusConteudo && (
+                                    <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${getTrainingStatusClasses(item.statusConteudo, isLightMode)}`}>
+                                      {item.statusConteudo}
+                                    </span>
+                                  )}
                                 </div>
                               </div>
 
                               <p className={`mt-3 text-sm leading-6 ${isLightMode ? 'text-zinc-600' : 'text-white/72'}`}>
                                 {item.Assunto_geral}
                               </p>
+
+                              <div className={`mt-4 grid gap-2 rounded-2xl border px-3.5 py-3 text-xs ${isLightMode ? 'border-zinc-200 bg-zinc-50 text-zinc-600' : 'border-white/10 bg-white/5 text-white/62'}`}>
+                                <div className="flex items-center justify-between gap-3">
+                                  <span className="inline-flex items-center gap-1.5">
+                                    <Clock3 className="h-3.5 w-3.5 text-[#F78E43]" />
+                                    {item.duracao || 'Duração não informada'}
+                                  </span>
+                                  <span className="font-semibold">{item.Prioridade ? `Prioridade ${item.Prioridade}` : 'Sem prioridade'}</span>
+                                </div>
+                                <div className="flex items-center justify-between gap-3">
+                                  <span className="inline-flex items-center gap-1.5">
+                                    <CalendarClock className="h-3.5 w-3.5 text-[#F78E43]" />
+                                    Revisão {formatShortDate(item.proximaRevisao)}
+                                  </span>
+                                  <span className="truncate font-semibold">{item.responsavel || 'Sem responsável'}</span>
+                                </div>
+                              </div>
 
                             <div className={`mt-4 rounded-2xl border px-4 py-3 hidden ${isLightMode ? 'border-zinc-200 bg-zinc-50' : 'border-white/10 bg-white/5'}`}>
                                 <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>
@@ -587,7 +715,7 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                                   type="button"
                                   onClick={(event) => {
                                     event.stopPropagation();
-                                    setExpandedTrainingId((current) => (current === item.id ? null : item.id));
+                                    toggleTrainingDetails(item.id);
                                   }}
                                   className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-semibold transition-colors ${
                                     isLightMode ? 'border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50' : 'border-white/10 bg-white/6 text-white hover:bg-white/10'
@@ -620,43 +748,79 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                                       <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Tema</p>
                                       <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.Assunto_especifico || 'Não informado'}</p>
                                     </div>
+                                    <div>
+                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Última atualização</p>
+                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.ultimaRevisao || item.Data || 'Sem data'}</p>
+                                    </div>
+                                    <div>
+                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Próxima revisão</p>
+                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.proximaRevisao || 'Sem revisão agendada'}</p>
+                                    </div>
+                                    <div>
+                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Responsável</p>
+                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.responsavel || 'Não informado'}</p>
+                                    </div>
+                                    <div>
+                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Recursos</p>
+                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.Mídias || item.Outros_recursos || 'Não informados'}</p>
+                                    </div>
                                   </div>
                                 </div>
                               )}
                             </div>
                           </div>
                         ) : (
-                          <div className="grid gap-0 lg:grid-cols-[260px_minmax(0,1fr)]">
-                            <div className="relative h-32 overflow-hidden lg:h-full">
+                          <div className="grid grid-cols-[112px_minmax(0,1fr)] gap-0 sm:grid-cols-[160px_minmax(0,1fr)] lg:grid-cols-[260px_minmax(0,1fr)]">
+                            <div className="relative min-h-[168px] overflow-hidden sm:min-h-[190px] lg:h-full lg:min-h-0">
                               <img
                                 src={item.Imagem_capa}
                                 alt={item.Projeto}
                                 className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                               />
                               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent" />
-                              <span className="absolute left-4 top-4 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.25em] text-white" style={{ backgroundColor: accent }}>
+                              <span className="absolute left-2 top-2 rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-white sm:left-4 sm:top-4 sm:px-3 sm:text-[10px] sm:tracking-[0.25em]" style={{ backgroundColor: accent }}>
                                 {item.Time || item.Cliente}
                               </span>
                             </div>
 
-                            <div className={`p-4 lg:p-5`}>
-                              <div className="flex items-start justify-between gap-4">
+                            <div className="p-3 sm:p-4 lg:p-5">
+                              <div className="flex items-start justify-between gap-2 sm:gap-4">
                                 <div className="min-w-0">
-                                  <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[#F78E43]">
-                                    {item.Time}
-                                  </p>
-                                  <h2 className={`mt-1.5 text-[1.08rem] font-black leading-tight ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>
+                                  <h2 className={`text-[0.98rem] font-black leading-tight sm:mt-1 sm:text-[1.08rem] ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>
                                     {item.Projeto}
                                   </h2>
-                                  <p className={`mt-2 text-sm leading-6 line-clamp-2 ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>
+                                  <p className={`mt-1.5 line-clamp-2 text-xs leading-5 sm:mt-2 sm:text-sm sm:leading-6 ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>
                                     {item.Assunto_geral}
                                   </p>
                                 </div>
-                                <span className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.25em] text-white" style={{ backgroundColor: accent }}>
-                                  {item.Time || item.Cliente}
+                                <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-1.5">
+                                  {item.versao && (
+                                    <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] sm:px-2.5 sm:py-1 sm:text-[10px] sm:tracking-[0.16em] ${isLightMode ? 'border-zinc-200 bg-zinc-50 text-zinc-600' : 'border-white/10 bg-white/6 text-white/65'}`}>
+                                      {item.versao}
+                                    </span>
+                                  )}
+                                  {item.statusConteudo && (
+                                    <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] sm:px-2.5 sm:py-1 sm:text-[10px] sm:tracking-[0.14em] ${getTrainingStatusClasses(item.statusConteudo, isLightMode)}`}>
+                                      {item.statusConteudo}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className={`mt-2 flex flex-wrap items-center gap-1.5 text-[11px] sm:mt-3 sm:gap-2 sm:text-xs ${isLightMode ? 'text-zinc-500' : 'text-white/55'}`}>
+                                <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 sm:gap-1.5 sm:px-2.5 sm:py-1 ${isLightMode ? 'border-zinc-200 bg-zinc-50' : 'border-white/10 bg-white/5'}`}>
+                                  <Clock3 className="h-3.5 w-3.5 text-[#F78E43]" />
+                                  {item.duracao || 'Sem duração'}
+                                </span>
+                                <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 sm:gap-1.5 sm:px-2.5 sm:py-1 ${isLightMode ? 'border-zinc-200 bg-zinc-50' : 'border-white/10 bg-white/5'}`}>
+                                  <CalendarClock className="h-3.5 w-3.5 text-[#F78E43]" />
+                                  Revisão {formatShortDate(item.proximaRevisao)}
+                                </span>
+                                <span className={`hidden items-center gap-1.5 rounded-full border px-2.5 py-1 sm:inline-flex ${isLightMode ? 'border-zinc-200 bg-zinc-50' : 'border-white/10 bg-white/5'}`}>
+                                  <UserRound className="h-3.5 w-3.5 text-[#F78E43]" />
+                                  {item.responsavel || 'Sem responsável'}
                                 </span>
                               </div>
-                              <div className={`mt-3 flex flex-wrap items-center gap-2 text-xs ${isLightMode ? 'text-zinc-500' : 'text-white/55'}`}>
+                              <div className={`mt-2 hidden flex-wrap items-center gap-2 text-xs sm:flex ${isLightMode ? 'text-zinc-500' : 'text-white/55'}`}>
                                 <button
                                   type="button"
                                   onClick={(event) => {
@@ -699,19 +863,19 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                                 </button>
                               </div>
 
-                              <div className="mt-4 flex flex-wrap items-center gap-3">
+                              <div className="mt-3 flex flex-wrap items-center gap-2 sm:mt-4 sm:gap-3">
                                 <button
                                   type="button"
                                   onClick={(event) => {
                                     event.stopPropagation();
-                                    setExpandedTrainingId((current) => (current === item.id ? null : item.id));
+                                    toggleTrainingDetails(item.id);
                                   }}
-                                  className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-semibold transition-colors ${
+                                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors sm:gap-2 sm:px-3.5 sm:py-2 sm:text-sm ${
                                     isLightMode ? 'border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50' : 'border-white/10 bg-white/6 text-white hover:bg-white/10'
                                   }`}
                                 >
                                   {expandedTrainingId === item.id ? 'Fechar detalhes' : 'Ver detalhes'}
-                                  <ArrowRight className="h-4 w-4" />
+                                  <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                                 </button>
                                 <button
                                   type="button"
@@ -719,10 +883,10 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                                     event.stopPropagation();
                                     openAccess(item);
                                   }}
-                                  className="inline-flex items-center gap-2 rounded-full bg-[#88C125] px-3.5 py-2 text-sm font-bold text-white transition-colors hover:brightness-95"
+                                  className="inline-flex items-center gap-1.5 rounded-full bg-[#88C125] px-3 py-1.5 text-xs font-bold text-white transition-colors hover:brightness-95 sm:gap-2 sm:px-3.5 sm:py-2 sm:text-sm"
                                 >
                                   Acessar
-                                  <ExternalLink className="h-4 w-4" />
+                                  <ExternalLink className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                                 </button>
                               </div>
 
@@ -738,12 +902,28 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                                       <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.Data || 'Sem data'}</p>
                                     </div>
                                     <div>
+                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Versão</p>
+                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.versao || 'Sem versão'}</p>
+                                    </div>
+                                    <div>
+                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Status do conteúdo</p>
+                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.statusConteudo || 'Sem status'}</p>
+                                    </div>
+                                    <div>
                                       <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Público-alvo</p>
                                       <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.Publico_alvo || 'Não informado'}</p>
                                     </div>
                                     <div>
                                       <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Metodologia</p>
                                       <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.Metodologias || 'Não informada'}</p>
+                                    </div>
+                                    <div>
+                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Próxima revisão</p>
+                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.proximaRevisao || 'Sem revisão agendada'}</p>
+                                    </div>
+                                    <div>
+                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Responsável</p>
+                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.responsavel || 'Não informado'}</p>
                                     </div>
                                   </div>
                                 </div>

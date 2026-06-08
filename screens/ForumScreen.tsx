@@ -8,6 +8,7 @@ import { buildCommentTree, forumDiscussionSeed, type ForumCommentNode, type Foru
 import { processosItems } from '../data/processosItems';
 import { treinamentosItems } from '../data/treinamentosItems';
 import { krsItems } from '../data/krsItems';
+import { recordLocalCardInteractionEvent } from '../hooks/useLocalCardInteractions';
 import { FEEDBACK_COPY_ERROR, FEEDBACK_COPY_SUCCESS, FEEDBACK_TIMEOUT_ERROR, FEEDBACK_TIMEOUT_SUCCESS } from '../constants/feedbackMessages';
 import {
   ArrowRight,
@@ -152,6 +153,7 @@ const ForumScreen: React.FC<ForumScreenProps> = ({
   const [commentsByThread, setCommentsByThread] = useState<Record<string, ForumCommentRecord[]>>(createInitialComments);
   const [currentPage, setCurrentPage] = useState(1);
   const replyComposerRef = useRef<HTMLDivElement | null>(null);
+  const filtersRef = useRef<HTMLElement | null>(null);
   const [draft, setDraft] = useState<DiscussionDraft>({
     title: '',
     excerpt: '',
@@ -235,6 +237,18 @@ const ForumScreen: React.FC<ForumScreenProps> = ({
     [filteredItems, currentPage]
   );
 
+  useEffect(() => {
+    if (!openMenu) return;
+
+    const closeOpenMenu = (event: PointerEvent) => {
+      if (filtersRef.current?.contains(event.target as Node)) return;
+      setOpenMenu(null);
+    };
+
+    document.addEventListener('pointerdown', closeOpenMenu);
+    return () => document.removeEventListener('pointerdown', closeOpenMenu);
+  }, [openMenu]);
+
   const buildShareUrl = () => {
     const url = new URL(window.location.href);
     url.searchParams.set('view', 'forum');
@@ -298,6 +312,7 @@ const ForumScreen: React.FC<ForumScreenProps> = ({
   }, [commentsByThread]);
 
   const openThreadDetails = (threadId: string) => {
+    recordLocalCardInteractionEvent('forum', threadId, 'open');
     setSelectedThreadId(threadId);
     setReplyingTo(null);
     setReplyDraft('');
@@ -320,6 +335,7 @@ const ForumScreen: React.FC<ForumScreenProps> = ({
     if (!selectedThreadId) return;
     const text = replyDraft.trim();
     if (!text) return;
+    recordLocalCardInteractionEvent('forum', selectedThreadId, 'reply');
     const newComment: ForumCommentRecord = {
       id: `c-${Date.now()}`,
       author: user?.displayName || 'Você',
@@ -343,6 +359,7 @@ const ForumScreen: React.FC<ForumScreenProps> = ({
   };
 
   const toggleCommentLike = (threadId: string, commentId: string) => {
+    recordLocalCardInteractionEvent('forum', threadId, 'like');
     setCommentsByThread((current) => ({
       ...current,
       [threadId]: (current[threadId] ?? []).map((comment) =>
@@ -385,6 +402,7 @@ const ForumScreen: React.FC<ForumScreenProps> = ({
       source: 'manual',
     };
 
+    recordLocalCardInteractionEvent('forum', id, 'create');
     setDiscussionItems((current) => [newThread, ...current]);
     setCommentsByThread((current) => ({ ...current, [id]: [] }));
     setDraft({
@@ -484,7 +502,7 @@ const ForumScreen: React.FC<ForumScreenProps> = ({
     { label: 'Home', icon: Home, action: onNavigateToPortfolio },
     { label: 'Processos', icon: LayoutGrid, action: onNavigateToProcessos },
     { label: 'Treinamentos', icon: BookOpen, action: onNavigateToTreinamentos },
-    { label: "Banco de KR's", icon: BookMarked, action: onNavigateToKRs },
+    { label: "Banco de OKR's", icon: BookMarked, action: onNavigateToKRs },
     { label: 'Fórum', icon: MessageSquareMore, action: undefined, active: true },
   ];
 
@@ -983,7 +1001,14 @@ const ForumScreen: React.FC<ForumScreenProps> = ({
               </div>
             </section>
 
-            <section className={filtersClass}>
+            <section
+              ref={filtersRef}
+              className={filtersClass}
+              onPointerDownCapture={(event) => {
+                if ((event.target as HTMLElement).closest('[data-filter-dropdown]')) return;
+                setOpenMenu(null);
+              }}
+            >
               <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto_auto_auto] xl:items-center">
                 <div className="xl:pr-4">
                   <div className="relative">
@@ -1004,7 +1029,7 @@ const ForumScreen: React.FC<ForumScreenProps> = ({
                   </div>
                 </div>
 
-                <div className="relative">
+                <div className="relative" data-filter-dropdown>
                   <button
                     type="button"
                     onClick={() => setOpenMenu(openMenu === 'categoria' ? null : 'categoria')}
@@ -1042,7 +1067,7 @@ const ForumScreen: React.FC<ForumScreenProps> = ({
                   )}
                 </div>
 
-                <div className="relative">
+                <div className="relative" data-filter-dropdown>
                   <button
                     type="button"
                     onClick={() => setOpenMenu(openMenu === 'ordem' ? null : 'ordem')}

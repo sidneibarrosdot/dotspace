@@ -5,7 +5,7 @@ import Pagination from '../components/Pagination';
 import PageFilterActions from '../components/PageFilterActions';
 import SearchBar from '../components/SearchBar';
 import NeutralThumb from '../components/NeutralThumb';
-import { useLocalCardInteractions } from '../hooks/useLocalCardInteractions';
+import { useLocalCardInteractions, recordLocalCardInteractionEvent } from '../hooks/useLocalCardInteractions';
 import { processosItems } from '../data/processosItems';
 import { FEEDBACK_COPY_ERROR, FEEDBACK_COPY_SUCCESS, FEEDBACK_TIMEOUT_ERROR, FEEDBACK_TIMEOUT_SUCCESS } from '../constants/feedbackMessages';
 import type { PortfolioItem } from '../types';
@@ -31,6 +31,7 @@ import {
 import type { User } from 'firebase/auth';
 
 type SortMode = 'recentes' | 'a-z' | 'z-a';
+const PENDING_HOME_TARGET_KEY = 'dot-space.pending-home-target';
 
 interface ProcessosScreenProps {
   user: User | null;
@@ -168,8 +169,12 @@ const ProcessosScreen: React.FC<ProcessosScreenProps> = ({
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [shareFeedback, setShareFeedback] = useState('');
   const [expandedProcessId, setExpandedProcessId] = useState<string>('');
+  const [openPointSections, setOpenPointSections] = useState<Record<string, boolean>>({});
+  const [pendingHomeTargetId, setPendingHomeTargetId] = useState<string>('');
   const [currentPage, setCurrentPage] = useState(1);
   const pendingScrollRestoreRef = useRef<number | null>(null);
+  const didRunInitialFilterResetRef = useRef(false);
+  const filtersRef = useRef<HTMLElement | null>(null);
   const { interactions, getState, incrementViews, toggleLike, toggleFavorite, registerShare } = useLocalCardInteractions('processos');
 
   const pageClass = isLightMode ? 'min-h-screen bg-gray-100 text-zinc-900 transition-colors duration-300' : 'min-h-screen bg-[#111114] text-white transition-colors duration-300';
@@ -256,6 +261,8 @@ const ProcessosScreen: React.FC<ProcessosScreenProps> = ({
           item.Cliente,
           item.Time,
           item.Assunto_geral,
+          item.Finalidade,
+          item.Prioridade,
           item.Assunto_especifico,
           item.Publico_alvo,
           item.Metodologias,
@@ -298,6 +305,42 @@ const ProcessosScreen: React.FC<ProcessosScreenProps> = ({
   );
 
   useEffect(() => {
+    if (!openMenu) return;
+
+    const closeOpenMenu = (event: PointerEvent) => {
+      if (filtersRef.current?.contains(event.target as Node)) return;
+      setOpenMenu(null);
+    };
+
+    document.addEventListener('pointerdown', closeOpenMenu);
+    return () => document.removeEventListener('pointerdown', closeOpenMenu);
+  }, [openMenu]);
+
+  useEffect(() => {
+    try {
+      const rawTarget = window.localStorage.getItem(PENDING_HOME_TARGET_KEY);
+      if (!rawTarget) return;
+      const parsed = JSON.parse(rawTarget) as { kind?: string; id?: string };
+      if (parsed.kind !== 'processos' || !parsed.id) return;
+
+      window.localStorage.removeItem(PENDING_HOME_TARGET_KEY);
+      const targetIndex = filteredItems.findIndex((item) => item.id === parsed.id);
+      if (targetIndex < 0) return;
+
+      setPendingHomeTargetId(parsed.id);
+      setExpandedProcessId(parsed.id);
+      setCurrentPage(Math.floor(targetIndex / pageSize) + 1);
+    } catch {
+      window.localStorage.removeItem(PENDING_HOME_TARGET_KEY);
+    }
+  }, [filteredItems]);
+
+  useEffect(() => {
+    if (!didRunInitialFilterResetRef.current) {
+      didRunInitialFilterResetRef.current = true;
+      return;
+    }
+
     setCurrentPage(1);
   }, [searchTerm, categoryFilter, areaFilter, sortMode, showFavoritesOnly]);
 
@@ -353,7 +396,19 @@ const ProcessosScreen: React.FC<ProcessosScreenProps> = ({
     }
   }, [currentPage, totalPages]);
 
+  useEffect(() => {
+    if (!pendingHomeTargetId) return;
+    const target = document.getElementById(`processo-card-${pendingHomeTargetId}`);
+    if (!target) return;
+
+    window.requestAnimationFrame(() => {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setPendingHomeTargetId('');
+    });
+  }, [currentPage, pendingHomeTargetId]);
+
   const openAccess = (item: PortfolioItem) => {
+    recordLocalCardInteractionEvent('processos', item.id, 'open');
     window.open(item.Link_PMV, '_blank', 'noopener,noreferrer');
   };
 
@@ -378,6 +433,7 @@ const ProcessosScreen: React.FC<ProcessosScreenProps> = ({
       const nextExpandedId = current === itemId ? '' : itemId;
       if (nextExpandedId) {
         pendingScrollRestoreRef.current = window.scrollY;
+        recordLocalCardInteractionEvent('processos', itemId, 'open');
       }
       return nextExpandedId;
     });
@@ -409,7 +465,7 @@ const ProcessosScreen: React.FC<ProcessosScreenProps> = ({
     { label: 'Home', icon: Home, active: false, action: onNavigateToPortfolio },
     { label: 'Processos', icon: LayoutGrid, active: true, action: undefined },
     { label: 'Treinamentos', icon: BookOpen, active: false, action: onNavigateToTreinamentos },
-    { label: "Banco de KR's", icon: BookMarked, active: false, action: onNavigateToKRs },
+    { label: "Banco de OKR's", icon: BookMarked, active: false, action: onNavigateToKRs },
     { label: 'Fórum', icon: MessageSquareMore, active: false, action: onNavigateToForum },
   ];
 
@@ -496,7 +552,14 @@ const ProcessosScreen: React.FC<ProcessosScreenProps> = ({
               </div>
             </section>
 
-            <section className={filtersClass}>
+            <section
+              ref={filtersRef}
+              className={filtersClass}
+              onPointerDownCapture={(event) => {
+                if ((event.target as HTMLElement).closest('[data-filter-dropdown]')) return;
+                setOpenMenu(null);
+              }}
+            >
               <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto_auto_auto] xl:items-center">
                 <div className="xl:pr-4">
                   <SearchBar
@@ -509,7 +572,7 @@ const ProcessosScreen: React.FC<ProcessosScreenProps> = ({
                   />
                 </div>
 
-                <div className="relative">
+                <div className="relative" data-filter-dropdown>
                   <button
                     type="button"
                     onClick={() => setOpenMenu(openMenu === 'categoria' ? null : 'categoria')}
@@ -547,7 +610,7 @@ const ProcessosScreen: React.FC<ProcessosScreenProps> = ({
                   )}
                 </div>
 
-                <div className="relative">
+                <div className="relative" data-filter-dropdown>
                   <button
                     type="button"
                     onClick={() => setOpenMenu(openMenu === 'ordem' ? null : 'ordem')}
@@ -653,6 +716,7 @@ const ProcessosScreen: React.FC<ProcessosScreenProps> = ({
                     return (
                       <article
                         key={item.id}
+                        id={`processo-card-${item.id}`}
                         className={`${cardClass} relative`}
                         style={{ overflowAnchor: 'none' }}
                         role="button"
@@ -697,10 +761,12 @@ const ProcessosScreen: React.FC<ProcessosScreenProps> = ({
                                   </p>
                                 )}
                               </div>
-                              <span className={`shrink-0 rounded-full border px-3 py-1 text-[11px] font-semibold ${integrityClass}`}>
-                                <ShieldCheck className="mr-1 inline-block h-3.5 w-3.5" />
-                                {item.integridade || 'Pendente'}
-                              </span>
+                              <div className="flex shrink-0 flex-col items-end gap-2">
+                                <span className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${integrityClass}`}>
+                                  <ShieldCheck className="mr-1 inline-block h-3.5 w-3.5" />
+                                  {item.integridade || 'Pendente'}
+                                </span>
+                              </div>
                             </div>
 
                             <p className={`mt-3 max-w-3xl text-sm leading-6 line-clamp-2 ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>{item.Assunto_geral}</p>
@@ -765,77 +831,11 @@ const ProcessosScreen: React.FC<ProcessosScreenProps> = ({
                         {isExpanded && (
                           <div className={cardBodyClass}>
                             <div className="space-y-4">
-                              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                                <MetaBlock label="Responsável" value={item.Publico_alvo} theme={theme} />
-                                <MetaBlock label="Função" value={item.Metodologias} theme={theme} />
-                                <MetaBlock label="Time / Squad" value={item.Time} theme={theme} />
-                                <div className={`rounded-2xl border p-3 ${isLightMode ? 'border-zinc-200 bg-white shadow-sm' : 'border-white/8 bg-white/5'}`}>
-                                  <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/40'}`}>Status</p>
-                                  <div className="mt-2 flex flex-wrap gap-2">
-                                    {statusValues.length > 0 ? (
-                                      statusValues.map((status) => (
-                                        <span
-                                          key={status}
-                                          className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${
-                                            /válido|valido/i.test(status)
-                                              ? isLightMode
-                                                ? 'border-[#4CD07D]/40 bg-[#4CD07D]/12 text-[#166a41]'
-                                                : 'border-[#4CD07D]/30 bg-[#4CD07D]/10 text-[#c8ffe0]'
-                                              : /defasado/i.test(status)
-                                                ? isLightMode
-                                                  ? 'border-[#F78E43]/45 bg-[#F78E43]/16 text-[#8a3f06]'
-                                                  : 'border-[#F78E43]/30 bg-[#F78E43]/10 text-[#ffe0c7]'
-                                                : /revis/i.test(status)
-                                                  ? isLightMode
-                                                    ? 'border-[#EEC137]/45 bg-[#EEC137]/18 text-[#6d4f00]'
-                                                    : 'border-[#EEC137]/30 bg-[#EEC137]/10 text-[#fff0be]'
-                                                  : isLightMode
-                                                    ? 'border-zinc-200 bg-zinc-100 text-zinc-700'
-                                                    : 'border-white/10 bg-white/6 text-white/78'
-                                          }`}
-                                        >
-                                          {status}
-                                        </span>
-                                      ))
-                                    ) : (
-                                      <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${isLightMode ? 'border-zinc-200 bg-zinc-100 text-zinc-700' : 'border-white/10 bg-white/6 text-white/78'}`}>
-                                        {item.Cliente || 'Pendente'}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className={`rounded-[24px] border p-4 ${isLightMode ? 'border-zinc-200 bg-white shadow-sm' : 'border-white/8 bg-white/5'}`}>
-                                <div className="flex items-center justify-between gap-4">
-                                  <div>
-                                    <p className={`text-[10px] font-semibold uppercase tracking-[0.3em] ${isLightMode ? 'text-zinc-500' : 'text-white/40'}`}>Acesso direto</p>
-                                    <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>Links rápidos para consulta e atualização.</p>
-                                  </div>
-                                  <FileText className="h-5 w-5 shrink-0 text-[#88C125]" />
-                                </div>
-                                <div className="mt-4 flex flex-wrap gap-2">
-                                  {links.map((link) => (
-                                    <ProcessLink
-                                      key={link.label}
-                                      label={link.label}
-                                      href={link.href}
-                                      hint={link.hint}
-                                      onOpen={openDirectLink}
-                                      theme={theme}
-                                    />
-                                  ))}
-                                </div>
-                              </div>
-
                               {item.inventoryEntries?.length ? (
                                 <div className={`rounded-[24px] border p-4 ${isLightMode ? 'border-zinc-200 bg-zinc-50 shadow-sm' : 'border-white/8 bg-black/20'}`}>
                                   <div className="flex items-center justify-between gap-4">
                                     <div>
                                       <p className={`text-[10px] font-semibold uppercase tracking-[0.3em] ${isLightMode ? 'text-zinc-500' : 'text-white/40'}`}>Entradas consolidadas</p>
-                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>
-                                        Cada item preserva a linha original da planilha, mas em um formato mais compacto.
-                                      </p>
                                     </div>
                                     <BookOpen className="h-5 w-5 shrink-0 text-[#88C125]" />
                                   </div>
@@ -851,39 +851,45 @@ const ProcessosScreen: React.FC<ProcessosScreenProps> = ({
                                             <p className={`text-sm font-bold ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>{entry.responsavel}</p>
                                             <p className={`mt-1 text-sm leading-6 ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>{entry.funcao}</p>
                                           </div>
-                                          <span
-                                            className={`shrink-0 rounded-full border px-3 py-1 text-[11px] font-semibold ${
-                                              entry.status.trim().toLowerCase().includes('válido') || entry.status.trim().toLowerCase().includes('valido')
-                                                ? isLightMode
-                                                  ? 'border-[#4CD07D]/40 bg-[#4CD07D]/12 text-[#166a41]'
-                                                  : 'border-[#4CD07D]/30 bg-[#4CD07D]/10 text-[#c8ffe0]'
-                                                : entry.status.trim().toLowerCase().includes('defasado')
+                                          <div className="flex shrink-0 flex-wrap items-center gap-2">
+                                            <span
+                                              className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${
+                                                entry.status.trim().toLowerCase().includes('válido') || entry.status.trim().toLowerCase().includes('valido')
                                                   ? isLightMode
-                                                    ? 'border-[#F78E43]/45 bg-[#F78E43]/16 text-[#8a3f06]'
-                                                    : 'border-[#F78E43]/30 bg-[#F78E43]/10 text-[#ffe0c7]'
-                                                  : isLightMode
-                                                    ? 'border-zinc-200 bg-zinc-100 text-zinc-700'
-                                                    : 'border-white/10 bg-white/6 text-white/70'
-                                            }`}
-                                          >
-                                            {entry.status}
-                                          </span>
+                                                    ? 'border-[#4CD07D]/40 bg-[#4CD07D]/12 text-[#166a41]'
+                                                    : 'border-[#4CD07D]/30 bg-[#4CD07D]/10 text-[#c8ffe0]'
+                                                  : entry.status.trim().toLowerCase().includes('defasado')
+                                                    ? isLightMode
+                                                      ? 'border-[#F78E43]/45 bg-[#F78E43]/16 text-[#8a3f06]'
+                                                      : 'border-[#F78E43]/30 bg-[#F78E43]/10 text-[#ffe0c7]'
+                                                    : isLightMode
+                                                      ? 'border-zinc-200 bg-zinc-100 text-zinc-700'
+                                                      : 'border-white/10 bg-white/6 text-white/70'
+                                              }`}
+                                            >
+                                              {entry.status}
+                                            </span>
+                                            {entry.prioridade && (
+                                              <span className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${isLightMode ? 'border-zinc-200 bg-zinc-100 text-zinc-700' : 'border-white/10 bg-white/6 text-white/70'}`}>
+                                                {entry.prioridade}
+                                              </span>
+                                            )}
+                                          </div>
                                         </div>
 
-                                        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                                        {entry.finalidade && (
+                                          <p className={`mt-3 text-sm leading-6 ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>
+                                            <span className={`font-semibold ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Finalidade:</span>{' '}
+                                            <span>{entry.finalidade}</span>
+                                          </p>
+                                        )}
+
+                                        <div className="mt-3 grid gap-2 sm:grid-cols-4">
                                           <CompactField label="Responsável" value={entry.responsavel} theme={theme} />
                                           <CompactField label="Função" value={entry.funcao} theme={theme} />
                                           <CompactField label="Time / Squad" value={entry.squad} theme={theme} />
                                         </div>
 
-                                        <div className="mt-3 flex flex-wrap items-center gap-2">
-                                          <ProcessLink label="Abrir origem" href={entry.link} hint="Linha da planilha" onOpen={openDirectLink} theme={theme} />
-                                          {entry.prioridade && (
-                                            <span className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${isLightMode ? 'border-zinc-200 bg-zinc-100 text-zinc-700' : 'border-white/10 bg-white/6 text-white/70'}`}>
-                                              {entry.prioridade}
-                                            </span>
-                                          )}
-                                        </div>
                                       </div>
                                     ))}
                                   </div>
@@ -891,8 +897,18 @@ const ProcessosScreen: React.FC<ProcessosScreenProps> = ({
                               ) : null}
 
                               <div className={`grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]`}>
-                                <details className={`rounded-[24px] border p-4 ${isLightMode ? 'border-zinc-200 bg-white shadow-sm' : 'border-white/8 bg-white/5'}`}>
-                                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4">
+                                <section className={`rounded-[24px] border p-4 ${isLightMode ? 'border-zinc-200 bg-white shadow-sm' : 'border-white/8 bg-white/5'}`}>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setOpenPointSections((current) => ({
+                                        ...current,
+                                        [item.id]: !current[item.id],
+                                      }))
+                                    }
+                                    className="flex w-full cursor-pointer items-center justify-between gap-4 text-left"
+                                    aria-expanded={Boolean(openPointSections[item.id])}
+                                  >
                                     <div className="flex items-center gap-2">
                                       <Target className="h-4 w-4 text-[#88C125]" />
                                       <div>
@@ -900,13 +916,15 @@ const ProcessosScreen: React.FC<ProcessosScreenProps> = ({
                                         <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>Resumo do que precisa ser mantido vivo na operação</p>
                                       </div>
                                     </div>
-                                    <ChevronDown className="h-4 w-4 shrink-0 text-[#88C125]" />
-                                  </summary>
-                                  <div className="mt-4 space-y-3">
-                                    <p className={`text-sm leading-7 ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>{item.Assunto_especifico}</p>
-                                    <p className={`text-sm leading-7 ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>{item.Outros_recursos}</p>
-                                  </div>
-                                </details>
+                                    <ChevronDown className={`h-4 w-4 shrink-0 text-[#88C125] transition-transform ${openPointSections[item.id] ? 'rotate-180' : ''}`} />
+                                  </button>
+                                  {openPointSections[item.id] && (
+                                    <div className="mt-4 space-y-3">
+                                      <p className={`text-sm leading-7 ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>{item.Assunto_especifico}</p>
+                                      <p className={`text-sm leading-7 ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>{item.Outros_recursos}</p>
+                                    </div>
+                                  )}
+                                </section>
                               </div>
                             </div>
                           </div>
