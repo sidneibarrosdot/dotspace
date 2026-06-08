@@ -1,0 +1,47 @@
+[
+  {
+    "Área": "Operações",
+    "Nome do Documento": "Central de briefings",
+    "Finalidade": "Padronizar a chegada de novas demandas e reduzir ruído no início do fluxo.",
+    "Link Atual (Drive)": "https://example.com/processos/central-briefings",
+    "Status": "Válido",
+    "Dono do Processo": "Pessoa Mock 01",
+    "Prioridade": "Alta"
+  },
+  {
+    "Área": "Governança",
+    "Nome do Documento": "Mapa de links seguros",
+    "Finalidade": "Manter referências oficiais revisadas e acessíveis para consulta rápida.",
+    "Link Atual (Drive)": "https://example.com/processos/links-seguros",
+    "Status": "Válido",
+    "Dono do Processo": "Pessoa Mock 02",
+    "Prioridade": "Média"
+  },
+  {
+    "Área": "Produto",
+    "Nome do Documento": "Roteiro de handoff",
+    "Finalidade": "Organizar passagem de contexto entre criação, produção e revisão.",
+    "Link Atual (Drive)": "https://example.com/processos/handoff",
+    "Status": "Em revisão",
+    "Dono do Processo": "Pessoa Mock 03",
+    "Prioridade": "Alta"
+  },
+  {
+    "Área": "Qualidade",
+    "Nome do Documento": "Checklist de revisão",
+    "Finalidade": "Conferir critérios mínimos antes de publicar materiais ou fluxos.",
+    "Link Atual (Drive)": "https://example.com/processos/checklist-revisao",
+    "Status": "Sob revisão",
+    "Dono do Processo": "Pessoa Mock 04",
+    "Prioridade": "Baixa"
+  },
+  {
+    "Área": "Acessos",
+    "Nome do Documento": "Fluxo de permissões",
+    "Finalidade": "Definir responsabilidades para solicitações, aprovações e auditoria de acesso.",
+    "Link Atual (Drive)": "https://example.com/processos/permissoes",
+    "Status": "Atualizado",
+    "Dono do Processo": "Pessoa Mock 05",
+    "Prioridade": "Média"
+  }
+]

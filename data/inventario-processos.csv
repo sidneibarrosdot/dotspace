@@ -1,0 +1,6 @@
+Área,Nome do Documento,Finalidade,Link Atual (Drive),Status,Dono do Processo,Prioridade
+Operações,Central de briefings,Padronizar a chegada de novas demandas e reduzir ruído no início do fluxo.,https://example.com/processos/central-briefings,Válido,Pessoa Mock 01,Alta
+Governança,Mapa de links seguros,Manter referências oficiais revisadas e acessíveis para consulta rápida.,https://example.com/processos/links-seguros,Válido,Pessoa Mock 02,Média
+Produto,Roteiro de handoff,Organizar passagem de contexto entre criação produção e revisão.,https://example.com/processos/handoff,Em revisão,Pessoa Mock 03,Alta
+Qualidade,Checklist de revisão,Conferir critérios mínimos antes de publicar materiais ou fluxos.,https://example.com/processos/checklist-revisao,Sob revisão,Pessoa Mock 04,Baixa
+Acessos,Fluxo de permissões,Definir responsabilidades para solicitações aprovações e auditoria de acesso.,https://example.com/processos/permissoes,Atualizado,Pessoa Mock 05,Média

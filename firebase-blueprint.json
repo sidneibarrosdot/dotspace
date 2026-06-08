@@ -1,0 +1,89 @@
+{
+  "entities": {
+    "PMV": {
+      "title": "PMV",
+      "description": "A PMV (Project) item from Google Sheets",
+      "type": "object",
+      "properties": {
+        "Imagem_capa": { "type": "string" },
+        "Time": { "type": "string" },
+        "Cliente": { "type": "string" },
+        "Data": { "type": "string" },
+        "Projeto": { "type": "string" },
+        "DI": { "type": "string" },
+        "DM": { "type": "string" },
+        "Link_PMV": { "type": "string" },
+        "Assunto_geral": { "type": "string" },
+        "Assunto_especifico": { "type": "string" },
+        "Publico_alvo": { "type": "string" },
+        "Metodologias": { "type": "string" },
+        "Mídias": { "type": "string" },
+        "Outros_recursos": { "type": "string" }
+      },
+      "required": ["Projeto", "Cliente", "Link_PMV"]
+    },
+    "AccessLog": {
+      "title": "Access Log",
+      "description": "Log of admin panel access",
+      "type": "object",
+      "properties": {
+        "userEmail": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      }
+    },
+    "UploadLog": {
+      "title": "Upload Log",
+      "description": "Log of bulk data uploads",
+      "type": "object",
+      "properties": {
+        "fileName": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      }
+    },
+    "AuditLog": {
+      "title": "Audit Log",
+      "description": "Log of system-wide actions",
+      "type": "object",
+      "properties": {
+        "userEmail": { "type": "string" },
+        "action": { "type": "string" },
+        "details": { "type": "string" },
+        "version": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Favorite": {
+      "title": "Favorite",
+      "description": "A project favorited by a user",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "projectId": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "projectId"]
+    }
+  },
+  "firestore": {
+    "/projects": {
+      "schema": "PMV",
+      "description": "Collection of PMVs synced from Google Sheets"
+    },
+    "/accessLogs": {
+      "schema": "AccessLog",
+      "description": "Logs of admin access"
+    },
+    "/uploadLogs": {
+      "schema": "UploadLog",
+      "description": "Logs of bulk uploads"
+    },
+    "/auditLogs": {
+      "schema": "AuditLog",
+      "description": "System-wide audit logs"
+    },
+    "/favorites": {
+      "schema": "Favorite",
+      "description": "User favorited projects"
+    }
+  }
+}
