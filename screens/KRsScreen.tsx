@@ -545,7 +545,16 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
   };
 
   const openAccess = (item: KRsItem) => {
-    openItemDetails(item);
+    const channel = String(item.timeSquad || '')
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/time-/g, "squad-");
+
+    const slackUrl = `https://slack.com/app_redirect?channel=${channel || 'geral'}`;
+    recordLocalCardInteractionEvent('krs', item.id, 'slack_interest');
+    window.open(slackUrl, '_blank', 'noopener,noreferrer');
   };
 
   const handleShareItem = async (item: KRsItem) => {
@@ -699,18 +708,18 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
             </div>
           </aside>
 
-          <div className="space-y-6">
+          <div className="space-y-6" data-development-lock-content>
             <section className={heroClass}>
               <div className="absolute inset-x-0 top-0 h-2 bg-[#EEC137]" />
               <div className={heroOverlayClass} />
               <div className="relative z-10 grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.38em] text-[#EEC137]">Banco de OKR's</p>
-                  <h1 className={`mt-3 max-w-4xl text-2xl font-black leading-tight sm:text-3xl lg:text-4xl ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>
-                    Objetivos vivos para orientar o time e acelerar resultados.
+                   <h1 className={`mt-3 max-w-4xl text-2xl font-black leading-tight sm:text-3xl lg:text-4xl ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>
+                    Acompanhe o que move nossos resultados
                   </h1>
                   <p className={`mt-4 max-w-2xl text-sm leading-7 sm:text-base ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>
-                    OKR's organizados com foco em meta área, período, responsável, evolução e alinhamento com a planilha conectada ao sistema.
+                    Uma visão consolidada dos objetivos e resultados-chave da organização. Acompanhe metas, responsáveis, evolução dos indicadores e alinhamento estratégico em um único ambiente.
                   </p>
                   <div className="mt-6 flex flex-wrap gap-3">
                     {['Objetivos', 'Indicadores', 'Metas', 'Ciclos'].map((chip) => (
@@ -1197,7 +1206,7 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
                                   onClick={() => openAccess(item)}
                                   className="inline-flex items-center gap-2 rounded-full bg-[#88C125] px-4 py-3 text-sm font-bold text-white transition-colors hover:brightness-95"
                                 >
-                                  Abrir OKR
+                                  Participar do KR
                                   <ExternalLink className="h-4 w-4" />
                                 </button>
                               </div>

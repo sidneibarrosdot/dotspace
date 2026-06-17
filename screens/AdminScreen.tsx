@@ -4,7 +4,7 @@ import DotLogo from '../components/DotLogo';
 import { db, auth } from '../firebase';
 import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, writeBatch, doc, onSnapshot } from 'firebase/firestore';
 import { User } from 'firebase/auth';
-import type { PortfolioItem } from '../types';
+import type { DevelopmentLockKey, PortfolioItem } from '../types';
 import { portfolioItems as localPortfolioItems } from '../data/portfolioItems';
 import { processosItems } from '../data/processosItems';
 import { treinamentosItems } from '../data/treinamentosItems';
@@ -88,8 +88,21 @@ interface AdminScreenProps {
   theme: 'light' | 'dark';
   manualInteractionsEnabled: boolean;
   onToggleManualInteractions: (enabled: boolean) => Promise<void> | void;
+  developmentLockedSections: DevelopmentLockKey[];
+  onToggleDevelopmentLock: (section: DevelopmentLockKey, locked: boolean) => Promise<void> | void;
   offlineMode?: boolean;
 }
+
+const DEVELOPMENT_LOCK_OPTIONS: Array<{
+  key: DevelopmentLockKey;
+  label: string;
+  description: string;
+}> = [
+  { key: 'processos', label: 'Processos', description: 'Fluxos, documentos e cards de processos.' },
+  { key: 'treinamentos', label: 'Treinamentos', description: 'Conteúdos e trilhas de aprendizagem.' },
+  { key: 'krs', label: "Banco de OKR's", description: 'Objetivos, resultados-chave e acompanhamento.' },
+  { key: 'forum', label: 'Fórum', description: 'Discussões, respostas e alinhamentos do time.' },
+];
 
 interface UploadLog {
     id: string;
@@ -311,7 +324,17 @@ const ArrowLeftIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
     </svg>
 );
 
-const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, theme, manualInteractionsEnabled, onToggleManualInteractions, offlineMode = false }) => {
+const AdminScreen: React.FC<AdminScreenProps> = ({
+  user,
+  onLogout,
+  onNavigate,
+  theme,
+  manualInteractionsEnabled,
+  onToggleManualInteractions,
+  developmentLockedSections,
+  onToggleDevelopmentLock,
+  offlineMode = false,
+}) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
@@ -1020,6 +1043,77 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
       ),
     );
   };
+
+  const renderDevelopmentLockControls = () => (
+    <section className="rounded-2xl border border-amber-200 bg-white p-6 shadow-sm dark:border-amber-900/50 dark:bg-zinc-800">
+      <div>
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-600 dark:text-amber-400">
+          Disponibilidade
+        </p>
+        <h2 className="mt-2 text-xl font-bold text-zinc-900 dark:text-white">Bloqueio de Desenvolvimento</h2>
+        <p className="mt-1 max-w-2xl text-sm text-gray-600 dark:text-gray-400">
+          Use os toggles para ativar o aviso de desenvolvimento em cada seção.
+        </p>
+      </div>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        {DEVELOPMENT_LOCK_OPTIONS.map((option) => {
+          const isLocked = developmentLockedSections.includes(option.key);
+
+          return (
+            <button
+              key={option.key}
+              type="button"
+              role="switch"
+              aria-checked={isLocked}
+              aria-label={`Bloqueio de desenvolvimento: ${option.label}`}
+              onClick={async () => {
+                setIsSavingSettings(true);
+                try {
+                  await onToggleDevelopmentLock(option.key, !isLocked);
+                  setMessage(isLocked
+                    ? `${option.label} liberado.`
+                    : `${option.label} marcado como Em Desenvolvimento.`);
+                  setUploadStatus('success');
+                } catch (error) {
+                  console.error('Error updating development lock setting:', error);
+                  setMessage(`Não foi possível atualizar ${option.label}.`);
+                  setUploadStatus('error');
+                } finally {
+                  setIsSavingSettings(false);
+                }
+              }}
+              disabled={isSavingSettings}
+              className={`group flex w-full items-center justify-between gap-4 rounded-2xl border px-4 py-3 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-accent/40 focus:ring-offset-2 disabled:cursor-wait disabled:opacity-60 dark:focus:ring-offset-zinc-800 ${
+                isLocked
+                  ? 'border-amber-400/60 bg-amber-50 dark:border-amber-700/60 dark:bg-amber-950/20'
+                  : 'border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-gray-100 dark:border-zinc-700 dark:bg-zinc-900/60 dark:hover:border-zinc-600 dark:hover:bg-zinc-900'
+              }`}
+            >
+              <div className="min-w-0">
+                <p className="font-bold text-zinc-900 dark:text-white">{option.label}</p>
+                <p className="mt-0.5 text-xs leading-relaxed text-gray-500 dark:text-gray-400">{option.description}</p>
+              </div>
+              <span
+                aria-hidden="true"
+                className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
+                  isLocked ? 'bg-amber-500' : 'bg-zinc-300 dark:bg-zinc-600'
+                }`}
+              >
+                <span
+                  aria-hidden="true"
+                  className={`absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+                    isLocked ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+
   return (
       offlineMode ? (
         <div className="min-h-screen bg-gray-100 dark:bg-zinc-900">
@@ -1065,6 +1159,8 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                 {renderStat('Alterações registradas', uploadLogs.length)}
                 {renderStat('Itens em revisão', monitoredAreas.reduce((acc, item) => acc + item.review, 0))}
               </div>
+
+              {renderDevelopmentLockControls()}
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="rounded-2xl bg-white p-6 shadow-lg border border-gray-200 dark:bg-zinc-800 dark:border-zinc-700/50">
@@ -1409,6 +1505,8 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ user, onLogout, onNavigate, t
                   ))}
                 </div>
               </div>
+
+              {renderDevelopmentLockControls()}
 
               <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-4 sm:p-8 border border-green-500/30 dark:border-green-500/50 mb-8">
                 <div className="flex items-center gap-3 mb-4">

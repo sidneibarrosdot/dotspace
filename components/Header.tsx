@@ -2,6 +2,7 @@ import React from 'react';
 import ThemeToggle from './ThemeToggle';
 import DotLogo from './DotLogo';
 import { Settings2 } from 'lucide-react';
+import { scrollToAppTop } from '../utils/scrollHost';
 
 interface HeaderProps {
   theme: 'light' | 'dark';
@@ -20,7 +21,7 @@ const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, isLoggedIn, session
   const showLogoutButton = sessionActive ?? isLoggedIn;
   const handleLogoClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
     event.preventDefault();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    scrollToAppTop();
     window.history.replaceState(null, '', '#');
   };
 

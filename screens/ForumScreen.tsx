@@ -10,6 +10,7 @@ import { treinamentosItems } from '../data/treinamentosItems';
 import { krsItems } from '../data/krsItems';
 import { recordLocalCardInteractionEvent } from '../hooks/useLocalCardInteractions';
 import { FEEDBACK_COPY_ERROR, FEEDBACK_COPY_SUCCESS, FEEDBACK_TIMEOUT_ERROR, FEEDBACK_TIMEOUT_SUCCESS } from '../constants/feedbackMessages';
+import { scrollToAppTop } from '../utils/scrollHost';
 import {
   ArrowRight,
   BookOpen,
@@ -316,14 +317,14 @@ const ForumScreen: React.FC<ForumScreenProps> = ({
     setSelectedThreadId(threadId);
     setReplyingTo(null);
     setReplyDraft('');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    scrollToAppTop();
   };
 
   const closeThreadDetails = () => {
     setSelectedThreadId(null);
     setReplyingTo(null);
     setReplyDraft('');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    scrollToAppTop();
   };
 
   const activeDiscussionComments = useMemo(
@@ -416,7 +417,7 @@ const ForumScreen: React.FC<ForumScreenProps> = ({
     setReplyDraft('');
     setReplyingTo(null);
     window.requestAnimationFrame(() => {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      scrollToAppTop();
     });
   };
 
@@ -804,7 +805,7 @@ const ForumScreen: React.FC<ForumScreenProps> = ({
             </div>
           </aside>
 
-          <div className="space-y-6">
+          <div className="relative space-y-6" data-development-lock-content>
             <section className={heroClass}>
               <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-zinc-300 via-zinc-200 to-zinc-300" />
               <div className={heroOverlayClass} />

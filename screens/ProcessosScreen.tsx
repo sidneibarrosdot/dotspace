@@ -9,6 +9,7 @@ import { useLocalCardInteractions, recordLocalCardInteractionEvent } from '../ho
 import { processosItems } from '../data/processosItems';
 import { FEEDBACK_COPY_ERROR, FEEDBACK_COPY_SUCCESS, FEEDBACK_TIMEOUT_ERROR, FEEDBACK_TIMEOUT_SUCCESS } from '../constants/feedbackMessages';
 import type { PortfolioItem } from '../types';
+import { getScrollTop, scrollAppTo } from '../utils/scrollHost';
 import {
   ArrowRight,
   BookOpen,
@@ -386,7 +387,7 @@ const ProcessosScreen: React.FC<ProcessosScreenProps> = ({
     pendingScrollRestoreRef.current = null;
 
     window.requestAnimationFrame(() => {
-      window.scrollTo({ top: targetScroll, behavior: 'auto' });
+      scrollAppTo(targetScroll, 'auto');
     });
   }, [expandedProcessId]);
 
@@ -432,7 +433,7 @@ const ProcessosScreen: React.FC<ProcessosScreenProps> = ({
     setExpandedProcessId((current) => {
       const nextExpandedId = current === itemId ? '' : itemId;
       if (nextExpandedId) {
-        pendingScrollRestoreRef.current = window.scrollY;
+        pendingScrollRestoreRef.current = getScrollTop();
         recordLocalCardInteractionEvent('processos', itemId, 'open');
       }
       return nextExpandedId;
@@ -512,7 +513,7 @@ const ProcessosScreen: React.FC<ProcessosScreenProps> = ({
             </div>
           </aside>
 
-          <div className="space-y-6">
+          <div className="space-y-6" data-development-lock-content>
             <section className={heroClass}>
               <div className="absolute inset-x-0 top-0 h-2 bg-[#88C125]" />
               <div className={heroOverlayClass} />

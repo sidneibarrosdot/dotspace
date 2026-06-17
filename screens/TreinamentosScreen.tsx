@@ -25,12 +25,15 @@ import {
   Share2,
   CalendarClock,
   Clock3,
+  Bug,
   UserRound,
 } from 'lucide-react';
 import type { User } from 'firebase/auth';
 
 type SortMode = 'recentes' | 'a-z' | 'z-a';
 const PENDING_HOME_TARGET_KEY = 'dot-space.pending-home-target';
+const TRAINING_FEEDBACK_SLACK_URL =
+  import.meta.env.VITE_TRAINING_FEEDBACK_SLACK_URL || 'https://slack.com/app_redirect?channel=treinamentos-feedback';
 
 interface TreinamentosScreenProps {
   user: User | null;
@@ -47,32 +50,10 @@ interface TreinamentosScreenProps {
 }
 
 const compareByDateDesc = (a: PortfolioItem, b: PortfolioItem) => {
-  const dateA = Date.parse(a.Data || '');
-  const dateB = Date.parse(b.Data || '');
+  const dateA = Date.parse(a.ultimaRevisao || a.Data || '');
+  const dateB = Date.parse(b.ultimaRevisao || b.Data || '');
   if (dateA !== dateB) return dateB - dateA;
   return a.Projeto.localeCompare(b.Projeto, 'pt-BR');
-};
-
-const getTrainingStatusClasses = (status?: string, isLightMode = true) => {
-  const normalized = (status || '').toLowerCase();
-  if (normalized.includes('atualiza')) {
-    return isLightMode
-      ? 'border-amber-200 bg-amber-50 text-amber-700'
-      : 'border-amber-400/35 bg-amber-400/12 text-amber-200';
-  }
-  if (normalized.includes('revis')) {
-    return isLightMode
-      ? 'border-orange-200 bg-orange-50 text-orange-700'
-      : 'border-orange-400/35 bg-orange-400/12 text-orange-200';
-  }
-  if (normalized.includes('obsoleto')) {
-    return isLightMode
-      ? 'border-zinc-300 bg-zinc-100 text-zinc-600'
-      : 'border-white/15 bg-white/8 text-white/65';
-  }
-  return isLightMode
-    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-    : 'border-emerald-400/35 bg-emerald-400/12 text-emerald-200';
 };
 
 const formatShortDate = (value?: string) => {
@@ -310,9 +291,19 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
     }
   };
 
+  const getTrainingOwner = (item: PortfolioItem) => item.responsavel || item.Cliente || 'responsável pelo treinamento';
+
+  const openTrainingFeedback = (item: PortfolioItem) => {
+    recordLocalCardInteractionEvent('treinamentos', item.id, 'open');
+    window.open(TRAINING_FEEDBACK_SLACK_URL, '_blank', 'noopener,noreferrer');
+  };
+
+  const getTrainingFeedbackLabel = (item: PortfolioItem) =>
+    `Abrir canal no Slack para reportar bug, erro ou sugestão. No Slack, marque @${getTrainingOwner(item)} e descreva o ponto encontrado em "${item.Projeto}".`;
+
   const stats = [
     { label: 'Treinamentos', value: treinamentosItems.length, accent: '#4CD07D' },
-    { label: 'Áreas', value: areas.length, accent: '#F78E43' },
+    { label: 'Categorias', value: areas.length, accent: '#F78E43' },
     { label: 'Últimos acessos', value: filteredItems.length, accent: '#EEC137' },
     { label: 'Módulos', value: 8, accent: '#88C125' },
   ];
@@ -368,7 +359,7 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
             </div>
           </aside>
 
-          <div className="space-y-6">
+          <div className="space-y-6" data-development-lock-content>
             <section className={heroClass}>
               <div className="absolute inset-x-0 top-0 h-2 bg-[#F78E43]" />
               <div className={heroOverlayClass} />
@@ -376,13 +367,13 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.38em] text-[#F78E43]">Treinamentos</p>
                   <h1 className={`mt-3 max-w-4xl text-2xl font-black leading-tight sm:text-3xl lg:text-4xl ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>
-                    Um hub para manter todos os colaboradores atualizados
+                    Seu desenvolvimento começa aqui
                   </h1>
                   <p className={`mt-4 max-w-2xl text-sm leading-7 sm:text-base ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>
-                    Conteúdos de aprendizagem, onboarding e cultura organizados com visual leve, cores do guia e navegação rápida.
+                    Encontre treinamentos, trilhas de aprendizagem, materiais de onboarding e conteúdos de desenvolvimento em um só lugar. Um espaço criado para apoiar o crescimento contínuo dos colaboradores.
                   </p>
                   <div className="mt-6 flex flex-wrap gap-3">
-                    {['Onboarding', 'Cultura', 'Habilidades', 'Favoritos'].map((chip) => (
+                    {['Trilhas', 'Onboarding', 'Treinamentos', 'Materiais de apoio'].map((chip) => (
                       <span
                         key={chip}
                         className={`rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] ${
@@ -420,7 +411,7 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                   <SearchBar
                     searchTerm={searchTerm}
                     setSearchTerm={setSearchTerm}
-                    placeholder="Buscar treinamento, área, tema..."
+                    placeholder="Buscar treinamento, categoria, tema..."
                     suggestions={searchTerm ? filteredItems : []}
                     onSuggestionClick={(item) => setExpandedTrainingId(item.id)}
                     theme={theme}
@@ -433,7 +424,7 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                     onClick={() => setOpenMenu(openMenu === 'area' ? null : 'area')}
                     className={filtersButtonClass}
                   >
-                    <span>{areaFilter || 'Área'}</span>
+                    <span>{areaFilter || 'Categoria'}</span>
                     <ChevronDown className="h-4 w-4" />
                   </button>
                   {openMenu === 'area' && (
@@ -446,7 +437,7 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                         }}
                         className={filtersMenuItemClass}
                       >
-                        Todas as áreas
+                        Todas as categorias
                       </button>
                       {areas.map((area) => (
                         <button
@@ -471,13 +462,13 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                     onClick={() => setOpenMenu(openMenu === 'ordem' ? null : 'ordem')}
                     className={filtersButtonClass}
                   >
-                    <span>{sortMode === 'recentes' ? 'Ordem' : sortMode.toUpperCase()}</span>
+                    <span>{sortMode === 'recentes' ? 'Recentemente atualizado' : sortMode.toUpperCase()}</span>
                     <Filter className="h-4 w-4" />
                   </button>
                   {openMenu === 'ordem' && (
                     <div className={`${filtersMenuClass} right-0 left-auto lg:w-48`}>
                       {[
-                        { label: 'Recentes', value: 'recentes' as SortMode },
+                        { label: 'Recentemente atualizado', value: 'recentes' as SortMode },
                         { label: 'A-Z', value: 'a-z' as SortMode },
                         { label: 'Z-A', value: 'z-a' as SortMode },
                       ].map((item) => (
@@ -614,11 +605,6 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                                       {item.versao}
                                     </span>
                                   )}
-                                  {item.statusConteudo && (
-                                    <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${getTrainingStatusClasses(item.statusConteudo, isLightMode)}`}>
-                                      {item.statusConteudo}
-                                    </span>
-                                  )}
                                 </div>
                               </div>
 
@@ -632,14 +618,13 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                                     <Clock3 className="h-3.5 w-3.5 text-[#F78E43]" />
                                     {item.duracao || 'Duração não informada'}
                                   </span>
-                                  <span className="font-semibold">{item.Prioridade ? `Prioridade ${item.Prioridade}` : 'Sem prioridade'}</span>
                                 </div>
                                 <div className="flex items-center justify-between gap-3">
                                   <span className="inline-flex items-center gap-1.5">
                                     <CalendarClock className="h-3.5 w-3.5 text-[#F78E43]" />
                                     Revisão {formatShortDate(item.proximaRevisao)}
                                   </span>
-                                  <span className="truncate font-semibold">{item.responsavel || 'Sem responsável'}</span>
+                                  <span className="truncate font-semibold">{item.responsavel || 'ID não informado'}</span>
                                 </div>
                               </div>
 
@@ -708,6 +693,18 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                                 >
                                   <Share2 className="h-3.5 w-3.5" /> Compartilhar
                                 </button>
+                                <button
+                                  type="button"
+                                  title={getTrainingFeedbackLabel(item)}
+                                  aria-label={getTrainingFeedbackLabel(item)}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    openTrainingFeedback(item);
+                                  }}
+                                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 ${isLightMode ? 'border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100' : 'border-orange-400/35 bg-orange-400/12 text-orange-200 hover:bg-orange-400/18'}`}
+                                >
+                                  <Bug className="h-3.5 w-3.5" /> Reportar erro
+                                </button>
                               </div>
 
                               <div className="mt-auto flex flex-wrap items-center gap-3 pt-5">
@@ -757,7 +754,7 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                                       <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.proximaRevisao || 'Sem revisão agendada'}</p>
                                     </div>
                                     <div>
-                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Responsável</p>
+                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>ID usuário</p>
                                       <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.responsavel || 'Não informado'}</p>
                                     </div>
                                     <div>
@@ -799,11 +796,6 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                                       {item.versao}
                                     </span>
                                   )}
-                                  {item.statusConteudo && (
-                                    <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] sm:px-2.5 sm:py-1 sm:text-[10px] sm:tracking-[0.14em] ${getTrainingStatusClasses(item.statusConteudo, isLightMode)}`}>
-                                      {item.statusConteudo}
-                                    </span>
-                                  )}
                                 </div>
                               </div>
                               <div className={`mt-2 flex flex-wrap items-center gap-1.5 text-[11px] sm:mt-3 sm:gap-2 sm:text-xs ${isLightMode ? 'text-zinc-500' : 'text-white/55'}`}>
@@ -817,7 +809,7 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                                 </span>
                                 <span className={`hidden items-center gap-1.5 rounded-full border px-2.5 py-1 sm:inline-flex ${isLightMode ? 'border-zinc-200 bg-zinc-50' : 'border-white/10 bg-white/5'}`}>
                                   <UserRound className="h-3.5 w-3.5 text-[#F78E43]" />
-                                  {item.responsavel || 'Sem responsável'}
+                                  {item.responsavel || 'ID não informado'}
                                 </span>
                               </div>
                               <div className={`mt-2 hidden flex-wrap items-center gap-2 text-xs sm:flex ${isLightMode ? 'text-zinc-500' : 'text-white/55'}`}>
@@ -860,6 +852,18 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                                   className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 ${isLightMode ? 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
                                 >
                                   <Share2 className="h-3.5 w-3.5" /> Compartilhar
+                                </button>
+                                <button
+                                  type="button"
+                                  title={getTrainingFeedbackLabel(item)}
+                                  aria-label={getTrainingFeedbackLabel(item)}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    openTrainingFeedback(item);
+                                  }}
+                                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 ${isLightMode ? 'border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100' : 'border-orange-400/35 bg-orange-400/12 text-orange-200 hover:bg-orange-400/18'}`}
+                                >
+                                  <Bug className="h-3.5 w-3.5" /> Reportar erro
                                 </button>
                               </div>
 
@@ -922,7 +926,7 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                                       <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.proximaRevisao || 'Sem revisão agendada'}</p>
                                     </div>
                                     <div>
-                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Responsável</p>
+                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>ID usuário</p>
                                       <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.responsavel || 'Não informado'}</p>
                                     </div>
                                   </div>

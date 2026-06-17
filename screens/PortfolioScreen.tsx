@@ -40,6 +40,13 @@ import { db } from '../firebase';
 import { addDoc, collection, query, onSnapshot, doc, updateDoc, increment, getDoc, Timestamp } from 'firebase/firestore';
 import { logAudit } from '../services/auditService';
 import {
+  addAppScrollListener,
+  getScrollHeight,
+  getScrollTop,
+  getViewportHeight,
+  scrollToAppTop,
+} from '../utils/scrollHost';
+import {
   createFavoriteList,
   deleteFavoriteList,
   ensureFavoriteListsReady,
@@ -429,7 +436,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
     'Atualize, compartilhe e acesse materiais DOT sem perder contexto. 💡',
     'Conhecimento útil, curado e fácil de encontrar para o dia a dia do time. 🎯',
     'Do processo ao treinamento, o DOT Space conecta o que importa. 🌟',
-    'Um espaço para consultar, aprender e executar com mais consistência. 🛠️'
+    'O espaço que conecta conhecimento, processos, pessoas e inovação em um só lugar.'
   ];
 
   useEffect(() => {
@@ -1398,21 +1405,21 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
     const handleScroll = () => {
       if (selectedItem) return; // Don't load more items when modal is open
 
-      setShowBackToTop(window.scrollY > 500);
+      const scrollTop = getScrollTop();
+      setShowBackToTop(scrollTop > 500);
 
-      const nearBottom = window.innerHeight + window.scrollY >= document.body.offsetHeight - 500;
+      const nearBottom = getViewportHeight() + scrollTop >= getScrollHeight() - 500;
       
       if (nearBottom && visibleCount < filteredItems.length) {
         setVisibleCount(prevCount => prevCount + ITEMS_TO_LOAD);
       }
     };
 
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    return addAppScrollListener(handleScroll);
   }, [visibleCount, filteredItems.length, selectedItem]);
 
   useEffect(() => {
-    window.scrollTo(0, 0);
+    scrollToAppTop('auto');
     setVisibleCount(ITEMS_TO_LOAD);
   }, [searchTerm, activeFilters, sharedProjectIds]);
 
@@ -1441,7 +1448,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
             >
               <div className="space-y-2">
                 {[
-                  { label: 'Home', icon: Home, action: () => window.scrollTo({ top: 0, behavior: 'smooth' }), active: true },
+                  { label: 'Home', icon: Home, action: () => scrollToAppTop(), active: true },
                   { label: 'Processos', icon: LayoutGrid, action: onNavigateToProcessos, active: false },
                   { label: 'Treinamentos', icon: BookOpen, action: onNavigateToTreinamentos, active: false },
                   { label: "Banco de OKR's", icon: BookMarked, action: onNavigateToKRs, active: false },
@@ -1497,8 +1504,8 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
                     {randomPhrase}
                   </h1>
                   <p className={`mt-4 max-w-2xl text-sm leading-7 sm:text-base ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>
-                    Acesso central aos materiais, processos e treinamentos com governança rígida,
-                    versionamento claro e navegação rápida.
+                    Acesse conteúdos, iniciativas e ferramentas que impulsionam a inovação e apoiam a
+                    evolução no DOT.
                   </p>
                 </div>
 
@@ -1539,7 +1546,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[#88c125]">Novidades</p>
-                    <h2 className="mt-2 text-2xl font-black tracking-tight text-zinc-900 dark:text-white">Conteúdos recentes</h2>
+                    <h2 className="mt-2 text-2xl font-black tracking-tight text-zinc-900 dark:text-white">Últimas atualizações</h2>
                   </div>
                   <button
                     type="button"
@@ -1550,8 +1557,8 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
                   </button>
                 </div>
                 <p className="mt-3 max-w-2xl text-sm leading-7 text-zinc-500 dark:text-zinc-400">
-                  Os processos e KR&apos;s mais recentes aparecem primeiro aqui, criando uma leitura rápida do que entrou
-                  no sistema e do que merece acompanhamento agora.
+                  Acompanhe as novidades mais recentes do Dot Space. Aqui você encontra atualizações de processos,
+                  treinamentos, iniciativas estratégicas, KRs e conteúdos que acabaram de ser publicados ou revisados.
                 </p>
                 <div className="mt-6 grid gap-4 md:grid-cols-2 xl:max-w-[760px]">
                   {recentItems.slice(0, 2).map((item) => (
@@ -1564,9 +1571,6 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
                       <div className="relative h-48 overflow-hidden">
                         <img src={item.Imagem_capa} alt={item.Projeto} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-transparent to-transparent" />
-                        <span className={`absolute left-4 top-4 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.25em] ${getHomeFeedAccent(item)}`}>
-                          {getHomeFeedLabel(item)}
-                        </span>
                       </div>
                       <div className="p-5">
                         <p className="text-sm font-black uppercase tracking-[0.2em] text-[#88c125]">{getHomeFeedMeta(item)}</p>
@@ -1581,7 +1585,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
               <article className="overflow-hidden rounded-[30px] border border-zinc-200/80 bg-white shadow-[0_25px_60px_rgba(15,23,42,0.08)] dark:border-zinc-800 dark:bg-zinc-900">
                 <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-5 dark:border-zinc-800">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[#88c125]">Continuar fazendo</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[#88c125]">Continuar acessando</p>
                     <h2 className="mt-2 text-xl font-black tracking-tight text-zinc-900 dark:text-white">Destaque da casa</h2>
                   </div>
                   <span className="rounded-full bg-[#88C125]/15 px-3 py-1 text-xs font-bold uppercase tracking-[0.22em] text-[#88C125]">
@@ -1643,11 +1647,12 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
                         IA em alta
                       </div>
                       <h2 className="mt-3 max-w-2xl text-2xl font-black leading-tight text-zinc-900 dark:text-white sm:text-3xl">
-                        Inteligência Artificial aplicada a processos e treinamentos.
+                        Hub de Inteligência Artificial.
                       </h2>
                       <p className="mt-4 max-w-2xl text-sm leading-7 text-zinc-600 dark:text-zinc-300 sm:text-base">
-                        Um destaque para a categoria que mais está ganhando espaço na empresa. Aqui ficam conteúdos,
-                        iniciativas e materiais que conectam automação, produtividade e capacitação do time.
+                        Explore ferramentas, boas práticas, treinamentos e iniciativas relacionadas à Inteligência
+                        Artificial. Um espaço para aprender, experimentar e descobrir novas formas de aumentar a
+                        produtividade, a qualidade das entregas e a inovação no dia a dia.
                       </p>
                       <div className="mt-6 flex flex-wrap gap-3">
                         {['Chatbots', 'Automação', 'Conteúdo', 'Produtividade'].map((tag) => (
@@ -1698,7 +1703,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
       <MobileFooterNav
         theme={theme}
         items={[
-          { label: 'Home', icon: Home, onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }), active: true },
+          { label: 'Home', icon: Home, onClick: () => scrollToAppTop(), active: true },
           { label: 'Processos', icon: LayoutGrid, onClick: onNavigateToProcessos },
           { label: 'Treinamentos', icon: BookOpen, onClick: onNavigateToTreinamentos },
           { label: "Banco de OKR's", icon: BookMarked, onClick: onNavigateToKRs },
@@ -1727,7 +1732,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
             Voltar ao topo
           </div>
           <button
-            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            onClick={() => scrollToAppTop()}
             className="bg-white dark:bg-zinc-800 text-zinc-700 dark:text-gray-200 border border-gray-200 dark:border-zinc-700 rounded-full w-12 h-12 flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5"
             aria-label="Voltar ao topo"
             title="Voltar ao topo"

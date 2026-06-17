@@ -104,9 +104,11 @@ export interface Like {
 }
 
 export type AppEnvironment = 'production' | 'test';
+export type DevelopmentLockKey = 'processos' | 'treinamentos' | 'krs' | 'forum';
 
 export interface AppSettings {
   manualInteractionsEnabled: boolean;
+  developmentLockedSections: DevelopmentLockKey[];
   environment: AppEnvironment;
   updatedAt?: string;
   updatedBy?: string;
