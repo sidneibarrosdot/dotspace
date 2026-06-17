@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, CalendarRange, ChevronLeft, ChevronRight, ExternalLink, RefreshCcw } from 'lucide-react';
+import { CalendarDays, CalendarRange, ChevronLeft, ChevronRight, ExternalLink, RefreshCcw, Slack } from 'lucide-react';
 
 type CalendarEvent = {
   id: string;
@@ -140,7 +140,7 @@ const CalendarAgenda: React.FC = () => {
       setEvents(MOCK_EVENTS);
       setSource('mock');
       setLastUpdated(new Date());
-      setError('Exibindo agenda simulada até a configuração final do Google Calendar.');
+      setError('');
     } finally {
       setLoading(false);
     }
@@ -199,53 +199,67 @@ const CalendarAgenda: React.FC = () => {
   }, [events, currentMonth]);
 
   const selectedEvents = eventsByDay[selectedDay] || [];
-
   return (
     <article className="rounded-[30px] border border-zinc-200/80 bg-white p-6 shadow-[0_25px_60px_rgba(15,23,42,0.08)] dark:border-zinc-800 dark:bg-zinc-900">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-[280px] flex-1">
           <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[#88C125]">Agenda</p>
-          <h2 className="mt-2 text-2xl font-black tracking-tight text-zinc-900 dark:text-white">Espelho do Google Calendar</h2>
+          <h2 className="mt-2 text-2xl font-black tracking-tight text-zinc-900 dark:text-white">Calendário</h2>
           <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-            {source === 'mock'
-              ? 'Agenda simulada para validação visual até a integração final.'
-              : 'Integração sincronizada com o Google Calendar.'}
+            Acompanhe os próximos treinamentos e workshop. Consulte datas, horários e temas para planejar sua participação e continuar evoluindo com o DOT.
           </p>
+          {source !== 'mock' && (
+            <p className="mt-1 text-xs text-[#88C125] dark:text-[#88C125]/80 font-medium">
+              Integração sincronizada com o Google Calendar.
+            </p>
+          )}
         </div>
 
-        <div className="flex items-center gap-2 rounded-full border border-zinc-200 bg-white p-1 dark:border-zinc-700 dark:bg-zinc-800">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 rounded-full border border-zinc-200 bg-white p-1 dark:border-zinc-700 dark:bg-zinc-800">
+            <button
+              type="button"
+              onClick={() => setViewMode('lista')}
+              className={`rounded-full px-4 py-2 text-xs font-bold transition-colors ${
+                viewMode === 'lista'
+                  ? 'bg-[#88C125] text-white'
+                  : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700'
+              }`}
+            >
+              Lista
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('calendario')}
+              className={`rounded-full px-4 py-2 text-xs font-bold transition-colors ${
+                viewMode === 'calendario'
+                  ? 'bg-[#88C125] text-white'
+                  : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700'
+              }`}
+            >
+              Calendário
+            </button>
+          </div>
+
+          <a
+            href={import.meta.env.VITE_SUGGEST_TRAINING_SLACK_URL || 'https://slack.com/app_redirect?channel=treinamentos-sugestoes'}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-2 text-xs font-bold text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+          >
+            <Slack className="h-4 w-4 text-[#E01E5A]" />
+            Sugerir treinamento
+          </a>
+
           <button
             type="button"
-            onClick={() => setViewMode('lista')}
-            className={`rounded-full px-4 py-2 text-xs font-bold transition-colors ${
-              viewMode === 'lista'
-                ? 'bg-[#88C125] text-white'
-                : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700'
-            }`}
+            onClick={() => void loadEvents()}
+            className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-2 text-xs font-bold text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
           >
-            Lista
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('calendario')}
-            className={`rounded-full px-4 py-2 text-xs font-bold transition-colors ${
-              viewMode === 'calendario'
-                ? 'bg-[#88C125] text-white'
-                : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700'
-            }`}
-          >
-            Calendário
+            <RefreshCcw className="h-4 w-4" />
+            Atualizar
           </button>
         </div>
-
-        <button
-          type="button"
-          onClick={() => void loadEvents()}
-          className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-2 text-xs font-bold text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
-        >
-          <RefreshCcw className="h-4 w-4" />
-          Atualizar
-        </button>
       </div>
 
       {lastUpdated && (

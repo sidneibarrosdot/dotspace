@@ -106,6 +106,74 @@ async function startServer() {
 
   app.use(express.json({ limit: '10mb' }));
 
+  // Cabeçalhos de Segurança (Security Headers)
+  app.use((req, res, next) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Frame-Options", "DENY");
+    res.setHeader("X-XSS-Protection", "1; mode=block");
+    res.setHeader("Referrer-Policy", "no-referrer-when-downgrade");
+    next();
+  });
+
+  // Limite de Requisições (Rate Limiter)
+  interface RateLimitInfo {
+    count: number;
+    resetTime: number;
+  }
+
+  const rateLimitStore = new Map<string, RateLimitInfo>();
+
+  // Limpeza periódica do cache de rate limit para liberar memória
+  setInterval(() => {
+    const now = Date.now();
+    for (const [ip, info] of rateLimitStore.entries()) {
+      if (info.resetTime < now) {
+        rateLimitStore.delete(ip);
+      }
+    }
+  }, 10 * 60 * 1000); // Executa a cada 10 minutos
+
+  const apiRateLimiter = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const ip = (req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || 'anonymous').split(',')[0].trim();
+    const now = Date.now();
+    const windowMs = 15 * 60 * 1000; // Janela de 15 minutos
+    const maxRequests = 100; // Limite de 100 requisições por IP por janela
+
+    let clientInfo = rateLimitStore.get(ip);
+
+    if (!clientInfo || clientInfo.resetTime < now) {
+      clientInfo = {
+        count: 1,
+        resetTime: now + windowMs
+      };
+      rateLimitStore.set(ip, clientInfo);
+      res.setHeader('X-RateLimit-Limit', maxRequests);
+      res.setHeader('X-RateLimit-Remaining', maxRequests - 1);
+      res.setHeader('X-RateLimit-Reset', Math.ceil(clientInfo.resetTime / 1000));
+      return next();
+    }
+
+    clientInfo.count++;
+    const remaining = Math.max(0, maxRequests - clientInfo.count);
+    res.setHeader('X-RateLimit-Limit', maxRequests);
+    res.setHeader('X-RateLimit-Remaining', remaining);
+    res.setHeader('X-RateLimit-Reset', Math.ceil(clientInfo.resetTime / 1000));
+
+    if (clientInfo.count > maxRequests) {
+      res.setHeader('Retry-After', Math.ceil((clientInfo.resetTime - now) / 1000));
+      return res.status(429).json({
+        error: "Too Many Requests",
+        message: "Limite de requisições excedido para esta API. Por favor, tente novamente mais tarde.",
+        retryAfterSeconds: Math.ceil((clientInfo.resetTime - now) / 1000)
+      });
+    }
+
+    next();
+  };
+
+  // Aplica o rate limiter em todas as rotas da API (/api/*)
+  app.use("/api", apiRateLimiter);
+
   // API Sync Endpoint
   app.post("/api/sync", async (req, res) => {
     const apiKey = req.headers['x-sync-api-key'];

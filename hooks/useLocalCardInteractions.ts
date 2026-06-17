@@ -17,6 +17,7 @@ export type CardInteractionAction =
   | 'favorite'
   | 'unfavorite'
   | 'share'
+  | 'slack_interest'
   | 'reply'
   | 'create';
 

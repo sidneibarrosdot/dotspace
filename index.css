@@ -2,6 +2,36 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+html,
+body,
+#root {
+  height: 100%;
+}
+
+html {
+  overflow: hidden;
+  scrollbar-gutter: stable;
+}
+
+body {
+  min-height: 100vh;
+  overflow: hidden;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y;
+}
+
+#root {
+  height: 100vh;
+  height: 100dvh;
+  min-height: 100vh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scroll-behavior: smooth;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+
 @theme {
   --font-sans: "Lato", sans-serif;
   --color-accent: #99cc00;
@@ -178,4 +208,24 @@ html:not(.dark) .bg-gray-50 {
 html:not(.dark) .bg-zinc-100,
 html:not(.dark) .bg-gray-100 {
   background-color: #f4f4f5 !important;
+}
+.development-lock-active [data-development-lock-content] {
+  position: relative;
+  isolation: isolate;
+  filter: blur(3px);
+  transition: filter 180ms ease;
+  user-select: none;
+}
+
+.development-lock-active [data-development-lock-content]::after {
+  position: absolute;
+  inset: 0;
+  z-index: 2147483647;
+  border-radius: 30px;
+  background: rgb(255 255 255 / 8%);
+  content: '';
+}
+
+.dark .development-lock-active [data-development-lock-content]::after {
+  background: rgb(24 24 27 / 8%);
 }

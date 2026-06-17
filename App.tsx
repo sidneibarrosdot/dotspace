@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Wrench } from 'lucide-react';
 import LoginScreen from './screens/LoginScreen';
 import AdminScreen from './screens/AdminScreen';
 import PortfolioScreen from './screens/PortfolioScreen';
@@ -10,16 +12,45 @@ import ErrorBoundary from './components/ErrorBoundary';
 import PostLoginLoader from './components/PostLoginLoader';
 import { auth, firebaseReady } from './firebase';
 import { logAudit } from './services/auditService';
+import { scrollToAppTop } from './utils/scrollHost';
 import { DEFAULT_APP_SETTINGS, subscribeToAppSettings, updateAppSettings } from './services/appSettingsService';
+import type { AppSettings, DevelopmentLockKey } from './types';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 
 export type View = 'portfolio' | 'processos' | 'treinamentos' | 'krs' | 'forum' | 'login' | 'admin';
 export type Theme = 'light' | 'dark';
 
 const LOCAL_SESSION_KEY = 'dot-space.local-session';
+const LOCAL_APP_SETTINGS_KEY = 'dot-space.app-settings';
 const ADMIN_ACCESS_KEY = 'dot-space.admin-access-granted';
 const ADMIN_ACCESS_PASSWORD = import.meta.env.VITE_ADMIN_ACCESS_PASSWORD?.trim() || 'dotspace-admin';
 const GCP_LOGIN_ENABLED = false;
+const DEVELOPMENT_VIEW_KEYS: Partial<Record<View, DevelopmentLockKey>> = {
+  processos: 'processos',
+  treinamentos: 'treinamentos',
+  krs: 'krs',
+  forum: 'forum',
+};
+
+const loadLocalAppSettings = (): AppSettings => {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(LOCAL_APP_SETTINGS_KEY) || '{}') as Partial<AppSettings>;
+    const validLocks = Array.isArray(saved.developmentLockedSections)
+      ? saved.developmentLockedSections.filter((key): key is DevelopmentLockKey =>
+          ['processos', 'treinamentos', 'krs', 'forum'].includes(key as DevelopmentLockKey),
+        )
+      : [];
+
+    return {
+      ...DEFAULT_APP_SETTINGS,
+      ...saved,
+      developmentLockedSections: validLocks,
+      environment: 'production',
+    };
+  } catch {
+    return DEFAULT_APP_SETTINGS;
+  }
+};
 
 const createLocalUser = (email: string, displayName: string): User =>
   ({
@@ -129,13 +160,23 @@ const AdminAccessGate: React.FC<{
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
-  const [currentView, setCurrentView] = useState<View>('login');
+  const [currentView, setCurrentView] = useState<View>(() => {
+    try {
+      const saved = window.localStorage.getItem('dot-space.current-view') as View | null;
+      if (saved && ['portfolio', 'processos', 'treinamentos', 'krs', 'forum', 'admin'].includes(saved)) {
+        return saved;
+      }
+    } catch {}
+    return 'login';
+  });
   const [authLoading, setAuthLoading] = useState(true);
   const [theme, setTheme] = useState<Theme>(() => {
     const savedTheme = localStorage.getItem('portfolio-theme') as Theme;
     return savedTheme || 'dark';
   });
-  const [appSettings, setAppSettings] = useState(DEFAULT_APP_SETTINGS);
+  const [appSettings, setAppSettings] = useState<AppSettings>(() =>
+    firebaseReady ? DEFAULT_APP_SETTINGS : loadLocalAppSettings(),
+  );
   const [postLoginLoading, setPostLoginLoading] = useState(false);
   const [postLoginExiting, setPostLoginExiting] = useState(false);
   const [adminAccessGranted, setAdminAccessGranted] = useState<boolean>(() => loadAdminAccessGranted());
@@ -154,7 +195,14 @@ const App: React.FC = () => {
       setPostLoginExiting(true);
       window.setTimeout(() => {
         setUser(nextUser);
-        setCurrentView('portfolio');
+        let targetView: View = 'portfolio';
+        try {
+          const savedView = window.localStorage.getItem('dot-space.current-view') as View | null;
+          if (savedView && savedView !== 'login') {
+            targetView = savedView;
+          }
+        } catch {}
+        setCurrentView(targetView);
         setPostLoginLoading(false);
         setPostLoginExiting(false);
       }, 700);
@@ -172,11 +220,28 @@ const App: React.FC = () => {
   }, [theme, currentView]);
 
   useEffect(() => {
+    try {
+      if (currentView && currentView !== 'login') {
+        window.localStorage.setItem('dot-space.current-view', currentView);
+      }
+    } catch {}
+  }, [currentView]);
+
+  useEffect(() => {
     if (!firebaseReady) {
       const savedUser = loadLocalSession();
       if (savedUser) {
         setUser(savedUser);
-        setCurrentView('portfolio');
+        try {
+          const savedView = window.localStorage.getItem('dot-space.current-view') as View | null;
+          if (savedView && savedView !== 'login') {
+            setCurrentView(savedView);
+          } else {
+            setCurrentView('portfolio');
+          }
+        } catch {
+          setCurrentView('portfolio');
+        }
       } else {
         setUser(null);
         setCurrentView('login');
@@ -194,7 +259,16 @@ const App: React.FC = () => {
           logAudit('LOGIN', `Usuário logou: ${currentUser.email}`, currentUser);
         } else {
           setUser(currentUser);
-          setCurrentView('portfolio');
+          try {
+            const savedView = window.localStorage.getItem('dot-space.current-view') as View | null;
+            if (savedView && savedView !== 'login') {
+              setCurrentView(savedView);
+            } else {
+              setCurrentView('portfolio');
+            }
+          } catch {
+            setCurrentView('portfolio');
+          }
         }
       } else {
         if (currentUser) {
@@ -212,7 +286,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (!firebaseReady || !user) {
-      setAppSettings(DEFAULT_APP_SETTINGS);
+      setAppSettings(firebaseReady ? DEFAULT_APP_SETTINGS : loadLocalAppSettings());
       return;
     }
 
@@ -223,35 +297,41 @@ const App: React.FC = () => {
     return unsubscribe;
   }, [user]);
 
-  const handleUpdateAppSettings = async (enabled: boolean) => {
+  const handleUpdateAppSettings = async (patch: Partial<AppSettings>) => {
     if (!firebaseReady) {
-      setAppSettings((prev) => ({
-        ...prev,
-        manualInteractionsEnabled: enabled,
-        environment: 'production',
-      }));
+      setAppSettings((prev) => {
+        const nextSettings = {
+          ...prev,
+          ...patch,
+          environment: 'production' as const,
+        };
+        window.localStorage.setItem(LOCAL_APP_SETTINGS_KEY, JSON.stringify(nextSettings));
+        return nextSettings;
+      });
       return;
     }
 
     const previousSettings = appSettings;
     setAppSettings((prev) => ({
       ...prev,
-      manualInteractionsEnabled: enabled,
+      ...patch,
       environment: 'production',
     }));
 
     try {
-      await updateAppSettings(
-        {
-          manualInteractionsEnabled: enabled,
-          environment: 'production',
-        },
-        user?.email || null
-      );
+      await updateAppSettings({ ...patch, environment: 'production' }, user?.email || null);
     } catch (error) {
       setAppSettings(previousSettings);
       throw error;
     }
+  };
+
+  const handleToggleDevelopmentLock = async (section: DevelopmentLockKey, locked: boolean) => {
+    const nextSections = locked
+      ? Array.from(new Set([...appSettings.developmentLockedSections, section]))
+      : appSettings.developmentLockedSections.filter((item) => item !== section);
+
+    await handleUpdateAppSettings({ developmentLockedSections: nextSections });
   };
 
   const handleLocalLogin = (email: string, displayName: string) => {
@@ -267,6 +347,7 @@ const App: React.FC = () => {
     if (!firebaseReady) {
       window.localStorage.removeItem(LOCAL_SESSION_KEY);
       window.localStorage.removeItem(ADMIN_ACCESS_KEY);
+      window.localStorage.removeItem('dot-space.current-view');
       loginTransitionPlayedRef.current = false;
       setUser(null);
       setAdminAccessGranted(false);
@@ -279,6 +360,7 @@ const App: React.FC = () => {
       .then(() => {
         loginTransitionPlayedRef.current = false;
         window.localStorage.removeItem(ADMIN_ACCESS_KEY);
+        window.localStorage.removeItem('dot-space.current-view');
         setAdminAccessGranted(false);
         setAdminAccessError(null);
         setCurrentView('login');
@@ -287,12 +369,12 @@ const App: React.FC = () => {
   };
 
   const navigateTo = (view: View) => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    scrollToAppTop();
     setCurrentView(view);
   };
 
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    scrollToAppTop();
   }, [currentView]);
 
   const renderView = () => {
@@ -364,8 +446,10 @@ const App: React.FC = () => {
               onLogout={handleLogout}
               onNavigate={() => navigateTo('portfolio')}
               theme={theme}
-              manualInteractionsEnabled={false}
-              onToggleManualInteractions={handleUpdateAppSettings}
+              manualInteractionsEnabled={appSettings.manualInteractionsEnabled}
+              onToggleManualInteractions={(enabled) => handleUpdateAppSettings({ manualInteractionsEnabled: enabled })}
+              developmentLockedSections={appSettings.developmentLockedSections}
+              onToggleDevelopmentLock={handleToggleDevelopmentLock}
               offlineMode
             />
           );
@@ -376,7 +460,12 @@ const App: React.FC = () => {
         case 'krs':
           return <KRsScreen {...commonProps} offlineMode />;
         case 'forum':
-          return <ForumScreen {...commonProps} offlineMode />;
+          return (
+            <ForumScreen
+              {...commonProps}
+              offlineMode
+            />
+          );
         case 'portfolio':
         default:
           return <PortfolioScreen {...commonProps} manualInteractionsEnabled={false} offlineMode />;
@@ -415,7 +504,9 @@ const App: React.FC = () => {
             onNavigate={() => navigateTo('portfolio')}
             theme={theme}
             manualInteractionsEnabled={appSettings.manualInteractionsEnabled}
-            onToggleManualInteractions={handleUpdateAppSettings}
+            onToggleManualInteractions={(enabled) => handleUpdateAppSettings({ manualInteractionsEnabled: enabled })}
+            developmentLockedSections={appSettings.developmentLockedSections}
+            onToggleDevelopmentLock={handleToggleDevelopmentLock}
           />
         );
       case 'processos':
@@ -425,18 +516,47 @@ const App: React.FC = () => {
       case 'krs':
         return <KRsScreen {...commonProps} offlineMode={!firebaseReady} />;
       case 'forum':
-        return <ForumScreen {...commonProps} offlineMode={!firebaseReady} />;
+        return (
+          <ForumScreen
+            {...commonProps}
+            offlineMode={!firebaseReady}
+          />
+        );
       case 'portfolio':
       default:
         return <PortfolioScreen {...commonProps} manualInteractionsEnabled={appSettings.manualInteractionsEnabled} />;
     }
   };
 
+  const currentDevelopmentSection = DEVELOPMENT_VIEW_KEYS[currentView];
+  const showDevelopmentNotice = Boolean(
+    currentDevelopmentSection
+      && appSettings.developmentLockedSections.includes(currentDevelopmentSection),
+  );
+
   return (
     <ErrorBoundary>
-      <div className="ui-motion flex min-h-screen flex-col bg-gray-100 font-sans text-zinc-800 transition-colors duration-300 dark:bg-zinc-900 dark:text-gray-100">
-        <div className="flex-grow">{renderView()}</div>
-      </div>
+      <>
+        <div className={`ui-motion flex min-h-screen flex-col bg-gray-100 font-sans text-zinc-800 transition-colors duration-300 dark:bg-zinc-900 dark:text-gray-100 ${
+          showDevelopmentNotice ? 'development-lock-active' : ''
+        }`}>
+          <div className="flex-grow">{renderView()}</div>
+        </div>
+        {showDevelopmentNotice && typeof document !== 'undefined' && createPortal(
+          <div className="pointer-events-none fixed inset-0 z-[100] flex items-center justify-center px-4">
+            <div className="pointer-events-auto w-full max-w-sm rounded-[30px] border border-zinc-200 bg-white/95 p-8 text-center shadow-2xl backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/95">
+              <span className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#88C125]/10 text-[#88C125] dark:bg-[#88C125]/20">
+                <Wrench className="h-6 w-6" />
+              </span>
+              <h3 className="text-xl font-black text-zinc-900 dark:text-white">Em Desenvolvimento</h3>
+              <p className="mt-2 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+                Esta seção está sendo preparada e estará disponível em breve.
+              </p>
+            </div>
+          </div>,
+          document.body,
+        )}
+      </>
     </ErrorBoundary>
   );
 };
