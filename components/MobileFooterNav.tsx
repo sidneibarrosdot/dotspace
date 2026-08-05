@@ -25,7 +25,7 @@ const MobileFooterNav: React.FC<MobileFooterNavProps> = ({ theme, items }) => {
             : 'border-white/10 bg-zinc-950/92 text-white'
         }`}
       >
-        <div className="grid grid-cols-5 gap-1 p-2 sm:gap-2 sm:p-3">
+        <div className="grid grid-flow-col auto-cols-fr gap-1 p-2 sm:gap-2 sm:p-3">
           {items.map((item) => {
             const Icon = item.icon;
             const active = Boolean(item.active);

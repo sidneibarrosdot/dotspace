@@ -12,10 +12,19 @@ interface LoginScreenProps {
 
 const LoginScreen: React.FC<LoginScreenProps> = ({ onLocalLogin, offlineMode, gcpLoginEnabled }) => {
   const [error, setError] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleAccess = () => {
+  const handleAccess = async () => {
     setError('');
-    onLocalLogin('acesso@example.com', 'Usuário Mock');
+    setLoading(true);
+    try {
+      const response = await fetch('/api/access', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) });
+      if (!response.ok) throw new Error('Senha inválida.');
+      onLocalLogin('acesso@example.com', 'Usuário DOT');
+    } catch (accessError) {
+      setError(accessError instanceof Error ? accessError.message : 'Não foi possível validar o acesso.');
+    } finally { setLoading(false); }
   };
 
   return (
@@ -76,12 +85,14 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLocalLogin, offlineMode, gc
               </p>
 
               <div className="mt-6 w-full space-y-3">
+                <input type="password" value={password} onChange={event => setPassword(event.target.value)} onKeyDown={event => event.key === 'Enter' && handleAccess()} placeholder="Senha de acesso" autoComplete="current-password" className="w-full rounded-2xl border border-white/14 bg-black/24 px-4 py-4 text-white outline-none placeholder:text-white/40 focus:border-[#88C125]" />
                 <button
                   type="button"
                   onClick={handleAccess}
+                  disabled={loading || !password}
                   className="flex w-full items-center justify-center gap-3 rounded-2xl border border-white/14 bg-black/24 px-4 py-4 text-base font-bold text-white shadow-[0_18px_32px_rgba(0,0,0,0.28)] backdrop-blur-2xl transition-transform duration-200 hover:-translate-y-0.5 hover:bg-white/8"
                 >
-                  Acessar plataforma
+                  {loading ? 'Validando...' : 'Acessar plataforma'}
                 </button>
 
                 <button

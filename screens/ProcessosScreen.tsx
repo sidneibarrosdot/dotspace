@@ -13,6 +13,7 @@ import { getScrollTop, scrollAppTo } from '../utils/scrollHost';
 import {
   ArrowRight,
   BookOpen,
+  Bot,
   ChevronDown,
   Eye,
   ExternalLink,
@@ -39,6 +40,7 @@ interface ProcessosScreenProps {
   isLoggedIn: boolean;
   onNavigateToPortfolio: () => void;
   onNavigateToTreinamentos: () => void;
+  onNavigateToAgentes: () => void;
   onNavigateToKRs: () => void;
   onNavigateToForum: () => void;
   onNavigateToAdmin: () => void;
@@ -153,6 +155,7 @@ const ProcessosScreen: React.FC<ProcessosScreenProps> = ({
   isLoggedIn,
   onNavigateToPortfolio,
   onNavigateToTreinamentos,
+  onNavigateToAgentes,
   onNavigateToKRs,
   onNavigateToForum,
   onNavigateToAdmin,
@@ -467,6 +470,7 @@ const ProcessosScreen: React.FC<ProcessosScreenProps> = ({
     { label: 'Processos', icon: LayoutGrid, active: true, action: undefined },
     { label: 'Treinamentos', icon: BookOpen, active: false, action: onNavigateToTreinamentos },
     { label: "Banco de OKR's", icon: BookMarked, active: false, action: onNavigateToKRs },
+    { label: 'Agentes de IA', icon: Bot, active: false, action: onNavigateToAgentes },
     { label: 'Fórum', icon: MessageSquareMore, active: false, action: onNavigateToForum },
   ];
 
@@ -541,14 +545,8 @@ const ProcessosScreen: React.FC<ProcessosScreenProps> = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  {summaryStats.map((item, index) => (
-                    <div key={item.label} className={heroStatClass}>
-                      <div className="mb-3 h-1.5 w-16 rounded-full bg-zinc-300/70 dark:bg-white/20" />
-                      <p className={`text-xs font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/50'}`}>{item.label}</p>
-                      <p className={`mt-2 text-3xl font-black ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>{item.value}</p>
-                    </div>
-                  ))}
+                <div className="min-h-[260px] overflow-hidden rounded-[28px]">
+                  <img src="https://picsum.photos/seed/dotspace-processos/900/700" alt="Processos" className="h-full w-full object-cover" />
                 </div>
               </div>
             </section>

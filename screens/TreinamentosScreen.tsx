@@ -11,6 +11,7 @@ import { FEEDBACK_COPY_ERROR, FEEDBACK_COPY_SUCCESS, FEEDBACK_TIMEOUT_ERROR, FEE
 import {
   ArrowRight,
   BookOpen,
+  Bot,
   ChevronDown,
   LayoutGrid,
   List,
@@ -33,13 +34,14 @@ import type { User } from 'firebase/auth';
 type SortMode = 'recentes' | 'a-z' | 'z-a';
 const PENDING_HOME_TARGET_KEY = 'dot-space.pending-home-target';
 const TRAINING_FEEDBACK_SLACK_URL =
-  import.meta.env.VITE_TRAINING_FEEDBACK_SLACK_URL || 'https://slack.com/app_redirect?channel=treinamentos-feedback';
+  import.meta.env.VITE_TRAINING_FEEDBACK_SLACK_URL || 'https://dot-digital-group.slack.com/archives/C0BNBD4S16D';
 
 interface TreinamentosScreenProps {
   user: User | null;
   isLoggedIn: boolean;
   onNavigateToPortfolio: () => void;
   onNavigateToProcessos: () => void;
+  onNavigateToAgentes: () => void;
   onNavigateToKRs: () => void;
   onNavigateToForum: () => void;
   onNavigateToAdmin: () => void;
@@ -68,6 +70,7 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
   isLoggedIn,
   onNavigateToPortfolio,
   onNavigateToProcessos,
+  onNavigateToAgentes,
   onNavigateToKRs,
   onNavigateToForum,
   onNavigateToAdmin,
@@ -100,13 +103,12 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
   const heroOverlayClass = isLightMode
     ? 'absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(247,142,67,0.12),transparent_36%),radial-gradient(circle_at_bottom_left,rgba(15,23,42,0.05),transparent_26%)]'
     : 'absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(247,142,67,0.12),transparent_36%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.05),transparent_26%)]';
-  const heroStatClass = isLightMode ? 'min-h-[108px] rounded-3xl border border-zinc-200 bg-white p-3.5 shadow-sm backdrop-blur-sm' : 'min-h-[108px] rounded-3xl border border-white/10 bg-white/8 p-3.5 backdrop-blur-sm';
   const filtersClass = isLightMode
     ? 'relative z-40 space-y-4 rounded-[30px] border border-zinc-200 bg-white p-4 shadow-[0_25px_60px_rgba(15,23,42,0.08)] sm:p-5'
     : 'relative z-40 space-y-4 rounded-[30px] border border-white/10 bg-[#151517] p-4 shadow-[0_25px_60px_rgba(0,0,0,0.2)] sm:p-5';
   const filtersButtonClass = isLightMode
-    ? 'inline-flex h-[52px] w-full items-center justify-between gap-3 rounded-full border border-zinc-200 bg-zinc-50 px-5 text-sm font-semibold text-zinc-800 transition-colors hover:bg-zinc-100 lg:w-48'
-    : 'inline-flex h-[52px] w-full items-center justify-between gap-3 rounded-full border border-white/10 bg-white/6 px-5 text-sm font-semibold text-white/90 transition-colors hover:bg-white/10 lg:w-48';
+    ? 'inline-flex h-[52px] w-full items-center justify-between gap-3 rounded-full border border-zinc-200 bg-zinc-50 px-5 text-sm font-semibold text-zinc-800 transition-colors hover:bg-zinc-100 xl:w-56'
+    : 'inline-flex h-[52px] w-full items-center justify-between gap-3 rounded-full border border-white/10 bg-white/6 px-5 text-sm font-semibold text-white/90 transition-colors hover:bg-white/10 xl:w-56';
   const filtersMenuClass = isLightMode
     ? 'absolute left-0 top-full z-[90] mt-2 w-full overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl'
     : 'absolute left-0 top-full z-[90] mt-2 w-full overflow-hidden rounded-2xl border border-white/10 bg-[#1b1b20] shadow-2xl';
@@ -301,18 +303,12 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
   const getTrainingFeedbackLabel = (item: PortfolioItem) =>
     `Abrir canal no Slack para reportar bug, erro ou sugestão. No Slack, marque @${getTrainingOwner(item)} e descreva o ponto encontrado em "${item.Projeto}".`;
 
-  const stats = [
-    { label: 'Treinamentos', value: treinamentosItems.length, accent: '#4CD07D' },
-    { label: 'Categorias', value: areas.length, accent: '#F78E43' },
-    { label: 'Últimos acessos', value: filteredItems.length, accent: '#EEC137' },
-    { label: 'Módulos', value: 8, accent: '#88C125' },
-  ];
-
   const menuItems = [
     { label: 'Home', icon: Home, active: false, action: onNavigateToPortfolio },
     { label: 'Processos', icon: LayoutGrid, active: false, action: onNavigateToProcessos },
     { label: 'Treinamentos', icon: BookOpen, active: true, action: undefined },
     { label: "Banco de OKR's", icon: BookMarked, active: false, action: onNavigateToKRs },
+    { label: 'Agentes de IA', icon: Bot, active: false, action: onNavigateToAgentes },
     { label: 'Fórum', icon: MessageSquareMore, active: false, action: onNavigateToForum },
   ];
 
@@ -386,14 +382,8 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  {stats.map((item) => (
-                    <div key={item.label} className={heroStatClass}>
-                      <div className="mb-3 h-1.5 w-16 rounded-full bg-zinc-300/70 dark:bg-white/20" />
-                      <p className={`text-xs font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/50'}`}>{item.label}</p>
-                      <p className={`mt-2 text-3xl font-black ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>{item.value}</p>
-                    </div>
-                  ))}
+                <div className="min-h-[260px] overflow-hidden rounded-[28px]">
+                  <img src="https://picsum.photos/seed/dotspace-treinamentos/900/700" alt="Treinamentos" className="h-full w-full object-cover" />
                 </div>
               </div>
             </section>
@@ -406,8 +396,8 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                 setOpenMenu(null);
               }}
             >
-              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto] lg:items-center">
-                <div className="lg:pr-4">
+              <div className="grid gap-4 xl:grid-cols-[minmax(320px,1fr)_224px_250px] xl:items-center">
+                <div className="xl:pr-4">
                   <SearchBar
                     searchTerm={searchTerm}
                     setSearchTerm={setSearchTerm}
@@ -600,33 +590,12 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                                   </h2>
                                 </div>
                                 <div className="flex shrink-0 flex-col items-end gap-1.5">
-                                  {item.versao && (
-                                    <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${isLightMode ? 'border-zinc-200 bg-zinc-50 text-zinc-600' : 'border-white/10 bg-white/6 text-white/65'}`}>
-                                      {item.versao}
-                                    </span>
-                                  )}
                                 </div>
                               </div>
 
-                              <p className={`mt-3 text-sm leading-6 ${isLightMode ? 'text-zinc-600' : 'text-white/72'}`}>
-                                {item.Assunto_geral}
+                              <p className={`mt-3 text-sm font-semibold ${isLightMode ? 'text-zinc-600' : 'text-white/72'}`}>
+                                {item.Assunto_especifico || item.Time}
                               </p>
-
-                              <div className={`mt-4 grid gap-2 rounded-2xl border px-3.5 py-3 text-xs ${isLightMode ? 'border-zinc-200 bg-zinc-50 text-zinc-600' : 'border-white/10 bg-white/5 text-white/62'}`}>
-                                <div className="flex items-center justify-between gap-3">
-                                  <span className="inline-flex items-center gap-1.5">
-                                    <Clock3 className="h-3.5 w-3.5 text-[#F78E43]" />
-                                    {item.duracao || 'Duração não informada'}
-                                  </span>
-                                </div>
-                                <div className="flex items-center justify-between gap-3">
-                                  <span className="inline-flex items-center gap-1.5">
-                                    <CalendarClock className="h-3.5 w-3.5 text-[#F78E43]" />
-                                    Revisão {formatShortDate(item.proximaRevisao)}
-                                  </span>
-                                  <span className="truncate font-semibold">{item.responsavel || 'ID não informado'}</span>
-                                </div>
-                              </div>
 
                             <div className={`mt-4 rounded-2xl border px-4 py-3 hidden ${isLightMode ? 'border-zinc-200 bg-zinc-50' : 'border-white/10 bg-white/5'}`}>
                                 <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>
@@ -746,20 +715,12 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                                       <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.Assunto_especifico || 'Não informado'}</p>
                                     </div>
                                     <div>
-                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Última atualização</p>
-                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.ultimaRevisao || item.Data || 'Sem data'}</p>
+                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Descrição</p>
+                                      <p className={`mt-1 text-sm ${isLightMode ? 'text-zinc-700' : 'text-white/78'}`}>{item.Assunto_geral}</p>
                                     </div>
                                     <div>
-                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Próxima revisão</p>
-                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.proximaRevisao || 'Sem revisão agendada'}</p>
-                                    </div>
-                                    <div>
-                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>ID usuário</p>
-                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.responsavel || 'Não informado'}</p>
-                                    </div>
-                                    <div>
-                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Recursos</p>
-                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.Mídias || item.Outros_recursos || 'Não informados'}</p>
+                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Referência do processo</p>
+                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.Mídias || 'Não informada'}</p>
                                     </div>
                                   </div>
                                 </div>
@@ -786,31 +747,15 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                                   <h2 className={`text-[0.98rem] font-black leading-tight sm:mt-1 sm:text-[1.08rem] ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>
                                     {item.Projeto}
                                   </h2>
-                                  <p className={`mt-1.5 line-clamp-2 text-xs leading-5 sm:mt-2 sm:text-sm sm:leading-6 ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>
-                                    {item.Assunto_geral}
+                                  <p className={`mt-1.5 text-xs font-semibold sm:mt-2 sm:text-sm ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>
+                                    {item.Assunto_especifico || item.Time}
                                   </p>
                                 </div>
                                 <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-1.5">
-                                  {item.versao && (
-                                    <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] sm:px-2.5 sm:py-1 sm:text-[10px] sm:tracking-[0.16em] ${isLightMode ? 'border-zinc-200 bg-zinc-50 text-zinc-600' : 'border-white/10 bg-white/6 text-white/65'}`}>
-                                      {item.versao}
-                                    </span>
-                                  )}
                                 </div>
                               </div>
                               <div className={`mt-2 flex flex-wrap items-center gap-1.5 text-[11px] sm:mt-3 sm:gap-2 sm:text-xs ${isLightMode ? 'text-zinc-500' : 'text-white/55'}`}>
-                                <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 sm:gap-1.5 sm:px-2.5 sm:py-1 ${isLightMode ? 'border-zinc-200 bg-zinc-50' : 'border-white/10 bg-white/5'}`}>
-                                  <Clock3 className="h-3.5 w-3.5 text-[#F78E43]" />
-                                  {item.duracao || 'Sem duração'}
-                                </span>
-                                <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 sm:gap-1.5 sm:px-2.5 sm:py-1 ${isLightMode ? 'border-zinc-200 bg-zinc-50' : 'border-white/10 bg-white/5'}`}>
-                                  <CalendarClock className="h-3.5 w-3.5 text-[#F78E43]" />
-                                  Revisão {formatShortDate(item.proximaRevisao)}
-                                </span>
-                                <span className={`hidden items-center gap-1.5 rounded-full border px-2.5 py-1 sm:inline-flex ${isLightMode ? 'border-zinc-200 bg-zinc-50' : 'border-white/10 bg-white/5'}`}>
-                                  <UserRound className="h-3.5 w-3.5 text-[#F78E43]" />
-                                  {item.responsavel || 'ID não informado'}
-                                </span>
+                                <span className={`inline-flex items-center rounded-full border px-2.5 py-1 ${isLightMode ? 'border-zinc-200 bg-zinc-50' : 'border-white/10 bg-white/5'}`}>{item.Time}</span>
                               </div>
                               <div className={`mt-2 hidden flex-wrap items-center gap-2 text-xs sm:flex ${isLightMode ? 'text-zinc-500' : 'text-white/55'}`}>
                                 <button
@@ -899,35 +844,19 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                                   <div className="grid gap-3 sm:grid-cols-2">
                                     <div>
                                       <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Categoria</p>
-                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.Cliente || 'Treinamento'}</p>
+                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.Time}</p>
                                     </div>
                                     <div>
-                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Data</p>
-                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.Data || 'Sem data'}</p>
+                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Tema</p>
+                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.Assunto_especifico}</p>
                                     </div>
-                                    <div>
-                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Versão</p>
-                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.versao || 'Sem versão'}</p>
+                                    <div className="sm:col-span-2">
+                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Descrição</p>
+                                      <p className={`mt-1 text-sm ${isLightMode ? 'text-zinc-700' : 'text-white/78'}`}>{item.Assunto_geral}</p>
                                     </div>
-                                    <div>
-                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Status do conteúdo</p>
-                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.statusConteudo || 'Sem status'}</p>
-                                    </div>
-                                    <div>
-                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Público-alvo</p>
-                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.Publico_alvo || 'Não informado'}</p>
-                                    </div>
-                                    <div>
-                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Metodologia</p>
-                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.Metodologias || 'Não informada'}</p>
-                                    </div>
-                                    <div>
-                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Próxima revisão</p>
-                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.proximaRevisao || 'Sem revisão agendada'}</p>
-                                    </div>
-                                    <div>
-                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>ID usuário</p>
-                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.responsavel || 'Não informado'}</p>
+                                    <div className="sm:col-span-2">
+                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Referência do processo</p>
+                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.Mídias || 'Não informada'}</p>
                                     </div>
                                   </div>
                                 </div>

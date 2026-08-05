@@ -6,6 +6,7 @@ import AdminScreen from './screens/AdminScreen';
 import PortfolioScreen from './screens/PortfolioScreen';
 import ProcessosScreen from './screens/ProcessosScreen';
 import TreinamentosScreen from './screens/TreinamentosScreen';
+import AgentesScreen from './screens/AgentesScreen';
 import KRsScreen from './screens/KRsScreen';
 import ForumScreen from './screens/ForumScreen';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -14,10 +15,10 @@ import { auth, firebaseReady } from './firebase';
 import { logAudit } from './services/auditService';
 import { scrollToAppTop } from './utils/scrollHost';
 import { DEFAULT_APP_SETTINGS, subscribeToAppSettings, updateAppSettings } from './services/appSettingsService';
-import type { AppSettings, DevelopmentLockKey } from './types';
+import type { AppSettings, DevelopmentLockKey, HomeSectionKey } from './types';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 
-export type View = 'portfolio' | 'processos' | 'treinamentos' | 'krs' | 'forum' | 'login' | 'admin';
+export type View = 'portfolio' | 'processos' | 'treinamentos' | 'agentes' | 'krs' | 'forum' | 'login' | 'admin';
 export type Theme = 'light' | 'dark';
 
 const LOCAL_SESSION_KEY = 'dot-space.local-session';
@@ -40,11 +41,17 @@ const loadLocalAppSettings = (): AppSettings => {
           ['processos', 'treinamentos', 'krs', 'forum'].includes(key as DevelopmentLockKey),
         )
       : [];
+    const hiddenHomeSections = Array.isArray(saved.hiddenHomeSections)
+      ? saved.hiddenHomeSections.filter((key): key is HomeSectionKey =>
+          ['hero', 'updates', 'featured', 'aiHub', 'calendar'].includes(key as HomeSectionKey),
+        )
+      : [];
 
     return {
       ...DEFAULT_APP_SETTINGS,
       ...saved,
-      developmentLockedSections: validLocks,
+      developmentLockedSections: Array.from(new Set([...validLocks, 'forum'])),
+      hiddenHomeSections,
       environment: 'production',
     };
   } catch {
@@ -92,7 +99,7 @@ const AdminAccessGate: React.FC<{
   const [password, setPassword] = useState('');
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-zinc-900">
+    <div className={`min-h-screen ${theme === 'dark' ? 'bg-[#0d0e10]' : 'bg-gray-100'}`}>
       <main className="mx-auto flex min-h-screen w-full max-w-7xl items-center justify-center px-4 py-10 sm:px-6 lg:px-8">
         <section className="w-full max-w-md rounded-3xl border border-gray-200 bg-white p-8 shadow-xl dark:border-zinc-700/50 dark:bg-zinc-800">
           <div className="flex items-center justify-between gap-4">
@@ -334,6 +341,14 @@ const App: React.FC = () => {
     await handleUpdateAppSettings({ developmentLockedSections: nextSections });
   };
 
+  const handleToggleHomeSection = async (section: HomeSectionKey, visible: boolean) => {
+    const hiddenHomeSections = visible
+      ? appSettings.hiddenHomeSections.filter((item) => item !== section)
+      : Array.from(new Set([...appSettings.hiddenHomeSections, section]));
+
+    await handleUpdateAppSettings({ hiddenHomeSections });
+  };
+
   const handleLocalLogin = (email: string, displayName: string) => {
     const nextUser = createLocalUser(email, displayName);
     window.localStorage.setItem(
@@ -404,6 +419,7 @@ const App: React.FC = () => {
       onNavigateToPortfolio: () => navigateTo('portfolio' as View),
       onNavigateToProcessos: () => navigateTo('processos' as View),
       onNavigateToTreinamentos: () => navigateTo('treinamentos' as View),
+      onNavigateToAgentes: () => navigateTo('agentes' as View),
       onNavigateToKRs: () => navigateTo('krs' as View),
       onNavigateToForum: () => navigateTo('forum' as View),
       onNavigateToAdmin: () => navigateTo('admin' as View),
@@ -450,6 +466,8 @@ const App: React.FC = () => {
               onToggleManualInteractions={(enabled) => handleUpdateAppSettings({ manualInteractionsEnabled: enabled })}
               developmentLockedSections={appSettings.developmentLockedSections}
               onToggleDevelopmentLock={handleToggleDevelopmentLock}
+              hiddenHomeSections={appSettings.hiddenHomeSections}
+              onToggleHomeSection={handleToggleHomeSection}
               offlineMode
             />
           );
@@ -457,6 +475,8 @@ const App: React.FC = () => {
           return <ProcessosScreen {...commonProps} offlineMode />;
         case 'treinamentos':
           return <TreinamentosScreen {...commonProps} offlineMode />;
+        case 'agentes':
+          return <AgentesScreen {...commonProps} offlineMode />;
         case 'krs':
           return <KRsScreen {...commonProps} offlineMode />;
         case 'forum':
@@ -468,7 +488,7 @@ const App: React.FC = () => {
           );
         case 'portfolio':
         default:
-          return <PortfolioScreen {...commonProps} manualInteractionsEnabled={false} offlineMode />;
+          return <PortfolioScreen {...commonProps} manualInteractionsEnabled={false} hiddenHomeSections={appSettings.hiddenHomeSections} offlineMode />;
       }
     }
 
@@ -507,12 +527,16 @@ const App: React.FC = () => {
             onToggleManualInteractions={(enabled) => handleUpdateAppSettings({ manualInteractionsEnabled: enabled })}
             developmentLockedSections={appSettings.developmentLockedSections}
             onToggleDevelopmentLock={handleToggleDevelopmentLock}
+            hiddenHomeSections={appSettings.hiddenHomeSections}
+            onToggleHomeSection={handleToggleHomeSection}
           />
         );
       case 'processos':
         return <ProcessosScreen {...commonProps} offlineMode={!firebaseReady} />;
       case 'treinamentos':
         return <TreinamentosScreen {...commonProps} offlineMode={!firebaseReady} />;
+      case 'agentes':
+        return <AgentesScreen {...commonProps} offlineMode={!firebaseReady} />;
       case 'krs':
         return <KRsScreen {...commonProps} offlineMode={!firebaseReady} />;
       case 'forum':
@@ -524,7 +548,7 @@ const App: React.FC = () => {
         );
       case 'portfolio':
       default:
-        return <PortfolioScreen {...commonProps} manualInteractionsEnabled={appSettings.manualInteractionsEnabled} />;
+        return <PortfolioScreen {...commonProps} manualInteractionsEnabled={appSettings.manualInteractionsEnabled} hiddenHomeSections={appSettings.hiddenHomeSections} />;
     }
   };
 
@@ -537,7 +561,9 @@ const App: React.FC = () => {
   return (
     <ErrorBoundary>
       <>
-        <div className={`ui-motion flex min-h-screen flex-col bg-gray-100 font-sans text-zinc-800 transition-colors duration-300 dark:bg-zinc-900 dark:text-gray-100 ${
+        <div className={`ui-motion flex min-h-screen flex-col font-sans transition-colors duration-300 ${
+          theme === 'dark' ? 'bg-[#0d0e10] text-gray-100' : 'bg-gray-100 text-zinc-800'
+        } ${
           showDevelopmentNotice ? 'development-lock-active' : ''
         }`}>
           <div className="flex-grow">{renderView()}</div>
