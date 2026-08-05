@@ -166,7 +166,7 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
     return sorted;
   }, [searchTerm, areaFilter, sortMode, showFavoritesOnly, getState, interactions]);
 
-  const pageSize = 4;
+  const pageSize = 6;
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
   const paginatedItems = useMemo(
     () => filteredItems.slice((currentPage - 1) * pageSize, currentPage * pageSize),
