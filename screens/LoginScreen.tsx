@@ -4,6 +4,13 @@ import DotLogo from '../components/DotLogo';
 import LoginBackdrop from '../components/LoginBackdrop';
 import planetsDark from '../assets/planetas-dark.svg';
 
+const STATIC_ACCESS_HASH = '2c2e93942f29295ad846bc75459bef1f8f3180b4ac26721642342412fb8230f3';
+
+const hashPassword = async (value: string) => {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+};
+
 interface LoginScreenProps {
   onLocalLogin: (email: string, displayName: string) => void;
   offlineMode: boolean;
@@ -19,6 +26,11 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLocalLogin, offlineMode, gc
     setError('');
     setLoading(true);
     try {
+      if (window.location.hostname.endsWith('github.io')) {
+        if (await hashPassword(password) !== STATIC_ACCESS_HASH) throw new Error('Senha inválida.');
+        onLocalLogin('acesso@example.com', 'Usuário DOT');
+        return;
+      }
       const response = await fetch('/api/access', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) });
       if (!response.ok) throw new Error('Senha inválida.');
       onLocalLogin('acesso@example.com', 'Usuário DOT');
