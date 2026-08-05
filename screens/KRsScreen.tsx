@@ -13,6 +13,7 @@ import {
   ArrowRight,
   BookMarked,
   BookOpen,
+  Bot,
   ChevronDown,
   Eye,
   ExternalLink,
@@ -41,6 +42,7 @@ interface KRsScreenProps {
   onNavigateToPortfolio: () => void;
   onNavigateToProcessos: () => void;
   onNavigateToTreinamentos: () => void;
+  onNavigateToAgentes: () => void;
   onNavigateToForum: () => void;
   onNavigateToAdmin: () => void;
   onLogout: () => void;
@@ -284,6 +286,7 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
   onNavigateToPortfolio,
   onNavigateToProcessos,
   onNavigateToTreinamentos,
+  onNavigateToAgentes,
   onNavigateToForum,
   onNavigateToAdmin,
   onLogout,
@@ -662,6 +665,7 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
     { label: 'Processos', icon: LayoutGrid, active: false, action: onNavigateToProcessos },
     { label: 'Treinamentos', icon: BookOpen, active: false, action: onNavigateToTreinamentos },
     { label: "Banco de OKR's", icon: BookMarked, active: true, action: undefined },
+    { label: 'Agentes de IA', icon: Bot, active: false, action: onNavigateToAgentes },
     { label: 'Fórum', icon: MessageSquareMore, active: false, action: onNavigateToForum },
   ];
 
@@ -735,14 +739,8 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  {summaryStats.map((item) => (
-                    <div key={item.label} className={heroStatClass}>
-                      <div className="mb-3 h-1.5 w-16 rounded-full bg-zinc-300/70 dark:bg-white/20" />
-                      <p className={`text-xs font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/50'}`}>{item.label}</p>
-                      <p className={`mt-2 text-3xl font-black ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>{item.value}</p>
-                    </div>
-                  ))}
+                <div className="min-h-[260px] overflow-hidden rounded-[28px]">
+                  <img src="https://picsum.photos/seed/dotspace-okrs/900/700" alt="Banco de OKR's" className="h-full w-full object-cover" />
                 </div>
               </div>
             </section>

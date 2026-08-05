@@ -14,6 +14,7 @@ import { scrollToAppTop } from '../utils/scrollHost';
 import {
   ArrowRight,
   BookOpen,
+  Bot,
   ChevronDown,
   ChevronLeft,
   Clock3,
@@ -55,6 +56,7 @@ interface ForumScreenProps {
   onNavigateToProcessos: () => void;
   onNavigateToTreinamentos: () => void;
   onNavigateToKRs: () => void;
+  onNavigateToAgentes: () => void;
   onNavigateToAdmin: () => void;
   onLogout: () => void;
   theme: 'light' | 'dark';
@@ -135,6 +137,7 @@ const ForumScreen: React.FC<ForumScreenProps> = ({
   onNavigateToProcessos,
   onNavigateToTreinamentos,
   onNavigateToKRs,
+  onNavigateToAgentes,
   onNavigateToAdmin,
   onLogout,
   theme,
@@ -504,6 +507,7 @@ const ForumScreen: React.FC<ForumScreenProps> = ({
     { label: 'Processos', icon: LayoutGrid, action: onNavigateToProcessos },
     { label: 'Treinamentos', icon: BookOpen, action: onNavigateToTreinamentos },
     { label: "Banco de OKR's", icon: BookMarked, action: onNavigateToKRs },
+    { label: 'Agentes de IA', icon: Bot, action: onNavigateToAgentes },
     { label: 'Fórum', icon: MessageSquareMore, action: undefined, active: true },
   ];
 

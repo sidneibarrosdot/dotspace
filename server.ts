@@ -1,5 +1,6 @@
 import express from "express";
-import { createServer as createViteServer } from "vite";
+import { createServer as createViteServer, loadEnv } from "vite";
+import crypto from "crypto";
 import path from "path";
 import { fileURLToPath } from "url";
 import admin from "firebase-admin";
@@ -102,7 +103,8 @@ const commitInChunks = async (
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const serverEnv = loadEnv(process.env.NODE_ENV || 'development', process.cwd(), '');
+  const PORT = process.env.PORT ? Number(process.env.PORT) : 3002;
 
   app.use(express.json({ limit: '10mb' }));
 
@@ -173,6 +175,16 @@ async function startServer() {
 
   // Aplica o rate limiter em todas as rotas da API (/api/*)
   app.use("/api", apiRateLimiter);
+
+  app.post('/api/access', (req, res) => {
+    const expected = process.env.APP_ACCESS_PASSWORD || serverEnv.APP_ACCESS_PASSWORD;
+    const received = typeof req.body?.password === 'string' ? req.body.password : '';
+    if (!expected) return res.status(503).json({ error: 'Senha de acesso não configurada.' });
+    const expectedHash = crypto.createHash('sha256').update(expected).digest();
+    const receivedHash = crypto.createHash('sha256').update(received).digest();
+    if (!crypto.timingSafeEqual(expectedHash, receivedHash)) return res.status(401).json({ error: 'Senha inválida.' });
+    return res.json({ ok: true });
+  });
 
   // API Sync Endpoint
   app.post("/api/sync", async (req, res) => {

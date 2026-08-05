@@ -105,10 +105,12 @@ export interface Like {
 
 export type AppEnvironment = 'production' | 'test';
 export type DevelopmentLockKey = 'processos' | 'treinamentos' | 'krs' | 'forum';
+export type HomeSectionKey = 'hero' | 'updates' | 'featured' | 'aiHub' | 'calendar';
 
 export interface AppSettings {
   manualInteractionsEnabled: boolean;
   developmentLockedSections: DevelopmentLockKey[];
+  hiddenHomeSections: HomeSectionKey[];
   environment: AppEnvironment;
   updatedAt?: string;
   updatedBy?: string;

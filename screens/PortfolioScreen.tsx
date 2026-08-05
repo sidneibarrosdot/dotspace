@@ -5,6 +5,7 @@ import MobileFooterNav from '../components/MobileFooterNav';
 import PortfolioCard from '../components/PortfolioCard';
 import PortfolioModal from '../components/PortfolioModal';
 import CalendarAgenda from '../components/CalendarAgenda';
+import OrgChart from '../components/OrgChart';
 import {
   FEEDBACK_COPY_ERROR,
   FEEDBACK_COPY_SUCCESS,
@@ -20,6 +21,7 @@ import {
   Home,
   LayoutGrid,
   BookOpen,
+  Bot,
   BookMarked,
   MessageSquareMore,
   PencilLine,
@@ -30,7 +32,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import type { PortfolioItem } from '../types';
+import type { HomeSectionKey, PortfolioItem } from '../types';
 import { processosItems } from '../data/processosItems';
 import { krsItems } from '../data/krsItems';
 import { treinamentosItems } from '../data/treinamentosItems';
@@ -350,12 +352,14 @@ interface PortfolioScreenProps {
     onNavigateToAdmin: () => void;
     onNavigateToProcessos: () => void;
     onNavigateToTreinamentos: () => void;
+    onNavigateToAgentes: () => void;
     onNavigateToKRs: () => void;
     onNavigateToForum: () => void;
     onLogout: () => void;
     theme: 'light' | 'dark';
     toggleTheme: () => void;
     manualInteractionsEnabled: boolean;
+    hiddenHomeSections: HomeSectionKey[];
     offlineMode?: boolean;
 }
 
@@ -383,8 +387,9 @@ const normalizeCount = (value: unknown) => {
   return Number.isFinite(nextValue) && nextValue > 0 ? nextValue : 0;
 };
 
-const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onNavigateToAdmin, onNavigateToProcessos, onNavigateToTreinamentos, onNavigateToKRs, onNavigateToForum, onLogout, theme, toggleTheme, manualInteractionsEnabled, offlineMode = false }) => {
+const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onNavigateToAdmin, onNavigateToProcessos, onNavigateToTreinamentos, onNavigateToAgentes, onNavigateToKRs, onNavigateToForum, onLogout, theme, toggleTheme, manualInteractionsEnabled, hiddenHomeSections, offlineMode = false }) => {
   const isLightMode = theme === 'light';
+  const isHomeSectionVisible = (section: HomeSectionKey) => !hiddenHomeSections.includes(section);
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>(offlineMode ? localPortfolioItems : []);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -1424,7 +1429,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
   }, [searchTerm, activeFilters, sharedProjectIds]);
 
   return (
-    <div className={`bg-gray-100 dark:bg-zinc-900 min-h-screen transition-colors duration-300`}>
+    <div className={`min-h-screen transition-colors duration-300 ${isLightMode ? 'bg-gray-100' : 'bg-[#0d0e10]'}`}>
       <Header
         theme={theme}
         toggleTheme={toggleTheme}
@@ -1443,7 +1448,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
               className={`sticky top-24 rounded-[30px] p-6 shadow-[0_30px_80px_rgba(0,0,0,0.28)] ${
                 isLightMode
                   ? 'border border-zinc-200 bg-white text-zinc-900 shadow-[0_30px_80px_rgba(15,23,42,0.08)]'
-                  : 'border border-white/10 bg-[#151517] text-white'
+                  : 'border border-white/15 bg-[#191a1d] text-white'
               }`}
             >
               <div className="space-y-2">
@@ -1452,6 +1457,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
                   { label: 'Processos', icon: LayoutGrid, action: onNavigateToProcessos, active: false },
                   { label: 'Treinamentos', icon: BookOpen, action: onNavigateToTreinamentos, active: false },
                   { label: "Banco de OKR's", icon: BookMarked, action: onNavigateToKRs, active: false },
+                  { label: 'Agentes de IA', icon: Bot, action: onNavigateToAgentes, active: false },
                   { label: 'Fórum', icon: MessageSquareMore, action: onNavigateToForum, active: false },
                 ].map((item) => {
                   const Icon = item.icon;
@@ -1481,11 +1487,12 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
           </aside>
 
           <div className="space-y-6">
+            {isHomeSectionVisible('hero') && (
             <section
               className={`relative overflow-hidden rounded-[34px] px-6 py-8 shadow-[0_30px_90px_rgba(0,0,0,0.12)] sm:px-8 sm:py-10 ${
                 isLightMode
                   ? 'border border-zinc-200 bg-gradient-to-br from-white via-[#fbfcf7] to-[#eef4de] text-zinc-900'
-                  : 'border border-white/10 bg-gradient-to-br from-[#1d1d22] via-[#232329] to-[#111112] text-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]'
+                  : 'border border-white/15 bg-gradient-to-br from-[#222329] via-[#27282e] to-[#151618] text-white shadow-[0_30px_90px_rgba(0,0,0,0.32)]'
               }`}
             >
               <div
@@ -1540,9 +1547,20 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
                 </div>
               </div>
             </section>
+            )}
 
-            <section className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-              <article className="rounded-[30px] border border-zinc-200/80 bg-white p-6 shadow-[0_25px_60px_rgba(15,23,42,0.08)] dark:border-zinc-800 dark:bg-zinc-900">
+            {(isHomeSectionVisible('updates') || isHomeSectionVisible('featured')) && (
+            <section
+              className={`grid w-full gap-6 ${
+                isHomeSectionVisible('updates') && isHomeSectionVisible('featured')
+                  ? 'lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]'
+                  : isHomeSectionVisible('featured')
+                    ? 'lg:grid-cols-1'
+                    : ''
+              }`}
+            >
+              {isHomeSectionVisible('updates') && (
+              <article className="rounded-[30px] border border-zinc-200/80 bg-white p-6 shadow-[0_25px_60px_rgba(15,23,42,0.08)] dark:border-zinc-700/70 dark:bg-[#1b1c20] dark:shadow-[0_25px_60px_rgba(0,0,0,0.3)]">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[#88c125]">Novidades</p>
@@ -1581,9 +1599,11 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
                   ))}
                 </div>
               </article>
+              )}
 
-              <article className="overflow-hidden rounded-[30px] border border-zinc-200/80 bg-white shadow-[0_25px_60px_rgba(15,23,42,0.08)] dark:border-zinc-800 dark:bg-zinc-900">
-                <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-5 dark:border-zinc-800">
+              {isHomeSectionVisible('featured') && (
+              <article className="overflow-hidden rounded-[30px] border border-zinc-200/80 bg-white shadow-[0_25px_60px_rgba(15,23,42,0.08)] dark:border-zinc-700/70 dark:bg-[#1b1c20] dark:shadow-[0_25px_60px_rgba(0,0,0,0.3)]">
+                <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-5 dark:border-zinc-700/70">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[#88c125]">Continuar acessando</p>
                     <h2 className="mt-2 text-xl font-black tracking-tight text-zinc-900 dark:text-white">Destaque da casa</h2>
@@ -1593,12 +1613,12 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
                   </span>
                 </div>
                 {featuredItem ? (
-                  <div className="flex flex-col">
-                    <div className="relative h-[250px] bg-zinc-800 sm:h-[260px]">
+                  <div className={`flex flex-col ${!isHomeSectionVisible('updates') ? 'lg:grid lg:grid-cols-[minmax(0,0.85fr)_minmax(360px,1.15fr)]' : ''}`}>
+                    <div className={`relative h-[250px] bg-zinc-800 sm:h-[260px] ${!isHomeSectionVisible('updates') ? 'lg:h-auto' : ''}`}>
                       <img
                         src={featuredItem.Imagem_capa}
                         alt={featuredItem.Projeto}
-                        className="h-full w-full object-cover"
+                        className={`h-full w-full object-cover ${!isHomeSectionVisible('updates') ? 'lg:absolute lg:inset-0' : ''}`}
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
                       <div className={`absolute left-4 top-4 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] ${getHomeFeedAccent(featuredItem)}`}>
@@ -1634,10 +1654,13 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
                   </div>
                 ) : null}
               </article>
+              )}
             </section>
+            )}
 
+            {isHomeSectionVisible('aiHub') && (
             <section className="grid gap-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(300px,0.95fr)]">
-              <article className="overflow-hidden rounded-[30px] border border-zinc-200/80 bg-white shadow-[0_25px_60px_rgba(15,23,42,0.08)] dark:border-zinc-800 dark:bg-zinc-900 lg:col-span-2">
+              <article className="overflow-hidden rounded-[30px] border border-zinc-200/80 bg-white shadow-[0_25px_60px_rgba(15,23,42,0.08)] dark:border-zinc-700/70 dark:bg-[#1b1c20] dark:shadow-[0_25px_60px_rgba(0,0,0,0.3)] lg:col-span-2">
                 <div className="grid gap-0 lg:grid-cols-[minmax(0,1.15fr)_minmax(300px,0.85fr)]">
                   <div className="relative overflow-hidden px-6 py-7 sm:px-8 sm:py-8">
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(76,208,125,0.18),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(247,142,67,0.16),transparent_26%)]" />
@@ -1691,10 +1714,14 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
                 </div>
               </article>
             </section>
+            )}
 
+            {isHomeSectionVisible('calendar') && (
             <section className="grid gap-6">
               <CalendarAgenda />
             </section>
+            )}
+            <OrgChart theme={theme} />
 
           </div>
         </section>
@@ -1707,6 +1734,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
           { label: 'Processos', icon: LayoutGrid, onClick: onNavigateToProcessos },
           { label: 'Treinamentos', icon: BookOpen, onClick: onNavigateToTreinamentos },
           { label: "Banco de OKR's", icon: BookMarked, onClick: onNavigateToKRs },
+          { label: 'Agentes de IA', icon: Bot, onClick: onNavigateToAgentes },
           { label: 'Fórum', icon: MessageSquareMore, onClick: onNavigateToForum },
         ]}
       />

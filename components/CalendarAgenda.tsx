@@ -200,7 +200,7 @@ const CalendarAgenda: React.FC = () => {
 
   const selectedEvents = eventsByDay[selectedDay] || [];
   return (
-    <article className="rounded-[30px] border border-zinc-200/80 bg-white p-6 shadow-[0_25px_60px_rgba(15,23,42,0.08)] dark:border-zinc-800 dark:bg-zinc-900">
+    <article className="rounded-[30px] border border-zinc-200/80 bg-white p-6 shadow-[0_25px_60px_rgba(15,23,42,0.08)] dark:border-zinc-700/70 dark:bg-[#1b1c20] dark:shadow-[0_25px_60px_rgba(0,0,0,0.3)]">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-[280px] flex-1">
           <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[#88C125]">Agenda</p>
@@ -242,7 +242,7 @@ const CalendarAgenda: React.FC = () => {
           </div>
 
           <a
-            href={import.meta.env.VITE_SUGGEST_TRAINING_SLACK_URL || 'https://slack.com/app_redirect?channel=treinamentos-sugestoes'}
+            href={import.meta.env.VITE_SUGGEST_TRAINING_SLACK_URL || 'https://dot-digital-group.slack.com/archives/C0BNBD4S16D'}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-2 text-xs font-bold text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
@@ -284,7 +284,7 @@ const CalendarAgenda: React.FC = () => {
             events.map((event, index) => {
               const color = accentColors[index % accentColors.length];
               return (
-                <div key={event.id} className="rounded-2xl border border-zinc-200 bg-zinc-50 p-2.5 dark:border-zinc-800 dark:bg-zinc-800/70">
+                <div key={event.id} className="rounded-2xl border border-zinc-200 bg-zinc-50 p-2.5 dark:border-zinc-700/60 dark:bg-zinc-800/80">
                   <div className="flex items-start gap-2">
                     <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />
                     <div className="min-w-0 flex-1">
