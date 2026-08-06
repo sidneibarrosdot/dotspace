@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import Header from '../components/Header';
 import MobileFooterNav from '../components/MobileFooterNav';
 import Pagination from '../components/Pagination';
 import PageFilterActions from '../components/PageFilterActions';
@@ -32,6 +31,7 @@ import {
   Workflow
 } from 'lucide-react';
 import type { User } from 'firebase/auth';
+import aiHeroImage from '../assets/hero-agentes-ia.png';
 
 type SortMode = 'recentes' | 'a-z' | 'z-a';
 
@@ -91,8 +91,6 @@ const AgentesScreen: React.FC<AgentesScreenProps> = ({
   const heroOverlayClass = isLightMode
     ? 'absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.12),transparent_36%),radial-gradient(circle_at_bottom_left,rgba(15,23,42,0.05),transparent_26%)]'
     : 'absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.12),transparent_36%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.05),transparent_26%)]';
-  const heroStatClass = isLightMode ? 'min-h-[108px] rounded-3xl border border-zinc-200 bg-white p-3.5 shadow-sm backdrop-blur-sm' : 'min-h-[108px] rounded-3xl border border-white/10 bg-white/8 p-3.5 backdrop-blur-sm';
-  
   const filtersClass = isLightMode
     ? 'relative z-40 space-y-4 rounded-[30px] border border-zinc-200 bg-white p-4 shadow-[0_25px_60px_rgba(15,23,42,0.08)] sm:p-5'
     : 'relative z-40 space-y-4 rounded-[30px] border border-white/10 bg-[#151517] p-4 shadow-[0_25px_60px_rgba(0,0,0,0.2)] sm:p-5';
@@ -232,26 +230,8 @@ const AgentesScreen: React.FC<AgentesScreenProps> = ({
     onClick: item.action
   }));
 
-  const stats = [
-    { label: 'Total de Agentes', value: agentesItems.length, accent: '#3B82F6' },
-    { label: 'Prompts', value: agentesItems.filter(i => i.categoria === 'Prompt').length, accent: '#8B5CF6' },
-    { label: 'Assistentes', value: agentesItems.filter(i => i.categoria === 'Agente').length, accent: '#10B981' },
-    { label: 'Áreas ativas', value: areas.length, accent: '#F59E0B' },
-  ];
-
   return (
     <div className={pageClass}>
-      <Header
-        theme={theme}
-        toggleTheme={toggleTheme}
-        isLoggedIn={isLoggedIn}
-        sessionActive={Boolean(user)}
-        canManageAdmin={isLoggedIn}
-        offlineMode={offlineMode}
-        onNavigateToAdmin={onNavigateToAdmin}
-        onLogout={onLogout}
-      />
-
       <main className="container mx-auto px-4 py-6 pb-44 sm:px-6 sm:py-8 sm:pb-8 lg:px-8">
         <section className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
           <aside className="hidden xl:block">
@@ -285,8 +265,9 @@ const AgentesScreen: React.FC<AgentesScreenProps> = ({
           <div className="space-y-6">
             {/* Hero Section */}
             <section className={heroClass}>
+              <div className="absolute inset-x-0 top-0 h-2 bg-[#3B82F6]" />
               <div className={heroOverlayClass} />
-              <div className="relative z-10 grid gap-6 md:grid-cols-[1fr_auto] md:items-center">
+              <div className="relative z-10 grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(320px,0.72fr)] md:items-center">
                 <div className="space-y-3">
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/10 px-3 py-1 text-xs font-black uppercase tracking-[0.2em] text-blue-500">
                     <Sparkles className="h-3.5 w-3.5" /> Hub de Inteligência
@@ -298,18 +279,12 @@ const AgentesScreen: React.FC<AgentesScreenProps> = ({
                     Acelere suas entregas e automatize fluxos de trabalho usando nossa biblioteca interna de assistentes cognitivos e prompts otimizados.
                   </p>
                 </div>
-                {/* Stats */}
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 md:grid-cols-2 lg:grid-cols-4">
-                  {stats.map((stat) => (
-                    <div key={stat.label} className={heroStatClass}>
-                      <span className="text-2xl font-black sm:text-3xl" style={{ color: stat.accent }}>
-                        {stat.value}
-                      </span>
-                      <p className={`mt-1.5 text-[10px] font-black uppercase tracking-wider ${isLightMode ? 'text-zinc-500' : 'text-white/40'}`}>
-                        {stat.label}
-                      </p>
-                    </div>
-                  ))}
+                <div className="h-[220px] overflow-hidden rounded-[28px] sm:h-[260px]">
+                  <img
+                    src={aiHeroImage}
+                    alt="Representação visual de inteligência artificial conectada"
+                    className="h-full w-full object-cover"
+                  />
                 </div>
               </div>
             </section>

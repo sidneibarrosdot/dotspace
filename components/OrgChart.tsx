@@ -30,7 +30,6 @@ const OrgChart: React.FC<{ theme: 'light' | 'dark' }> = ({ theme }) => {
   return <section className={`rounded-[30px] border p-6 ${light ? 'border-zinc-200 bg-white' : 'border-zinc-700/70 bg-[#1b1c20]'}`}>
     <div className="flex flex-wrap items-center justify-between gap-4">
       <div><p className="text-xs font-bold uppercase tracking-[0.3em] text-[#88C125]">Organograma</p><h2 className="mt-2 text-2xl font-black">Times e colaboradores</h2></div>
-      <span className="rounded-full border border-[#88C125]/30 bg-[#88C125]/10 px-4 py-2 text-xs font-bold text-[#88C125]">Sincronizado por planilha</span>
     </div>
     <div className="mt-6 grid gap-4">
       {teams.map(team => {

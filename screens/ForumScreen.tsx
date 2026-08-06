@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import Header from '../components/Header';
 import MobileFooterNav from '../components/MobileFooterNav';
 import Pagination from '../components/Pagination';
 import PageFilterActions from '../components/PageFilterActions';
@@ -537,17 +536,6 @@ const ForumScreen: React.FC<ForumScreenProps> = ({
 
     return (
       <div className={pageClass}>
-        <Header
-          theme={theme}
-          toggleTheme={toggleTheme}
-          isLoggedIn={isLoggedIn}
-          sessionActive={Boolean(user)}
-          canManageAdmin={isLoggedIn}
-          offlineMode={offlineMode}
-          onNavigateToAdmin={onNavigateToAdmin}
-          onLogout={onLogout}
-        />
-
         <main className="container mx-auto px-4 py-6 pb-44 sm:px-6 sm:py-8 sm:pb-8 lg:px-8">
           <section className={heroClass}>
             <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-zinc-300 via-zinc-200 to-zinc-300" />
@@ -772,17 +760,6 @@ const ForumScreen: React.FC<ForumScreenProps> = ({
 
   return (
     <div className={pageClass}>
-      <Header
-        theme={theme}
-        toggleTheme={toggleTheme}
-        isLoggedIn={isLoggedIn}
-        sessionActive={Boolean(user)}
-        canManageAdmin={isLoggedIn}
-        offlineMode={offlineMode}
-        onNavigateToAdmin={onNavigateToAdmin}
-        onLogout={onLogout}
-      />
-
       <main className="container mx-auto px-4 py-6 pb-44 sm:px-6 sm:py-8 sm:pb-8 lg:px-8">
         <section className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
           <aside className="hidden xl:block">
@@ -819,7 +796,7 @@ const ForumScreen: React.FC<ForumScreenProps> = ({
               <div className={heroOverlayClass} />
               <div className="relative z-10 grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.38em] text-[#88C125]">Fórum</p>
+                  <p className="inline-flex rounded-full bg-[#88C125]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.28em] text-[#88C125]">Fórum</p>
                 <h1 className={`mt-3 max-w-4xl text-2xl font-black leading-tight sm:text-3xl lg:text-4xl ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>
                     Um espaço vivo para discutir, resolver e compartilhar.
                   </h1>

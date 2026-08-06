@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import Header from '../components/Header';
 import MobileFooterNav from '../components/MobileFooterNav';
 import NeutralThumb from '../components/NeutralThumb';
 import Pagination from '../components/Pagination';
@@ -31,6 +30,7 @@ import {
 } from 'lucide-react';
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import type { User } from 'firebase/auth';
+import okrsHeroImage from '../assets/hero-okrs-objetivos.png';
 import { FEEDBACK_COPY_ERROR, FEEDBACK_COPY_SUCCESS, FEEDBACK_TIMEOUT_ERROR, FEEDBACK_TIMEOUT_SUCCESS } from '../constants/feedbackMessages';
 
 type SortMode = 'recentes' | 'a-z' | 'z-a';
@@ -253,7 +253,6 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('');
-  const [areaFilter, setAreaFilter] = useState<string>('');
   const [sortMode, setSortMode] = useState<SortMode>('recentes');
   const [openMenu, setOpenMenu] = useState<'categoria' | 'ordem' | 'area' | null>(null);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
@@ -322,14 +321,6 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
     [allSourceEntries]
   );
 
-  const areas = useMemo(
-    () =>
-      Array.from(new Set([...krConfig.times, ...allSourceEntries.map((entry) => entry.timeSquad).filter(Boolean)])).sort((a, b) =>
-        a.localeCompare(b, 'pt-BR')
-      ),
-    [allSourceEntries]
-  );
-
   const filteredItems = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     const items = krsItems.filter((item) => {
@@ -341,7 +332,6 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
         getKrKeyResult(item),
         getKrResponsavel(item),
         getKrFuncao(item),
-        getKrTeam(item),
         getKrPeriod(item),
         getKrStatus(item),
         getKrSinergy(item),
@@ -359,7 +349,6 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
           entry.keyResult,
           entry.responsavelKR,
           entry.funcao,
-          entry.timeSquad,
           entry.periodo,
           entry.valorBase,
           entry.valorAlvo,
@@ -377,11 +366,10 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
 
       const matchesSearch = !term || searchableValues.some((value) => value.toLowerCase().includes(term));
       const matchesCategory = !categoryFilter || entries.some((entry) => entry.metaArea === categoryFilter) || getKrMetaArea(item) === categoryFilter;
-      const matchesArea = !areaFilter || entries.some((entry) => entry.timeSquad === areaFilter) || getKrTeam(item) === areaFilter;
       const localState = getState(item.id, item.views ?? 0, item.likes ?? 0, Boolean(item.pinned));
       const matchesFavorites = !showFavoritesOnly || localState.favorited;
 
-      return matchesSearch && matchesCategory && matchesArea && matchesFavorites;
+      return matchesSearch && matchesCategory && matchesFavorites;
     });
 
     const sorted = [...items];
@@ -394,7 +382,7 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
     }
 
     return sorted;
-  }, [searchTerm, categoryFilter, areaFilter, sortMode, showFavoritesOnly, getState, interactions]);
+  }, [searchTerm, categoryFilter, sortMode, showFavoritesOnly, getState, interactions]);
 
   const pageSize = 6;
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
@@ -439,8 +427,6 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
     else url.searchParams.delete('q');
     if (categoryFilter) url.searchParams.set('category', categoryFilter);
     else url.searchParams.delete('category');
-    if (areaFilter) url.searchParams.set('area', areaFilter);
-    else url.searchParams.delete('area');
     if (sortMode !== 'recentes') url.searchParams.set('sort', sortMode);
     else url.searchParams.delete('sort');
     if (showFavoritesOnly) url.searchParams.set('favorites', '1');
@@ -467,7 +453,7 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
     }
 
     setCurrentPage(1);
-  }, [searchTerm, categoryFilter, areaFilter, sortMode, showFavoritesOnly]);
+  }, [searchTerm, categoryFilter, sortMode, showFavoritesOnly]);
 
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
@@ -505,16 +491,8 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
   };
 
   const openAccess = (item: KRsItem) => {
-    const channel = String(item.timeSquad || '')
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/time-/g, "squad-");
-
-    const slackUrl = `https://slack.com/app_redirect?channel=${channel || 'geral'}`;
     recordLocalCardInteractionEvent('krs', item.id, 'slack_interest');
-    window.open(slackUrl, '_blank', 'noopener,noreferrer');
+    window.open('https://dot-digital-group.slack.com/archives/C0BNBD4S16D', '_blank', 'noopener,noreferrer');
   };
 
   const handleShareItem = async (item: KRsItem) => {
@@ -528,13 +506,6 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
       window.setTimeout(() => setShareFeedback(''), FEEDBACK_TIMEOUT_ERROR);
     }
   };
-
-  const summaryStats = [
-    { label: 'OKRs únicos', value: krsItems.length },
-    { label: 'Entradas', value: allSourceEntries.length },
-    { label: 'Meta áreas', value: categories.length },
-    { label: 'Times/Squads', value: areas.length },
-  ];
 
   const krByCycle = useMemo(() => {
     const grouped = filteredItems.reduce<Record<string, number>>((acc, item) => {
@@ -594,12 +565,23 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
     return [...ordered, ...extras].sort((a, b) => b.value - a.value);
   }, [filteredItems]);
 
+  const statusSummary = krConfig.statuses.map((status) => ({
+    name: status,
+    value: krByStatus.find((item) => item.name === status)?.value ?? 0,
+  }));
+
   const maxCycleCount = Math.max(1, ...krByCycle.map((item) => item.total));
   const maxMetaCount = Math.max(1, ...krByMetaArea.map((item) => item.value));
   const leadingCycle = krByCycle.reduce<(typeof krByCycle)[number] | null>((leader, item) => (!leader || item.total > leader.total ? item : leader), null);
   const leadingMeta = krByMetaArea[0] ?? null;
   const leadingStatus = krByStatus[0] ?? null;
   const chartPalette = ['#88C125', '#4CD07D', '#F78E43', '#EEC137', '#7C8AA5', '#A855F7'] as const;
+  const statusColors: Record<string, string> = {
+    'Concluído': '#4CD07D',
+    'Em andamento': '#88C125',
+    'Bloqueado': '#F78E43',
+    'Cancelado': '#7C8AA5',
+  };
   const chartCardClass = `flex h-fit flex-col rounded-3xl border p-5 xl:min-h-[22rem] ${
     isLightMode ? 'border-zinc-200 bg-white' : 'border-white/10 bg-white/5'
   }`;
@@ -619,17 +601,6 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
 
   return (
     <div className={pageClass}>
-      <Header
-        theme={theme}
-        toggleTheme={toggleTheme}
-        isLoggedIn={isLoggedIn}
-        sessionActive={Boolean(user)}
-        canManageAdmin={isLoggedIn}
-        offlineMode={offlineMode}
-        onNavigateToAdmin={onNavigateToAdmin}
-        onLogout={onLogout}
-      />
-
       <main className="container mx-auto px-4 py-6 pb-44 sm:px-6 sm:py-8 sm:pb-8 lg:px-8">
         <section className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
           <aside className="hidden xl:block">
@@ -666,7 +637,7 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
               <div className={heroOverlayClass} />
               <div className="relative z-10 grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.38em] text-[#EEC137]">Banco de OKR's</p>
+                  <p className="inline-flex rounded-full bg-[#EEC137]/12 px-3 py-1 text-xs font-semibold uppercase tracking-[0.28em] text-[#EEC137]">Banco de OKR's</p>
                    <h1 className={`mt-3 max-w-4xl text-2xl font-black leading-tight sm:text-3xl lg:text-4xl ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>
                     Acompanhe o que move nossos resultados
                   </h1>
@@ -688,7 +659,7 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
                 </div>
 
                 <div className="min-h-[260px] overflow-hidden rounded-[28px]">
-                  <img src="https://picsum.photos/seed/dotspace-okrs/900/700" alt="Banco de OKR's" className="h-full w-full object-cover" />
+                  <img src={okrsHeroImage} alt="Representação visual de objetivos e resultados-chave" className="h-full w-full object-cover" />
                 </div>
               </div>
             </section>
@@ -701,10 +672,10 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
                     <span className={chartCountClass}>{filteredItems.length} OKR's</span>
                   </div>
                   {leadingStatus && <p className={chartInsightClass}>{leadingStatus.name} aparece em {leadingStatus.value} OKR's.</p>}
-                  <div className="mt-4 flex flex-col items-center justify-start gap-3">
+                  <div className="mt-5 grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-center">
                     {krByStatus.length ? (
                       <>
-                        <div className="relative h-44 w-full max-w-[14.5rem] xl:h-48 xl:max-w-[15.5rem]">
+                        <div className="relative mx-auto h-52 w-full max-w-[260px]">
                           <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                               <Tooltip
@@ -731,31 +702,29 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
                                 stroke={isLightMode ? '#ffffff' : '#18181b'}
                                 strokeWidth={3}
                               >
-                                {krByStatus.map((entry, index) => (
-                                  <Cell key={entry.name} fill={chartPalette[index % chartPalette.length]} />
+                                {krByStatus.map((entry) => (
+                                  <Cell key={entry.name} fill={statusColors[entry.name] || '#7C8AA5'} />
                                 ))}
                               </Pie>
                             </PieChart>
                           </ResponsiveContainer>
                         </div>
-                        <div className="w-full">
-                          <div className="grid grid-cols-2 gap-2">
-                            {krByStatus.map((entry, index) => (
+                        <div className="grid w-full gap-3 sm:grid-cols-2">
+                            {statusSummary.map((entry) => (
                               <div
                                 key={entry.name}
-                                className={`flex items-center justify-between gap-2 rounded-full border px-3 py-2 text-xs font-semibold ${isLightMode ? 'border-zinc-200 text-zinc-700' : 'border-white/10 text-white/80'}`}
+                                className={`flex min-h-24 items-center justify-between gap-4 rounded-2xl border px-5 py-4 ${isLightMode ? 'border-zinc-200 bg-zinc-50 text-zinc-700' : 'border-white/10 bg-white/5 text-white/80'}`}
                               >
                                 <span className="flex min-w-0 items-center gap-2">
                                   <span
-                                    className="h-2.5 w-2.5 shrink-0 rounded-full"
-                                    style={{ backgroundColor: chartPalette[index % chartPalette.length] }}
+                                    className="h-3 w-3 shrink-0 rounded-full"
+                                    style={{ backgroundColor: statusColors[entry.name] }}
                                   />
-                                  <span className="truncate">{entry.name}</span>
+                                  <span className="font-bold">{entry.name}</span>
                                 </span>
-                                <span className={isLightMode ? 'text-zinc-500' : 'text-white/55'}>{entry.value}</span>
+                                <span className={`text-3xl font-black ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>{entry.value}</span>
                               </div>
                             ))}
-                          </div>
                         </div>
                       </>
                     ) : (
@@ -835,30 +804,18 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
                   onClick={() => {
                     setSearchTerm('');
                     setCategoryFilter('');
-                    setAreaFilter('');
                     setSortMode('recentes');
                   }}
                   className="rounded-full bg-[#88C125] px-4 py-2 text-sm font-bold text-white transition-colors"
                 >
                   Todos
                 </button>
-                {areas.map((area) => (
-                  <button
-                    key={area}
-                    type="button"
-                    onClick={() => setAreaFilter((current) => (current === area ? '' : area))}
-                    className={`${filterChipBaseClass} ${areaFilter === area ? 'text-white' : ''}`}
-                  >
-                    {area}
-                  </button>
-                ))}
-                {(categoryFilter || areaFilter || searchTerm) && (
+                {(categoryFilter || searchTerm) && (
                   <button
                     type="button"
                     onClick={() => {
                       setSearchTerm('');
                       setCategoryFilter('');
-                      setAreaFilter('');
                     }}
                     className={filterResetClass}
                   >
@@ -965,13 +922,6 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
                                 {displayValue(getKrObjective(item), 'OKR sem objetivo definido no momento.')}
                               </p>
 
-                              <div className={`mt-3 flex flex-wrap items-center gap-2 text-xs ${isLightMode ? 'text-zinc-500' : 'text-white/55'}`}>
-                                <span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 ${isLightMode ? 'border-zinc-200 bg-zinc-50' : 'border-white/10 bg-white/5'}`}>
-                                  <Users className="h-3.5 w-3.5" />
-                                  {displayValue(getKrTeam(item), 'Time/Squad')}
-                                </span>
-                              </div>
-
                               <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
                                 <button
                                   type="button"
@@ -1025,7 +975,7 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
                                   onClick={() => openAccess(item)}
                                   className="inline-flex items-center gap-2 rounded-full bg-[#88C125] px-4 py-3 text-sm font-bold text-white transition-colors hover:brightness-95"
                                 >
-                                  Participar do KR
+                                  Tenho interesse em participar
                                   <ExternalLink className="h-4 w-4" />
                                 </button>
                               </div>
@@ -1053,7 +1003,6 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
                                   <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                                     <InfoChip label="ID" value={displayValue(item.id, '—')} theme={theme} />
                                     <InfoChip label="Meta" value={displayValue(getKrMetaArea(item), '—')} theme={theme} />
-                                    <InfoChip label="Time" value={displayValue(getKrTeam(item), '—')} theme={theme} />
                                     <InfoChip label="Período" value={displayValue(getKrPeriod(item), '—')} theme={theme} />
                                     <InfoChip label="Status" value={displayValue(getKrStatus(item), 'Pendente')} theme={theme} />
                                     <InfoChip label="Atualização" value={displayValue(getKrUpdatedAt(item), '—')} theme={theme} />

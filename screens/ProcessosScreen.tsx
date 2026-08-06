@@ -1,10 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import Header from '../components/Header';
 import MobileFooterNav from '../components/MobileFooterNav';
 import Pagination from '../components/Pagination';
 import PageFilterActions from '../components/PageFilterActions';
 import SearchBar from '../components/SearchBar';
-import NeutralThumb from '../components/NeutralThumb';
 import { useLocalCardInteractions, recordLocalCardInteractionEvent } from '../hooks/useLocalCardInteractions';
 import { processosItems } from '../data/processosItems';
 import { FEEDBACK_COPY_ERROR, FEEDBACK_COPY_SUCCESS, FEEDBACK_TIMEOUT_ERROR, FEEDBACK_TIMEOUT_SUCCESS } from '../constants/feedbackMessages';
@@ -32,6 +30,7 @@ import {
   Share2,
 } from 'lucide-react';
 import type { User } from 'firebase/auth';
+import processosHeroImage from '../assets/hero-processos-fluxo.png';
 
 type SortMode = 'recentes' | 'a-z' | 'z-a';
 const PENDING_HOME_TARGET_KEY = 'dot-space.pending-home-target';
@@ -480,17 +479,6 @@ const ProcessosScreen: React.FC<ProcessosScreenProps> = ({
 
   return (
     <div className={pageClass}>
-      <Header
-        theme={theme}
-        toggleTheme={toggleTheme}
-        isLoggedIn={isLoggedIn}
-        sessionActive={Boolean(user)}
-        canManageAdmin={isLoggedIn}
-        offlineMode={offlineMode}
-        onNavigateToAdmin={onNavigateToAdmin}
-        onLogout={onLogout}
-      />
-
       <main className="container mx-auto px-4 py-6 pb-44 sm:px-6 sm:py-8 sm:pb-8 lg:px-8">
         <section className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
           <aside className="hidden xl:block">
@@ -527,7 +515,7 @@ const ProcessosScreen: React.FC<ProcessosScreenProps> = ({
               <div className={heroOverlayClass} />
               <div className="relative z-10 grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.38em] text-[#88C125]">Processos</p>
+                  <p className="inline-flex rounded-full bg-[#88C125]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.28em] text-[#88C125]">Processos</p>
                   <h1 className={`mt-3 max-w-4xl text-2xl font-black leading-tight sm:text-3xl lg:text-4xl ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>
                     Uma área central para organizar, consultar e manter processos com clareza e governança.
                   </h1>
@@ -550,7 +538,7 @@ const ProcessosScreen: React.FC<ProcessosScreenProps> = ({
                 </div>
 
                 <div className="min-h-[260px] overflow-hidden rounded-[28px]">
-                  <img src="https://picsum.photos/seed/dotspace-processos/900/700" alt="Processos" className="h-full w-full object-cover" />
+                  <img src={processosHeroImage} alt="Fluxo visual de processos conectados" className="h-full w-full object-cover" />
                 </div>
               </div>
             </section>
@@ -707,7 +695,6 @@ const ProcessosScreen: React.FC<ProcessosScreenProps> = ({
                     const integrityClass = (integridadeTone[item.integridade || 'Atualizado'] || integridadeTone.Pendente)[isLightMode ? 'light' : 'dark'];
                     const isExpanded = expandedProcessId === item.id;
                     const localState = getState(item.id, item.views ?? 0, item.likes ?? 0, Boolean(item.pinned));
-                    const hasCoverImage = Boolean(item.Imagem_capa);
                     const statusValues = Array.from(
                       new Set(
                         (item.inventoryEntries ?? [])
@@ -734,18 +721,12 @@ const ProcessosScreen: React.FC<ProcessosScreenProps> = ({
                         />
                         <div className="grid gap-4 p-4 md:grid-cols-[220px_minmax(0,1fr)] md:items-start">
                           <div className={`relative h-40 w-full shrink-0 overflow-hidden rounded-[24px] border sm:h-44 md:h-[180px] ${isLightMode ? 'border-zinc-200 bg-zinc-100' : 'border-white/10 bg-[#111114]'}`}>
-                            {hasCoverImage ? (
-                              <>
-                                <img
-                                  src={item.Imagem_capa}
-                                  alt={item.Projeto}
-                                  className="h-full w-full object-cover"
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/15 to-transparent" />
-                              </>
-                            ) : (
-                              <NeutralThumb />
-                            )}
+                            <img
+                              src={processosHeroImage}
+                              alt={item.Projeto}
+                              className="h-full w-full object-cover grayscale"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/15 to-transparent" />
                             <div className="absolute left-4 right-4 top-4 flex items-center justify-end gap-3">
                               <span className="rounded-full border border-white/12 bg-black/30 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-white/80">
                                 {item.versao || 'v1.0.0'}

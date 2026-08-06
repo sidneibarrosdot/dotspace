@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import type { LucideIcon } from 'lucide-react';
 
 export interface MobileFooterNavItem {
@@ -15,6 +15,18 @@ interface MobileFooterNavProps {
 
 const MobileFooterNav: React.FC<MobileFooterNavProps> = ({ theme, items }) => {
   const isLightMode = theme === 'light';
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const activeRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    const container = scrollRef.current;
+    const activeItem = activeRef.current;
+    if (!container || !activeItem) return;
+    container.scrollTo({
+      left: activeItem.offsetLeft - (container.clientWidth - activeItem.clientWidth) / 2,
+      behavior: 'smooth',
+    });
+  }, [items]);
 
   return (
     <nav className="fixed bottom-4 left-1/2 z-40 w-[calc(100%-1rem)] max-w-[760px] -translate-x-1/2 lg:hidden">
@@ -25,7 +37,10 @@ const MobileFooterNav: React.FC<MobileFooterNavProps> = ({ theme, items }) => {
             : 'border-white/10 bg-zinc-950/92 text-white'
         }`}
       >
-        <div className="grid grid-flow-col auto-cols-fr gap-1 p-2 sm:gap-2 sm:p-3">
+        <div
+          ref={scrollRef}
+          className="flex snap-x snap-mandatory gap-1 overflow-x-auto p-2 overscroll-x-contain scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-2 sm:p-3"
+        >
           {items.map((item) => {
             const Icon = item.icon;
             const active = Boolean(item.active);
@@ -33,10 +48,11 @@ const MobileFooterNav: React.FC<MobileFooterNavProps> = ({ theme, items }) => {
             return (
               <button
                 key={item.label}
+                ref={active ? activeRef : undefined}
                 type="button"
                 onClick={item.onClick}
                 disabled={!item.onClick}
-                className={`flex min-w-0 flex-col items-center justify-center gap-1 rounded-2xl px-2 py-2 text-center transition-colors disabled:cursor-default disabled:opacity-60 sm:py-3 ${
+                className={`flex min-w-[78px] snap-center flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2.5 text-center transition-colors disabled:cursor-default disabled:opacity-60 sm:min-w-[92px] sm:py-3 ${
                   active
                     ? 'bg-[#99cc00] text-zinc-950'
                     : isLightMode
@@ -45,7 +61,7 @@ const MobileFooterNav: React.FC<MobileFooterNavProps> = ({ theme, items }) => {
                 }`}
               >
                 <Icon className="h-4 w-4 shrink-0 sm:h-[18px] sm:w-[18px]" />
-                <span className="text-[9px] font-semibold leading-tight tracking-[0.02em] sm:text-[10px]">
+                <span className="text-[10px] font-semibold leading-tight tracking-[0.01em] sm:text-[11px]">
                   {item.label}
                 </span>
               </button>

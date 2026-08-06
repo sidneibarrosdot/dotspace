@@ -124,7 +124,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLocalLogin, offlineMode, gc
               </div>
 
               <p className="mt-6 text-[11px] font-medium uppercase tracking-[0.26em] text-white/42">
-                Acesso restrito ao ambiente mock
+                Ambiente de teste
               </p>
 
               {error && (

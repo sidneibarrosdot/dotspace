@@ -12,6 +12,7 @@ import ForumScreen from './screens/ForumScreen';
 import OrganogramaScreen from './screens/OrganogramaScreen';
 import ErrorBoundary from './components/ErrorBoundary';
 import PostLoginLoader from './components/PostLoginLoader';
+import Header from './components/Header';
 import { auth, firebaseReady } from './firebase';
 import { logAudit } from './services/auditService';
 import { scrollToAppTop } from './utils/scrollHost';
@@ -572,6 +573,18 @@ const App: React.FC = () => {
         } ${
           showDevelopmentNotice ? 'development-lock-active' : ''
         }`}>
+          {user && !authLoading && !postLoginLoading && currentView !== 'admin' && (
+            <Header
+              theme={theme}
+              toggleTheme={toggleTheme}
+              isLoggedIn
+              sessionActive
+              canManageAdmin
+              offlineMode={!firebaseReady}
+              onNavigateToAdmin={() => navigateTo('admin')}
+              onLogout={handleLogout}
+            />
+          )}
           <div className="flex-grow">{renderView()}</div>
         </div>
         {showDevelopmentNotice && typeof document !== 'undefined' && createPortal(

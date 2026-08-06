@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import Header from '../components/Header';
 import MobileFooterNav from '../components/MobileFooterNav';
 import Pagination from '../components/Pagination';
 import PageFilterActions from '../components/PageFilterActions';
@@ -9,7 +8,6 @@ import type { PortfolioItem } from '../types';
 import { treinamentosItems } from '../data/treinamentosItems';
 import { FEEDBACK_COPY_ERROR, FEEDBACK_COPY_SUCCESS, FEEDBACK_TIMEOUT_ERROR, FEEDBACK_TIMEOUT_SUCCESS } from '../constants/feedbackMessages';
 import {
-  ArrowRight,
   BookOpen,
   Bot,
   Building2,
@@ -31,6 +29,7 @@ import {
   UserRound,
 } from 'lucide-react';
 import type { User } from 'firebase/auth';
+import trainingHeroImage from '../assets/hero-treinamentos-equipe.png';
 
 type SortMode = 'recentes' | 'a-z' | 'z-a';
 const PENDING_HOME_TARGET_KEY = 'dot-space.pending-home-target';
@@ -88,7 +87,6 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
   const [openMenu, setOpenMenu] = useState<'ordem' | 'area' | null>(null);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [shareFeedback, setShareFeedback] = useState('');
-  const [expandedTrainingId, setExpandedTrainingId] = useState<string | null>(null);
   const [pendingHomeTargetId, setPendingHomeTargetId] = useState<string>('');
   const [currentPage, setCurrentPage] = useState(1);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -200,7 +198,6 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
       if (targetIndex < 0) return;
 
       setPendingHomeTargetId(parsed.id);
-      setExpandedTrainingId(parsed.id);
       setCurrentPage(Math.floor(targetIndex / pageSize) + 1);
     } catch {
       window.localStorage.removeItem(PENDING_HOME_TARGET_KEY);
@@ -223,13 +220,6 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
   useEffect(() => {
     setCurrentPage(1);
   }, [viewMode]);
-
-  useEffect(() => {
-    if (!expandedTrainingId) return;
-    if (!filteredItems.some((item) => item.id === expandedTrainingId)) {
-      setExpandedTrainingId(null);
-    }
-  }, [filteredItems, expandedTrainingId]);
 
   useEffect(() => {
     if (!pendingHomeTargetId) return;
@@ -274,16 +264,6 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
     window.open(item.Link_PMV, '_blank', 'noopener,noreferrer');
   };
 
-  const toggleTrainingDetails = (itemId: string) => {
-    setExpandedTrainingId((current) => {
-      const nextExpandedId = current === itemId ? null : itemId;
-      if (nextExpandedId) {
-        recordLocalCardInteractionEvent('treinamentos', itemId, 'open');
-      }
-      return nextExpandedId;
-    });
-  };
-
   const handleShareItem = async (item: PortfolioItem) => {
     try {
       await navigator.clipboard.writeText(item.Link_PMV);
@@ -318,17 +298,6 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
 
   return (
     <div className={pageClass}>
-      <Header
-        theme={theme}
-        toggleTheme={toggleTheme}
-        isLoggedIn={isLoggedIn}
-        sessionActive={Boolean(user)}
-        canManageAdmin={isLoggedIn}
-        offlineMode={offlineMode}
-        onNavigateToAdmin={onNavigateToAdmin}
-        onLogout={onLogout}
-      />
-
       <main className="container mx-auto px-4 py-6 pb-44 sm:px-6 sm:py-8 sm:pb-8 lg:px-8">
         <section className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
           <aside className="hidden xl:block">
@@ -365,7 +334,7 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
               <div className={heroOverlayClass} />
               <div className="relative z-10 grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.38em] text-[#F78E43]">Treinamentos</p>
+                  <p className="inline-flex rounded-full bg-[#F78E43]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.28em] text-[#F78E43]">Treinamentos</p>
                   <h1 className={`mt-3 max-w-4xl text-2xl font-black leading-tight sm:text-3xl lg:text-4xl ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>
                     Seu desenvolvimento começa aqui
                   </h1>
@@ -387,7 +356,7 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                 </div>
 
                 <div className="min-h-[260px] overflow-hidden rounded-[28px]">
-                  <img src="https://picsum.photos/seed/dotspace-treinamentos/900/700" alt="Treinamentos" className="h-full w-full object-cover" />
+                  <img src={trainingHeroImage} alt="Equipe colaborando em um treinamento" className="h-full w-full object-cover" />
                 </div>
               </div>
             </section>
@@ -407,7 +376,11 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                     setSearchTerm={setSearchTerm}
                     placeholder="Buscar treinamento, categoria, tema..."
                     suggestions={searchTerm ? filteredItems : []}
-                    onSuggestionClick={(item) => setExpandedTrainingId(item.id)}
+                    onSuggestionClick={(item) => {
+                      const targetIndex = filteredItems.findIndex((candidate) => candidate.id === item.id);
+                      if (targetIndex >= 0) setCurrentPage(Math.floor(targetIndex / pageSize) + 1);
+                      setPendingHomeTargetId(item.id);
+                    }}
                     theme={theme}
                   />
                 </div>
@@ -552,33 +525,24 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
 
             {filteredItems.length > 0 ? (
               <>
-                <section className={viewMode === 'grid' ? 'grid gap-4 md:grid-cols-2 xl:grid-cols-3' : 'grid gap-4'}>
+                <section className={viewMode === 'grid' ? 'grid grid-flow-row-dense items-start gap-4 md:grid-cols-2 xl:grid-cols-3' : 'grid gap-4'}>
                   {paginatedItems.map((item, index) => {
                     const localState = getState(item.id, item.views ?? 0, item.likes ?? 0, Boolean(item.pinned));
                     const accent = '#F78E43';
 
                     return (
+                      <React.Fragment key={item.id}>
                       <article
-                        key={item.id}
                         id={`treinamento-card-${item.id}`}
                         className={viewMode === 'grid' ? cardClass : listCardClass}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => toggleTrainingDetails(item.id)}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter' || event.key === ' ') {
-                            event.preventDefault();
-                            toggleTrainingDetails(item.id);
-                          }
-                        }}
                       >
                         {viewMode === 'grid' ? (
                           <div className="flex h-full flex-col">
                             <div className="relative h-40 overflow-hidden">
                               <img
-                                src={item.Imagem_capa}
+                                src={trainingHeroImage}
                                 alt={item.Projeto}
-                                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                className="h-full w-full object-cover grayscale transition-transform duration-500 group-hover:scale-105"
                               />
                               <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
                               <span className="absolute left-4 top-4 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.25em] text-white" style={{ backgroundColor: accent }}>
@@ -597,9 +561,14 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                                 </div>
                               </div>
 
-                              <p className={`mt-3 text-sm font-semibold ${isLightMode ? 'text-zinc-600' : 'text-white/72'}`}>
-                                {item.Assunto_especifico || item.Time}
+                              <p className={`mt-3 text-sm leading-relaxed ${isLightMode ? 'text-zinc-600' : 'text-white/72'}`}>
+                                {item.Assunto_geral || 'Descrição não informada.'}
                               </p>
+                              <div className={`mt-4 grid gap-3 border-t pt-4 sm:grid-cols-2 ${isLightMode ? 'border-zinc-200' : 'border-white/10'}`}>
+                                <div><p className={`text-[10px] font-semibold uppercase tracking-[0.2em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Categoria</p><p className="mt-1 text-sm font-semibold">{item.Cliente || item.Time || 'Treinamento'}</p></div>
+                                <div><p className={`text-[10px] font-semibold uppercase tracking-[0.2em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Tema</p><p className="mt-1 text-sm font-semibold">{item.Assunto_especifico || 'Não informado'}</p></div>
+                                <div className="sm:col-span-2"><p className={`text-[10px] font-semibold uppercase tracking-[0.2em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Referência do processo</p><p className="mt-1 text-sm font-semibold">{item.Mídias || 'Não informada'}</p></div>
+                              </div>
 
                             <div className={`mt-4 rounded-2xl border px-4 py-3 hidden ${isLightMode ? 'border-zinc-200 bg-zinc-50' : 'border-white/10 bg-white/5'}`}>
                                 <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>
@@ -685,19 +654,6 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                                   type="button"
                                   onClick={(event) => {
                                     event.stopPropagation();
-                                    toggleTrainingDetails(item.id);
-                                  }}
-                                  className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-semibold transition-colors ${
-                                    isLightMode ? 'border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50' : 'border-white/10 bg-white/6 text-white hover:bg-white/10'
-                                  }`}
-                                >
-                                  {expandedTrainingId === item.id ? 'Fechar detalhes' : 'Ver detalhes'}
-                                  <ArrowRight className="h-4 w-4" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
                                     openAccess(item);
                                   }}
                                   className="inline-flex items-center gap-2 rounded-full bg-[#88C125] px-3.5 py-2 text-sm font-bold text-white transition-colors hover:brightness-95"
@@ -707,37 +663,15 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                                 </button>
                               </div>
 
-                              {expandedTrainingId === item.id && (
-                                <div className={`mt-5 rounded-2xl border p-4 ${isLightMode ? 'border-zinc-200 bg-zinc-50' : 'border-white/10 bg-white/5'}`}>
-                                  <div className="grid gap-3 sm:grid-cols-2">
-                                    <div>
-                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Categoria</p>
-                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.Cliente || 'Treinamento'}</p>
-                                    </div>
-                                    <div>
-                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Tema</p>
-                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.Assunto_especifico || 'Não informado'}</p>
-                                    </div>
-                                    <div>
-                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Descrição</p>
-                                      <p className={`mt-1 text-sm ${isLightMode ? 'text-zinc-700' : 'text-white/78'}`}>{item.Assunto_geral}</p>
-                                    </div>
-                                    <div>
-                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Referência do processo</p>
-                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.Mídias || 'Não informada'}</p>
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
                             </div>
                           </div>
                         ) : (
                           <div className="grid grid-cols-[112px_minmax(0,1fr)] gap-0 sm:grid-cols-[160px_minmax(0,1fr)] lg:grid-cols-[260px_minmax(0,1fr)]">
                             <div className="relative min-h-[168px] overflow-hidden sm:min-h-[190px] lg:h-full lg:min-h-0">
                               <img
-                                src={item.Imagem_capa}
+                                src={trainingHeroImage}
                                 alt={item.Projeto}
-                                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                className="h-full w-full object-cover grayscale transition-transform duration-500 group-hover:scale-105"
                               />
                               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent" />
                               <span className="absolute left-2 top-2 rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-white sm:left-4 sm:top-4 sm:px-3 sm:text-[10px] sm:tracking-[0.25em]" style={{ backgroundColor: accent }}>
@@ -751,12 +685,17 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                                   <h2 className={`text-[0.98rem] font-black leading-tight sm:mt-1 sm:text-[1.08rem] ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>
                                     {item.Projeto}
                                   </h2>
-                                  <p className={`mt-1.5 text-xs font-semibold sm:mt-2 sm:text-sm ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>
-                                    {item.Assunto_especifico || item.Time}
+                                  <p className={`mt-1.5 text-xs leading-relaxed sm:mt-2 sm:text-sm ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>
+                                    {item.Assunto_geral || 'Descrição não informada.'}
                                   </p>
                                 </div>
                                 <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-1.5">
                                 </div>
+                              </div>
+                              <div className={`mt-4 grid gap-3 border-t pt-4 sm:grid-cols-3 ${isLightMode ? 'border-zinc-200' : 'border-white/10'}`}>
+                                <div><p className={`text-[10px] font-semibold uppercase tracking-[0.2em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Categoria</p><p className="mt-1 text-sm font-semibold">{item.Cliente || item.Time || 'Treinamento'}</p></div>
+                                <div><p className={`text-[10px] font-semibold uppercase tracking-[0.2em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Tema</p><p className="mt-1 text-sm font-semibold">{item.Assunto_especifico || 'Não informado'}</p></div>
+                                <div><p className={`text-[10px] font-semibold uppercase tracking-[0.2em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Referência do processo</p><p className="mt-1 text-sm font-semibold">{item.Mídias || 'Não informada'}</p></div>
                               </div>
                               <div className={`mt-2 flex flex-wrap items-center gap-1.5 text-[11px] sm:mt-3 sm:gap-2 sm:text-xs ${isLightMode ? 'text-zinc-500' : 'text-white/55'}`}>
                                 <span className={`inline-flex items-center rounded-full border px-2.5 py-1 ${isLightMode ? 'border-zinc-200 bg-zinc-50' : 'border-white/10 bg-white/5'}`}>{item.Time}</span>
@@ -821,19 +760,6 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                                   type="button"
                                   onClick={(event) => {
                                     event.stopPropagation();
-                                    toggleTrainingDetails(item.id);
-                                  }}
-                                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors sm:gap-2 sm:px-3.5 sm:py-2 sm:text-sm ${
-                                    isLightMode ? 'border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50' : 'border-white/10 bg-white/6 text-white hover:bg-white/10'
-                                  }`}
-                                >
-                                  {expandedTrainingId === item.id ? 'Fechar detalhes' : 'Ver detalhes'}
-                                  <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
                                     openAccess(item);
                                   }}
                                   className="inline-flex items-center gap-1.5 rounded-full bg-[#88C125] px-3 py-1.5 text-xs font-bold text-white transition-colors hover:brightness-95 sm:gap-2 sm:px-3.5 sm:py-2 sm:text-sm"
@@ -843,32 +769,11 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                                 </button>
                               </div>
 
-                              {expandedTrainingId === item.id && (
-                                <div className={`mt-5 rounded-2xl border p-4 ${isLightMode ? 'border-zinc-200 bg-zinc-50' : 'border-white/10 bg-white/5'}`}>
-                                  <div className="grid gap-3 sm:grid-cols-2">
-                                    <div>
-                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Categoria</p>
-                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.Time}</p>
-                                    </div>
-                                    <div>
-                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Tema</p>
-                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.Assunto_especifico}</p>
-                                    </div>
-                                    <div className="sm:col-span-2">
-                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Descrição</p>
-                                      <p className={`mt-1 text-sm ${isLightMode ? 'text-zinc-700' : 'text-white/78'}`}>{item.Assunto_geral}</p>
-                                    </div>
-                                    <div className="sm:col-span-2">
-                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Referência do processo</p>
-                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-800' : 'text-white/88'}`}>{item.Mídias || 'Não informada'}</p>
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
                             </div>
                           </div>
                         )}
                       </article>
+                      </React.Fragment>
                   );
                 })}
                 </section>
