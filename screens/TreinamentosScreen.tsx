@@ -12,6 +12,7 @@ import {
   ArrowRight,
   BookOpen,
   Bot,
+  Building2,
   ChevronDown,
   LayoutGrid,
   List,
@@ -42,6 +43,7 @@ interface TreinamentosScreenProps {
   onNavigateToPortfolio: () => void;
   onNavigateToProcessos: () => void;
   onNavigateToAgentes: () => void;
+  onNavigateToOrganograma: () => void;
   onNavigateToKRs: () => void;
   onNavigateToForum: () => void;
   onNavigateToAdmin: () => void;
@@ -71,6 +73,7 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
   onNavigateToPortfolio,
   onNavigateToProcessos,
   onNavigateToAgentes,
+  onNavigateToOrganograma,
   onNavigateToKRs,
   onNavigateToForum,
   onNavigateToAdmin,
@@ -309,6 +312,7 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
     { label: 'Treinamentos', icon: BookOpen, active: true, action: undefined },
     { label: "Banco de OKR's", icon: BookMarked, active: false, action: onNavigateToKRs },
     { label: 'Agentes de IA', icon: Bot, active: false, action: onNavigateToAgentes },
+    { label: 'Organograma', icon: Building2, active: false, action: onNavigateToOrganograma },
     { label: 'Fórum', icon: MessageSquareMore, active: false, action: onNavigateToForum },
   ];
 

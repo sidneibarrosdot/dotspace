@@ -15,6 +15,7 @@ import {
   ArrowRight,
   BookOpen,
   Bot,
+  Building2,
   ChevronDown,
   ChevronLeft,
   Clock3,
@@ -57,6 +58,7 @@ interface ForumScreenProps {
   onNavigateToTreinamentos: () => void;
   onNavigateToKRs: () => void;
   onNavigateToAgentes: () => void;
+  onNavigateToOrganograma: () => void;
   onNavigateToAdmin: () => void;
   onLogout: () => void;
   theme: 'light' | 'dark';
@@ -138,6 +140,7 @@ const ForumScreen: React.FC<ForumScreenProps> = ({
   onNavigateToTreinamentos,
   onNavigateToKRs,
   onNavigateToAgentes,
+  onNavigateToOrganograma,
   onNavigateToAdmin,
   onLogout,
   theme,
@@ -508,6 +511,7 @@ const ForumScreen: React.FC<ForumScreenProps> = ({
     { label: 'Treinamentos', icon: BookOpen, action: onNavigateToTreinamentos },
     { label: "Banco de OKR's", icon: BookMarked, action: onNavigateToKRs },
     { label: 'Agentes de IA', icon: Bot, action: onNavigateToAgentes },
+    { label: 'Organograma', icon: Building2, action: onNavigateToOrganograma },
     { label: 'Fórum', icon: MessageSquareMore, action: undefined, active: true },
   ];
 

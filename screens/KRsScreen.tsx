@@ -14,6 +14,7 @@ import {
   BookMarked,
   BookOpen,
   Bot,
+  Building2,
   ChevronDown,
   Eye,
   ExternalLink,
@@ -26,7 +27,6 @@ import {
   ShieldCheck,
   Bookmark,
   Share2,
-  TrendingUp,
   Users,
 } from 'lucide-react';
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
@@ -43,6 +43,7 @@ interface KRsScreenProps {
   onNavigateToProcessos: () => void;
   onNavigateToTreinamentos: () => void;
   onNavigateToAgentes: () => void;
+  onNavigateToOrganograma: () => void;
   onNavigateToForum: () => void;
   onNavigateToAdmin: () => void;
   onLogout: () => void;
@@ -62,39 +63,19 @@ const krConfig = {
 } as const;
 
 const statusTone: Record<string, { dark: string; light: string }> = {
-  'No prazo': {
-    dark: 'border-[#4CD07D]/30 bg-[#4CD07D]/10 text-[#c8ffe0]',
-    light: 'border-[#4CD07D]/40 bg-[#4CD07D]/16 text-[#166a41]',
-  },
-  'Em Risco': {
-    dark: 'border-[#F2A43A]/30 bg-[#F2A43A]/10 text-[#ffe6bf]',
-    light: 'border-[#F2A43A]/45 bg-[#F2A43A]/16 text-[#8b4d06]',
-  },
   'Em andamento': {
     dark: 'border-[#4CD07D]/30 bg-[#4CD07D]/10 text-[#c8ffe0]',
     light: 'border-[#4CD07D]/40 bg-[#4CD07D]/16 text-[#166a41]',
-  },
-  'Sob revisão': {
-    dark: 'border-[#F78E43]/30 bg-[#F78E43]/10 text-[#ffe0c7]',
-    light: 'border-[#F78E43]/45 bg-[#F78E43]/16 text-[#8a3f06]',
-  },
-  'Em atenção': {
-    dark: 'border-[#EEC137]/30 bg-[#EEC137]/10 text-[#fff0c7]',
-    light: 'border-[#EEC137]/45 bg-[#EEC137]/18 text-[#7f5b07]',
   },
   Concluído: {
     dark: 'border-[#4CD07D]/30 bg-[#4CD07D]/10 text-[#c8ffe0]',
     light: 'border-[#4CD07D]/40 bg-[#4CD07D]/16 text-[#166a41]',
   },
-  'A iniciar': {
-    dark: 'border-white/10 bg-white/6 text-white/72',
-    light: 'border-zinc-300 bg-zinc-100 text-zinc-700',
-  },
-  Atrasado: {
+  Bloqueado: {
     dark: 'border-[#F78E43]/30 bg-[#F78E43]/10 text-[#ffe0c7]',
     light: 'border-[#F78E43]/45 bg-[#F78E43]/16 text-[#8a3f06]',
   },
-  Pendente: {
+  Cancelado: {
     dark: 'border-white/10 bg-white/6 text-white/72',
     light: 'border-zinc-300 bg-zinc-100 text-zinc-700',
   },
@@ -107,13 +88,6 @@ const lower = (value: string) => value.toLowerCase();
 
 const displayValue = (value: string, fallback = '—') => (value.trim().length ? value : fallback);
 
-const parseNumericValue = (value: string) => {
-  const normalized = value.replace(/\s/g, '').replace('%', '').replace(/\./g, '').replace(',', '.').replace(/[^\d.-]/g, '');
-  if (!normalized) return null;
-  const parsed = Number(normalized);
-  return Number.isFinite(parsed) ? parsed : null;
-};
-
 const getKrMetaArea = (item: KRsItem) => getString(item.metaArea, item.Cliente, item.indicador);
 const getKrKeyResult = (item: KRsItem) => getString(item.keyResult, item.Projeto, item.Assunto_especifico);
 const getKrObjective = (item: KRsItem) => getString(item.objetivo, item.Assunto_geral, item.Outros_recursos);
@@ -121,7 +95,14 @@ const getKrResponsavel = (item: KRsItem) => getString(item.responsavelKR, item.r
 const getKrFuncao = (item: KRsItem) => getString(item.funcao, item.DI, item.DM);
 const getKrTeam = (item: KRsItem) => getString(item.timeSquad, item.Time, item.Publico_alvo);
 const getKrPeriod = (item: KRsItem) => getString(item.periodo, item.ciclo, item.Data, item.ultimaRevisao);
-const getKrStatus = (item: KRsItem) => getString(item.status, item.statusKR, item.integridade, item.Metodologias);
+const normalizeKrStatus = (value: string) => {
+  const status = lower(value);
+  if (status.includes('conclu')) return 'Concluído';
+  if (status.includes('bloque') || status.includes('risco') || status.includes('atras')) return 'Bloqueado';
+  if (status.includes('cancel')) return 'Cancelado';
+  return 'Em andamento';
+};
+const getKrStatus = (item: KRsItem) => normalizeKrStatus(getString(item.status, item.statusKR, item.integridade, item.Metodologias));
 const getKrSinergy = (item: KRsItem) => getString(item.sinergia, item.Publico_alvo);
 const getKrPartner = (item: KRsItem) => getString(item.frenteParceira);
 const getKrPlan = (item: KRsItem) => getString(item.planoAcao, item.Outros_recursos);
@@ -173,31 +154,6 @@ const compareRecent = (a: KRsItem, b: KRsItem) => {
   }
 
   return getKrKeyResult(a).localeCompare(getKrKeyResult(b), 'pt-BR');
-};
-
-const getCompletionPercent = (item: KRsItem) => {
-  const status = getKrStatus(item);
-  const statusMap: Record<string, number> = {
-    Concluído: 100,
-    'No prazo': 82,
-    'Em andamento': 62,
-    'Sob revisão': 42,
-    'Em atenção': 28,
-    'A iniciar': 18,
-  };
-
-  const current = parseNumericValue(getKrCurrent(item));
-  const goal = parseNumericValue(getKrGoal(item));
-
-  if (current !== null && goal !== null && goal > 0) {
-    return Math.max(0, Math.min(100, Math.round((current / goal) * 100)));
-  }
-
-  if (current !== null && goal === null && current <= 100) {
-    return Math.max(0, Math.min(100, Math.round(current)));
-  }
-
-  return statusMap[status] ?? 35;
 };
 
 const accentByMetaArea = (value: string) => {
@@ -287,6 +243,7 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
   onNavigateToProcessos,
   onNavigateToTreinamentos,
   onNavigateToAgentes,
+  onNavigateToOrganograma,
   onNavigateToForum,
   onNavigateToAdmin,
   onLogout,
@@ -642,16 +599,6 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
   const leadingCycle = krByCycle.reduce<(typeof krByCycle)[number] | null>((leader, item) => (!leader || item.total > leader.total ? item : leader), null);
   const leadingMeta = krByMetaArea[0] ?? null;
   const leadingStatus = krByStatus[0] ?? null;
-  const completedCount = useMemo(
-    () =>
-      filteredItems.filter((item) => {
-        const status = lower(getKrStatus(item));
-        const progress = getCompletionPercent(item);
-        return status.includes('conclu') || progress >= 100;
-      }).length,
-    [filteredItems]
-  );
-  const completedPercent = filteredItems.length ? Math.round((completedCount / filteredItems.length) * 100) : 0;
   const chartPalette = ['#88C125', '#4CD07D', '#F78E43', '#EEC137', '#7C8AA5', '#A855F7'] as const;
   const chartCardClass = `flex h-fit flex-col rounded-3xl border p-5 xl:min-h-[22rem] ${
     isLightMode ? 'border-zinc-200 bg-white' : 'border-white/10 bg-white/5'
@@ -666,6 +613,7 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
     { label: 'Treinamentos', icon: BookOpen, active: false, action: onNavigateToTreinamentos },
     { label: "Banco de OKR's", icon: BookMarked, active: true, action: undefined },
     { label: 'Agentes de IA', icon: Bot, active: false, action: onNavigateToAgentes },
+    { label: 'Organograma', icon: Building2, active: false, action: onNavigateToOrganograma },
     { label: 'Fórum', icon: MessageSquareMore, active: false, action: onNavigateToForum },
   ];
 
@@ -726,7 +674,7 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
                     Uma visão consolidada dos objetivos e resultados-chave da organização. Acompanhe metas, responsáveis, evolução dos indicadores e alinhamento estratégico em um único ambiente.
                   </p>
                   <div className="mt-6 flex flex-wrap gap-3">
-                    {['Objetivos', 'Indicadores', 'Metas', 'Ciclos'].map((chip) => (
+                    {['Objetivos', 'Iniciativas', 'Metas', 'Participantes'].map((chip) => (
                       <span
                         key={chip}
                         className={`rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] ${
@@ -746,79 +694,8 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
             </section>
 
             <section className={filtersClass}>
-              <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.12fr)_minmax(0,1fr)]">
-                <article className={chartCardClass}>
-                  <div className="flex items-center justify-between gap-3">
-                    <p className={chartTitleClass}>Quantidade por período</p>
-                    <span className={chartCountClass}>{filteredItems.length} OKR's</span>
-                  </div>
-                  {leadingCycle && <p className={chartInsightClass}>{leadingCycle.cycle} concentra {leadingCycle.total} OKR's no recorte atual.</p>}
-                  <div className="mt-4 flex flex-col gap-3">
-                    {krByCycle.map((item, index) => {
-                      const width = Math.max(12, Math.round((item.total / maxCycleCount) * 100));
-                      return (
-                        <div key={item.cycle}>
-                          <div className="mb-0.5 flex items-center justify-between gap-3 text-xs">
-                            <span className={`font-medium ${isLightMode ? 'text-zinc-700' : 'text-white/80'}`}>{item.cycle}</span>
-                            <span className={isLightMode ? 'text-zinc-500' : 'text-white/55'}>{item.total}</span>
-                          </div>
-                          <div className={`h-3.5 overflow-hidden rounded-full ${isLightMode ? 'bg-zinc-100' : 'bg-white/10'}`}>
-                            <div
-                              className="h-full rounded-full"
-                              style={{
-                                width: `${width}%`,
-                                backgroundColor: chartPalette[index % chartPalette.length],
-                              }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </article>
-
-                <article className={chartCardClass}>
-                  <div className="flex items-center justify-between gap-3">
-                    <p className={chartTitleClass}>Quantidade por meta</p>
-                    <span className={chartCountClass}>{filteredItems.length} OKR's</span>
-                  </div>
-                  {leadingMeta && <p className={chartInsightClass}>{leadingMeta.name} lidera com {leadingMeta.value} OKR's.</p>}
-                  <div className="mt-4 flex flex-col gap-4">
-                    {krByMetaArea.length ? (
-                      <div className="flex flex-col gap-3">
-                        {krByMetaArea.map((entry, index) => {
-                          const width = Math.max(10, Math.round((entry.value / maxMetaCount) * 100));
-                          const color = chartPalette[index % chartPalette.length];
-                          return (
-                            <div key={entry.name} className="space-y-2">
-                              <div className="flex items-start justify-between gap-3 text-xs">
-                                <span className={`min-w-0 flex-1 font-medium leading-tight ${isLightMode ? 'text-zinc-700' : 'text-white/80'}`}>{entry.name}</span>
-                                <span className={`shrink-0 font-semibold tabular-nums ${isLightMode ? 'text-zinc-500' : 'text-white/55'}`}>
-                                  {entry.value}
-                                </span>
-                              </div>
-                              <div className={`h-3 overflow-hidden rounded-full ${isLightMode ? 'bg-zinc-100' : 'bg-white/10'}`}>
-                                <div
-                                  className="h-full rounded-full"
-                                  style={{
-                                    width: `${width}%`,
-                                    background: `linear-gradient(90deg, ${color}, ${color}cc)`,
-                                  }}
-                                />
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className={`grid h-full place-items-center rounded-2xl border ${isLightMode ? 'border-zinc-200 bg-zinc-50 text-zinc-500' : 'border-white/10 bg-black/20 text-white/55'}`}>
-                        Sem dados para esse filtro
-                      </div>
-                    )}
-                  </div>
-                </article>
-
-                <article className={chartCardClass}>
+              <div className="grid items-start">
+                <article className={`${chartCardClass} xl:min-h-0`}>
                   <div className="flex items-center justify-between gap-3">
                     <p className={chartTitleClass}>Distribuição por status</p>
                     <span className={chartCountClass}>{filteredItems.length} OKR's</span>
@@ -862,12 +739,6 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
                           </ResponsiveContainer>
                         </div>
                         <div className="w-full">
-                          <div className={`mb-3 flex items-center justify-between rounded-2xl border px-4 py-3 ${isLightMode ? 'border-zinc-200 bg-zinc-50/70' : 'border-white/10 bg-white/[0.03]'}`}>
-                            <div>
-                              <p className={`text-xs font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Concluídos</p>
-                            </div>
-                            <span className={`text-2xl font-black ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>{completedPercent}%</span>
-                          </div>
                           <div className="grid grid-cols-2 gap-2">
                             {krByStatus.map((entry, index) => (
                               <div
@@ -905,7 +776,7 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
                 setOpenMenu(null);
               }}
             >
-              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto_auto_auto] xl:items-center">
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto_auto] xl:items-center">
                 <div className="xl:pr-4">
                   <SearchBar
                     searchTerm={searchTerm}
@@ -915,44 +786,6 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
                     onSuggestionClick={(item) => setExpandedKrId(item.id)}
                     theme={theme}
                   />
-                </div>
-
-                <div className="relative" data-filter-dropdown>
-                    <button
-                      type="button"
-                      onClick={() => setOpenMenu(openMenu === 'categoria' ? null : 'categoria')}
-                      className={filtersButtonClass}
-                    >
-                    <span>{categoryFilter || 'Meta área'}</span>
-                    <ChevronDown className="h-4 w-4" />
-                  </button>
-                  {openMenu === 'categoria' && (
-                    <div className={filtersMenuClass}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCategoryFilter('');
-                          setOpenMenu(null);
-                        }}
-                        className={filtersMenuItemClass}
-                      >
-                        Todas as meta áreas
-                      </button>
-                      {categories.map((category) => (
-                        <button
-                          key={category}
-                          type="button"
-                          onClick={() => {
-                            setCategoryFilter(category);
-                            setOpenMenu(null);
-                          }}
-                          className={filtersMenuItemClass}
-                        >
-                          {category}
-                        </button>
-                      ))}
-                    </div>
-                  )}
                 </div>
 
                 <div className="relative" data-filter-dropdown>
@@ -1042,10 +875,9 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
                     {paginatedItems.map((item) => {
                       const isExpanded = expandedKrId === item.id;
                       const localState = getState(item.id, item.views ?? 0, item.likes ?? 0, Boolean(item.pinned));
-                      const status = getKrStatus(item) || 'Pendente';
-                      const tone = (statusTone[status] || statusTone.Pendente)[isLightMode ? 'light' : 'dark'];
+                      const status = getKrStatus(item);
+                      const tone = statusTone[status][isLightMode ? 'light' : 'dark'];
                       const accent = accentByMetaArea(getKrMetaArea(item));
-                      const progress = getCompletionPercent(item);
                       const hasCoverImage = Boolean(item.Imagem_capa);
                       const cardId = `okr-card-${item.id}`;
                       const entryGroups = getKrEntries(item);
@@ -1126,17 +958,6 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
                                     <ShieldCheck className="h-3.5 w-3.5" />
                                     {status}
                                   </div>
-                                  <span
-                                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-semibold ${
-                                      isLightMode
-                                        ? 'border-[#88C125]/45 bg-[#88C125]/22 text-[#245b08] shadow-[0_4px_14px_rgba(136,193,37,0.15)]'
-                                        : 'border-[#88C125]/55 bg-[#88C125]/20 text-[#e1ff9e] shadow-[0_4px_14px_rgba(136,193,37,0.18)]'
-                                    } h-9`}
-                                  >
-                                    <TrendingUp className="h-3.5 w-3.5" />
-                                    <span className="text-[10px] uppercase tracking-[0.18em]">Evolução</span>
-                                    <span className="text-sm font-black">{displayValue(getKrEvolution(item), `${progress}%`)}</span>
-                                  </span>
                                 </div>
                               </div>
 
@@ -1214,11 +1035,10 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
                           {isExpanded && (
                             <div className={cardBodyClass}>
                               <div className="space-y-4">
-                                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                                <div className="grid gap-3 sm:grid-cols-3">
                                   <MetricCard label="Valor base" value={displayValue(getKrBase(item))} theme={theme} accent="#EEC137" />
                                   <MetricCard label="Valor alvo" value={displayValue(getKrGoal(item))} theme={theme} accent="#88C125" />
                                   <MetricCard label="Valor atual" value={displayValue(getKrCurrent(item))} theme={theme} accent="#4CD07D" />
-                                  <MetricCard label="Evolução" value={displayValue(getKrEvolution(item), `${progress}%`)} theme={theme} accent="#F78E43" />
                                 </div>
 
                                 <div className={`rounded-[24px] border p-4 ${isLightMode ? 'border-zinc-200 bg-white shadow-sm' : 'border-white/8 bg-black/20'}`}>
@@ -1300,11 +1120,7 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
                                                           : 'border-white/10 bg-white/6 text-white/70'
                                                   }`}
                                                 >
-                                                  {displayValue(entry.status, 'Pendente')}
-                                                </span>
-                                                <span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-[11px] font-semibold ${isLightMode ? 'border-[#88C125]/45 bg-[#88C125]/14 text-[#245b08]' : 'border-[#88C125]/35 bg-[#88C125]/10 text-[#e1ff9e]'}`}>
-                                                  <span className="uppercase tracking-[0.18em] text-[10px] opacity-80">Evolução</span>
-                                                  <span>{displayValue(entry.evolucao, '—')}</span>
+                                                  {normalizeKrStatus(entry.status || '')}
                                                 </span>
                                               </div>
                                               <span className={`text-[10px] font-semibold uppercase tracking-[0.24em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>

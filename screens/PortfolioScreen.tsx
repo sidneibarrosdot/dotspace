@@ -5,7 +5,6 @@ import MobileFooterNav from '../components/MobileFooterNav';
 import PortfolioCard from '../components/PortfolioCard';
 import PortfolioModal from '../components/PortfolioModal';
 import CalendarAgenda from '../components/CalendarAgenda';
-import OrgChart from '../components/OrgChart';
 import {
   FEEDBACK_COPY_ERROR,
   FEEDBACK_COPY_SUCCESS,
@@ -22,6 +21,7 @@ import {
   LayoutGrid,
   BookOpen,
   Bot,
+  Building2,
   BookMarked,
   MessageSquareMore,
   PencilLine,
@@ -353,6 +353,7 @@ interface PortfolioScreenProps {
     onNavigateToProcessos: () => void;
     onNavigateToTreinamentos: () => void;
     onNavigateToAgentes: () => void;
+    onNavigateToOrganograma: () => void;
     onNavigateToKRs: () => void;
     onNavigateToForum: () => void;
     onLogout: () => void;
@@ -387,7 +388,7 @@ const normalizeCount = (value: unknown) => {
   return Number.isFinite(nextValue) && nextValue > 0 ? nextValue : 0;
 };
 
-const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onNavigateToAdmin, onNavigateToProcessos, onNavigateToTreinamentos, onNavigateToAgentes, onNavigateToKRs, onNavigateToForum, onLogout, theme, toggleTheme, manualInteractionsEnabled, hiddenHomeSections, offlineMode = false }) => {
+const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onNavigateToAdmin, onNavigateToProcessos, onNavigateToTreinamentos, onNavigateToAgentes, onNavigateToOrganograma, onNavigateToKRs, onNavigateToForum, onLogout, theme, toggleTheme, manualInteractionsEnabled, hiddenHomeSections, offlineMode = false }) => {
   const isLightMode = theme === 'light';
   const isHomeSectionVisible = (section: HomeSectionKey) => !hiddenHomeSections.includes(section);
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>(offlineMode ? localPortfolioItems : []);
@@ -1458,6 +1459,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
                   { label: 'Treinamentos', icon: BookOpen, action: onNavigateToTreinamentos, active: false },
                   { label: "Banco de OKR's", icon: BookMarked, action: onNavigateToKRs, active: false },
                   { label: 'Agentes de IA', icon: Bot, action: onNavigateToAgentes, active: false },
+                  { label: 'Organograma', icon: Building2, action: onNavigateToOrganograma, active: false },
                   { label: 'Fórum', icon: MessageSquareMore, action: onNavigateToForum, active: false },
                 ].map((item) => {
                   const Icon = item.icon;
@@ -1721,8 +1723,6 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
               <CalendarAgenda />
             </section>
             )}
-            <OrgChart theme={theme} />
-
           </div>
         </section>
       </main>
@@ -1735,6 +1735,7 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
           { label: 'Treinamentos', icon: BookOpen, onClick: onNavigateToTreinamentos },
           { label: "Banco de OKR's", icon: BookMarked, onClick: onNavigateToKRs },
           { label: 'Agentes de IA', icon: Bot, onClick: onNavigateToAgentes },
+          { label: 'Organograma', icon: Building2, onClick: onNavigateToOrganograma },
           { label: 'Fórum', icon: MessageSquareMore, onClick: onNavigateToForum },
         ]}
       />

@@ -9,6 +9,7 @@ import TreinamentosScreen from './screens/TreinamentosScreen';
 import AgentesScreen from './screens/AgentesScreen';
 import KRsScreen from './screens/KRsScreen';
 import ForumScreen from './screens/ForumScreen';
+import OrganogramaScreen from './screens/OrganogramaScreen';
 import ErrorBoundary from './components/ErrorBoundary';
 import PostLoginLoader from './components/PostLoginLoader';
 import { auth, firebaseReady } from './firebase';
@@ -18,7 +19,7 @@ import { DEFAULT_APP_SETTINGS, subscribeToAppSettings, updateAppSettings } from 
 import type { AppSettings, DevelopmentLockKey, HomeSectionKey } from './types';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 
-export type View = 'portfolio' | 'processos' | 'treinamentos' | 'agentes' | 'krs' | 'forum' | 'login' | 'admin';
+export type View = 'portfolio' | 'processos' | 'treinamentos' | 'agentes' | 'organograma' | 'krs' | 'forum' | 'login' | 'admin';
 export type Theme = 'light' | 'dark';
 
 const LOCAL_SESSION_KEY = 'dot-space.local-session';
@@ -420,6 +421,7 @@ const App: React.FC = () => {
       onNavigateToProcessos: () => navigateTo('processos' as View),
       onNavigateToTreinamentos: () => navigateTo('treinamentos' as View),
       onNavigateToAgentes: () => navigateTo('agentes' as View),
+      onNavigateToOrganograma: () => navigateTo('organograma' as View),
       onNavigateToKRs: () => navigateTo('krs' as View),
       onNavigateToForum: () => navigateTo('forum' as View),
       onNavigateToAdmin: () => navigateTo('admin' as View),
@@ -477,6 +479,8 @@ const App: React.FC = () => {
           return <TreinamentosScreen {...commonProps} offlineMode />;
         case 'agentes':
           return <AgentesScreen {...commonProps} offlineMode />;
+        case 'organograma':
+          return <OrganogramaScreen {...commonProps} offlineMode />;
         case 'krs':
           return <KRsScreen {...commonProps} offlineMode />;
         case 'forum':
@@ -537,6 +541,8 @@ const App: React.FC = () => {
         return <TreinamentosScreen {...commonProps} offlineMode={!firebaseReady} />;
       case 'agentes':
         return <AgentesScreen {...commonProps} offlineMode={!firebaseReady} />;
+      case 'organograma':
+        return <OrganogramaScreen {...commonProps} offlineMode={!firebaseReady} />;
       case 'krs':
         return <KRsScreen {...commonProps} offlineMode={!firebaseReady} />;
       case 'forum':

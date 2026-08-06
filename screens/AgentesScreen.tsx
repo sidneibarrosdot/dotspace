@@ -10,6 +10,7 @@ import { FEEDBACK_COPY_ERROR, FEEDBACK_COPY_SUCCESS, FEEDBACK_TIMEOUT_ERROR, FEE
 import {
   ArrowRight,
   Bot,
+  Building2,
   ChevronDown,
   LayoutGrid,
   List,
@@ -43,6 +44,7 @@ interface AgentesScreenProps {
   onNavigateToKRs: () => void;
   onNavigateToForum: () => void;
   onNavigateToAgentes?: () => void;
+  onNavigateToOrganograma: () => void;
   onNavigateToAdmin: () => void;
   onLogout: () => void;
   theme: 'light' | 'dark';
@@ -58,6 +60,7 @@ const AgentesScreen: React.FC<AgentesScreenProps> = ({
   onNavigateToTreinamentos,
   onNavigateToKRs,
   onNavigateToForum,
+  onNavigateToOrganograma,
   onNavigateToAdmin,
   onLogout,
   theme,
@@ -218,6 +221,7 @@ const AgentesScreen: React.FC<AgentesScreenProps> = ({
     { label: 'Treinamentos', icon: BookOpen, active: false, action: onNavigateToTreinamentos },
     { label: "Banco de OKR's", icon: BookMarked, active: false, action: onNavigateToKRs },
     { label: 'Agentes de IA', icon: Bot, active: true, action: undefined },
+    { label: 'Organograma', icon: Building2, active: false, action: onNavigateToOrganograma },
     { label: 'Fórum', icon: MessageSquareMore, active: false, action: onNavigateToForum },
   ];
 

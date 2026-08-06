@@ -14,6 +14,7 @@ import {
   ArrowRight,
   BookOpen,
   Bot,
+  Building2,
   ChevronDown,
   Eye,
   ExternalLink,
@@ -41,6 +42,7 @@ interface ProcessosScreenProps {
   onNavigateToPortfolio: () => void;
   onNavigateToTreinamentos: () => void;
   onNavigateToAgentes: () => void;
+  onNavigateToOrganograma: () => void;
   onNavigateToKRs: () => void;
   onNavigateToForum: () => void;
   onNavigateToAdmin: () => void;
@@ -156,6 +158,7 @@ const ProcessosScreen: React.FC<ProcessosScreenProps> = ({
   onNavigateToPortfolio,
   onNavigateToTreinamentos,
   onNavigateToAgentes,
+  onNavigateToOrganograma,
   onNavigateToKRs,
   onNavigateToForum,
   onNavigateToAdmin,
@@ -471,6 +474,7 @@ const ProcessosScreen: React.FC<ProcessosScreenProps> = ({
     { label: 'Treinamentos', icon: BookOpen, active: false, action: onNavigateToTreinamentos },
     { label: "Banco de OKR's", icon: BookMarked, active: false, action: onNavigateToKRs },
     { label: 'Agentes de IA', icon: Bot, active: false, action: onNavigateToAgentes },
+    { label: 'Organograma', icon: Building2, active: false, action: onNavigateToOrganograma },
     { label: 'Fórum', icon: MessageSquareMore, active: false, action: onNavigateToForum },
   ];
 

@@ -50,7 +50,7 @@ export interface KRsItem extends PortfolioItem {
 }
 
 export const KR_META_AREA_OPTIONS = ['Lead Time', 'Redução de Custo', 'Aumento de Receita', 'Satisfação do Cliente'];
-export const KR_STATUS_OPTIONS = ['No prazo', 'A iniciar', 'Pendente', 'Concluído', 'Misto (2)'];
+export const KR_STATUS_OPTIONS = ['Concluído', 'Em andamento', 'Bloqueado', 'Cancelado'];
 export const KR_SYNERGY_OPTIONS = ['Sim - Alimenta outro time', 'Não', 'A validar'];
 export const KR_PERIOD_OPTIONS = ['Q1 2026', 'Q2 2026', 'Q3 2026'];
 export const KR_FUNCAO_OPTIONS = ['Gestão de projetos', 'Design instrucional', 'Produto', 'Operação', 'Dados'];
