@@ -14,18 +14,20 @@ import {
   BookOpen,
   Bot,
   Building2,
-  ChevronDown,
+  CalendarClock,
   Eye,
   ExternalLink,
-  FileText,
   Filter,
   Home,
   Heart,
+  Hash,
   LayoutGrid,
   MessageSquareMore,
   ShieldCheck,
   Bookmark,
   Share2,
+  Target,
+  UserRoundCheck,
   Users,
 } from 'lucide-react';
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
@@ -119,6 +121,14 @@ const getKrEntries = (item: KRsItem) =>
         {
           id: item.id,
           sourceIndex: item.sourceIndex,
+          aposta: item.aposta,
+          projetoEstrategico: item.projetoEstrategico,
+          canalSlack: item.canalSlack,
+          iniciativa: item.iniciativa,
+          participantesIniciativa: item.participantesIniciativa,
+          roadmapAcoes: item.roadmapAcoes,
+          indicadoresSucesso: item.indicadoresSucesso,
+          responsaveis: item.responsaveis,
           metaArea: getKrMetaArea(item),
           keyResult: getKrKeyResult(item),
           responsavelKR: getKrResponsavel(item),
@@ -259,7 +269,6 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
   const [shareFeedback, setShareFeedback] = useState('');
   const [expandedKrId, setExpandedKrId] = useState<string | null>(null);
   const [pendingHomeTargetId, setPendingHomeTargetId] = useState<string>('');
-  const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const { interactions, getState, incrementViews, toggleLike, toggleFavorite, registerShare } = useLocalCardInteractions('krs');
   const cardRefs = useRef<Record<string, HTMLElement | null>>({});
@@ -342,10 +351,26 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
         getKrGoal(item),
         getKrCurrent(item),
         getKrEvolution(item),
+        item.aposta,
+        item.projetoEstrategico,
+        item.canalSlack,
+        item.iniciativa,
+        item.participantesIniciativa,
+        item.roadmapAcoes,
+        item.indicadoresSucesso,
+        item.responsaveis,
         ...entries.flatMap((entry) => [
           entry.id,
           entry.metaArea,
           entry.objetivo,
+          entry.aposta,
+          entry.projetoEstrategico,
+          entry.canalSlack,
+          entry.iniciativa,
+          entry.participantesIniciativa,
+          entry.roadmapAcoes,
+          entry.indicadoresSucesso,
+          entry.responsaveis,
           entry.keyResult,
           entry.responsavelKR,
           entry.funcao,
@@ -485,11 +510,6 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
     });
   };
 
-  const toggleEntryDetails = (itemId: string, entryId: string) => {
-    const nextId = `${itemId}:${entryId}`;
-    setExpandedEntryId((current) => (current === nextId ? null : nextId));
-  };
-
   const openAccess = (item: KRsItem) => {
     recordLocalCardInteractionEvent('krs', item.id, 'slack_interest');
     window.open('https://dot-digital-group.slack.com/archives/C0BNBD4S16D', '_blank', 'noopener,noreferrer');
@@ -574,7 +594,6 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
   const maxMetaCount = Math.max(1, ...krByMetaArea.map((item) => item.value));
   const leadingCycle = krByCycle.reduce<(typeof krByCycle)[number] | null>((leader, item) => (!leader || item.total > leader.total ? item : leader), null);
   const leadingMeta = krByMetaArea[0] ?? null;
-  const leadingStatus = krByStatus[0] ?? null;
   const chartPalette = ['#88C125', '#4CD07D', '#F78E43', '#EEC137', '#7C8AA5', '#A855F7'] as const;
   const statusColors: Record<string, string> = {
     'Concluído': '#4CD07D',
@@ -582,9 +601,7 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
     'Bloqueado': '#F78E43',
     'Cancelado': '#7C8AA5',
   };
-  const chartCardClass = `flex h-fit flex-col rounded-3xl border p-5 xl:min-h-[22rem] ${
-    isLightMode ? 'border-zinc-200 bg-white' : 'border-white/10 bg-white/5'
-  }`;
+  const chartCardClass = 'flex h-fit flex-col p-1';
   const chartTitleClass = `text-xs font-semibold uppercase tracking-[0.3em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`;
   const chartCountClass = `text-xs font-semibold ${isLightMode ? 'text-zinc-500' : 'text-white/60'}`;
   const chartInsightClass = `mt-2 text-xs font-medium leading-5 ${isLightMode ? 'text-zinc-500' : 'text-white/50'}`;
@@ -664,18 +681,24 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
               </div>
             </section>
 
-            <section className={filtersClass}>
+            <section className={`${filtersClass} !p-4`}>
               <div className="grid items-start">
                 <article className={`${chartCardClass} xl:min-h-0`}>
-                  <div className="flex items-center justify-between gap-3">
-                    <p className={chartTitleClass}>Distribuição por status</p>
-                    <span className={chartCountClass}>{filteredItems.length} OKR's</span>
+                  <div className="flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                      <p className={chartTitleClass}>Distribuição por status</p>
+                      <p className={chartInsightClass}>Visão consolidada do andamento das iniciativas.</p>
+                    </div>
+                    <div className={`rounded-2xl border px-4 py-2 text-right ${isLightMode ? 'border-zinc-200 bg-zinc-50' : 'border-white/10 bg-white/5'}`}>
+                      <span className={`block text-2xl font-black ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>{filteredItems.length}</span>
+                      <span className={chartCountClass}>OKR's mapeados</span>
+                    </div>
                   </div>
-                  {leadingStatus && <p className={chartInsightClass}>{leadingStatus.name} aparece em {leadingStatus.value} OKR's.</p>}
-                  <div className="mt-5 grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-center">
+                  <div className={`my-3 h-px ${isLightMode ? 'bg-zinc-200' : 'bg-white/10'}`} />
+                  <div className="grid gap-4 lg:grid-cols-[190px_minmax(0,1fr)] lg:items-center">
                     {krByStatus.length ? (
                       <>
-                        <div className="relative mx-auto h-52 w-full max-w-[260px]">
+                        <div className="relative mx-auto h-36 w-full max-w-[190px]">
                           <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                               <Tooltip
@@ -698,6 +721,7 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
                                 cx="50%"
                                 cy="50%"
                                 outerRadius="86%"
+                                innerRadius="58%"
                                 paddingAngle={2}
                                 stroke={isLightMode ? '#ffffff' : '#18181b'}
                                 strokeWidth={3}
@@ -708,21 +732,32 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
                               </Pie>
                             </PieChart>
                           </ResponsiveContainer>
+                          <div className="pointer-events-none absolute inset-0 grid place-items-center text-center">
+                            <div>
+                              <span className={`block text-3xl font-black ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>{filteredItems.length}</span>
+                              <span className={`text-[9px] font-bold uppercase tracking-[0.18em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Total</span>
+                            </div>
+                          </div>
                         </div>
-                        <div className="grid w-full gap-3 sm:grid-cols-2">
+                        <div className="grid w-full gap-2.5 sm:grid-cols-2">
                             {statusSummary.map((entry) => (
                               <div
                                 key={entry.name}
-                                className={`flex min-h-24 items-center justify-between gap-4 rounded-2xl border px-5 py-4 ${isLightMode ? 'border-zinc-200 bg-zinc-50 text-zinc-700' : 'border-white/10 bg-white/5 text-white/80'}`}
+                                className={`flex min-h-16 items-center justify-between gap-4 rounded-2xl border px-4 py-2.5 ${isLightMode ? 'border-zinc-200 bg-zinc-50 text-zinc-700' : 'border-white/10 bg-white/5 text-white/80'}`}
                               >
-                                <span className="flex min-w-0 items-center gap-2">
+                                <span className="flex min-w-0 items-center gap-3">
                                   <span
-                                    className="h-3 w-3 shrink-0 rounded-full"
+                                    className="h-9 w-1.5 shrink-0 rounded-full"
                                     style={{ backgroundColor: statusColors[entry.name] }}
                                   />
-                                  <span className="font-bold">{entry.name}</span>
+                                  <span>
+                                    <span className="block font-bold">{entry.name}</span>
+                                    <span className={`mt-0.5 block text-xs ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>
+                                      {filteredItems.length ? Math.round((entry.value / filteredItems.length) * 100) : 0}% do total
+                                    </span>
+                                  </span>
                                 </span>
-                                <span className={`text-3xl font-black ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>{entry.value}</span>
+                                <span className={`text-2xl font-black ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>{entry.value}</span>
                               </div>
                             ))}
                         </div>
@@ -837,7 +872,6 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
                       const accent = accentByMetaArea(getKrMetaArea(item));
                       const hasCoverImage = Boolean(item.Imagem_capa);
                       const cardId = `okr-card-${item.id}`;
-                      const entryGroups = getKrEntries(item);
 
                       return (
                           <article
@@ -984,131 +1018,67 @@ const KRsScreen: React.FC<KRsScreenProps> = ({
 
                           {isExpanded && (
                             <div className={cardBodyClass}>
-                              <div className="space-y-4">
-                                <div className="grid gap-3 sm:grid-cols-3">
-                                  <MetricCard label="Valor base" value={displayValue(getKrBase(item))} theme={theme} accent="#EEC137" />
-                                  <MetricCard label="Valor alvo" value={displayValue(getKrGoal(item))} theme={theme} accent="#88C125" />
-                                  <MetricCard label="Valor atual" value={displayValue(getKrCurrent(item))} theme={theme} accent="#4CD07D" />
-                                </div>
-
-                                <div className={`rounded-[24px] border p-4 ${isLightMode ? 'border-zinc-200 bg-white shadow-sm' : 'border-white/8 bg-black/20'}`}>
-                                  <div className="flex items-center justify-between gap-4">
-                                    <div>
-                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.3em] ${isLightMode ? 'text-zinc-500' : 'text-white/40'}`}>Resumo da linha</p>
-                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>Metadados principais para identificar a entrada.</p>
-                                    </div>
-                                    <FileText className="h-5 w-5 shrink-0 text-[#EEC137]" />
-                                  </div>
-
-                                  <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                                    <InfoChip label="ID" value={displayValue(item.id, '—')} theme={theme} />
-                                    <InfoChip label="Meta" value={displayValue(getKrMetaArea(item), '—')} theme={theme} />
-                                    <InfoChip label="Período" value={displayValue(getKrPeriod(item), '—')} theme={theme} />
-                                    <InfoChip label="Status" value={displayValue(getKrStatus(item), 'Pendente')} theme={theme} />
-                                    <InfoChip label="Atualização" value={displayValue(getKrUpdatedAt(item), '—')} theme={theme} />
-                                  </div>
-                                </div>
-
-                                <div className="mt-4">
-                                  <div className="mb-3 flex items-center justify-between gap-3">
-                                    <div>
-                                      <p className={`text-[10px] font-semibold uppercase tracking-[0.3em] ${isLightMode ? 'text-zinc-500' : 'text-white/40'}`}>Responsáveis deste OKR</p>
-                                      <p className={`mt-1 text-sm font-semibold ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>Abra cada responsável para ver números, plano e observações.</p>
-                                    </div>
-                                    <span className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${isLightMode ? 'border-zinc-200 bg-white text-zinc-600' : 'border-white/10 bg-white/6 text-white/70'}`}>
-                                      {entryGroups.length} linhas
-                                    </span>
-                                  </div>
-
-                                  <div className="space-y-3">
-                                  {entryGroups.map((entry, entryIndex) => (
-                                    (() => {
-                                      const entryId = `${entry.id || entryIndex}`;
-                                      const entryKey = `${item.id}:${entryId}`;
-                                      const entryOpen = expandedEntryId === entryKey;
-                                      return (
-                                        <div
-                                          key={`${item.id}-${entryId}`}
-                                          className={`overflow-hidden rounded-[22px] border ${isLightMode ? 'border-zinc-200 bg-white' : 'border-white/8 bg-white/5'} ${entryOpen ? 'ring-1 ring-[#88C125]/20' : ''}`}
-                                        >
-                                          <button
-                                            type="button"
-                                            onClick={() => toggleEntryDetails(item.id, entryId)}
-                                            className={`flex w-full items-start justify-between gap-3 border-l-4 p-4 text-left transition-colors ${
-                                              isLightMode ? 'border-l-[#88C125]/70 hover:bg-zinc-50' : 'border-l-[#88C125]/80 hover:bg-white/5'
-                                            }`}
-                                          >
-                                            <div className="min-w-0">
-                                              <p className={`text-sm font-bold ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>
-                                                {displayValue(entry.responsavelKR, 'Sem responsável')}
-                                              </p>
-                                              <p className={`mt-1 text-sm leading-6 ${isLightMode ? 'text-zinc-600' : 'text-white/70'}`}>
-                                                {displayValue(entry.funcao, 'Função não definida')}
-                                              </p>
-                                              <p className={`mt-1 text-xs leading-5 ${isLightMode ? 'text-zinc-500' : 'text-white/55'}`}>
-                                                {displayValue(entry.objetivo, 'Objetivo não definido')}
-                                              </p>
-                                              <p className={`mt-1 text-[11px] font-semibold uppercase tracking-[0.22em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>
-                                                {displayValue(entry.id, 'Sem ID')}
-                                              </p>
-                                            </div>
-                                            <div className="flex shrink-0 flex-col items-end gap-2">
-                                              <div className="flex flex-wrap items-center justify-end gap-2">
-                                                <span
-                                                  className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${
-                                                    (entry.status || '').toLowerCase().includes('conclu')
-                                                      ? isLightMode
-                                                        ? 'border-[#4CD07D]/40 bg-[#4CD07D]/12 text-[#166a41]'
-                                                        : 'border-[#4CD07D]/30 bg-[#4CD07D]/10 text-[#c8ffe0]'
-                                                      : (entry.status || '').toLowerCase().includes('risco')
-                                                        ? isLightMode
-                                                          ? 'border-[#F2A43A]/45 bg-[#F2A43A]/16 text-[#8b4d06]'
-                                                          : 'border-[#F2A43A]/30 bg-[#F2A43A]/10 text-[#ffe6bf]'
-                                                        : isLightMode
-                                                          ? 'border-zinc-200 bg-zinc-100 text-zinc-700'
-                                                          : 'border-white/10 bg-white/6 text-white/70'
-                                                  }`}
-                                                >
-                                                  {normalizeKrStatus(entry.status || '')}
-                                                </span>
-                                              </div>
-                                              <span className={`text-[10px] font-semibold uppercase tracking-[0.24em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>
-                                                {entryOpen ? 'Fechar' : 'Abrir'}
-                                              </span>
-                                              <ChevronDown className={`h-4 w-4 transition-transform ${entryOpen ? 'rotate-180' : ''} ${isLightMode ? 'text-zinc-500' : 'text-white/50'}`} />
-                                            </div>
-                                          </button>
-
-                                          {entryOpen && (
-                                            <div className={`border-t px-4 py-4 ${isLightMode ? 'border-zinc-200 bg-zinc-50/70' : 'border-white/8 bg-black/15'}`}>
-                                              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                                                <MetricCard label="Valor base" value={displayValue(entry.valorBase, '—')} theme={theme} accent="#EEC137" subdued />
-                                                <MetricCard label="Valor alvo" value={displayValue(entry.valorAlvo, '—')} theme={theme} accent="#88C125" subdued />
-                                                <MetricCard label="Valor atual" value={displayValue(entry.valorAtual, '—')} theme={theme} accent="#4CD07D" subdued />
-                                              </div>
-
-                                              <div className="mt-3 flex flex-wrap gap-2">
-                                                <InfoChip label="Última atualização" value={displayValue(entry.ultimaAtualizacao, '—')} theme={theme} />
-                                                <InfoChip label="Sinergia" value={displayValue(entry.sinergia, 'Não informado')} theme={theme} />
-                                                <InfoChip label="Frente parceira" value={displayValue(entry.frenteParceira, 'Sem frente associada')} theme={theme} />
-                                              </div>
-
-                                              <div className="mt-3 grid gap-3 xl:grid-cols-2">
-                                                <div className={`rounded-2xl border p-3 ${isLightMode ? 'border-zinc-200 bg-white' : 'border-white/8 bg-white/5'}`}>
-                                                  <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/40'}`}>Plano de ação</p>
-                                                  <p className={`mt-2 whitespace-pre-wrap text-sm leading-6 ${isLightMode ? 'text-zinc-700' : 'text-white/76'}`}>{displayValue(entry.planoAcao, 'Sem plano de ação registrado.')}</p>
-                                                </div>
-                                                <div className={`rounded-2xl border p-3 ${isLightMode ? 'border-zinc-200 bg-white' : 'border-white/8 bg-white/5'}`}>
-                                                  <p className={`text-[10px] font-semibold uppercase tracking-[0.28em] ${isLightMode ? 'text-zinc-500' : 'text-white/40'}`}>Observações</p>
-                                                  <p className={`mt-2 whitespace-pre-wrap text-sm leading-6 ${isLightMode ? 'text-zinc-700' : 'text-white/76'}`}>{displayValue(entry.observacoes, 'Sem observações.')}</p>
-                                                </div>
-                                              </div>
-                                            </div>
-                                          )}
+                              <div className="grid gap-4">
+                                <div className="grid gap-3 md:grid-cols-3">
+                                  {[
+                                    { label: 'Aposta', value: item.aposta, icon: Target, color: '#88C125' },
+                                    { label: 'Projeto estratégico', value: item.projetoEstrategico, icon: Building2, color: '#EEC137' },
+                                    { label: 'Canal do Slack', value: item.canalSlack, icon: Hash, color: '#7C8AA5' },
+                                  ].map(({ label, value, icon: Icon, color }) => (
+                                    <div key={label} className={`group rounded-[20px] border p-4 transition-colors ${isLightMode ? 'border-zinc-200 bg-zinc-50 hover:bg-white' : 'border-white/8 bg-white/5 hover:bg-white/8'}`}>
+                                      <div className="flex items-start gap-3">
+                                        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl" style={{ backgroundColor: `${color}18`, color }}>
+                                          <Icon className="h-5 w-5" />
+                                        </span>
+                                        <div className="min-w-0">
+                                          <p className={`text-[9px] font-bold uppercase tracking-[0.22em] ${isLightMode ? 'text-zinc-500' : 'text-white/40'}`}>{label}</p>
+                                          <p className={`mt-1.5 break-words text-sm font-bold leading-5 ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>{displayValue(value)}</p>
                                         </div>
-                                      );
-                                    })()
+                                      </div>
+                                    </div>
                                   ))}
+                                </div>
+
+                                <div className="grid gap-3 xl:grid-cols-2">
+                                  <div className={`rounded-[22px] border p-5 ${isLightMode ? 'border-zinc-200 bg-gradient-to-br from-white to-[#88C125]/5' : 'border-white/8 bg-gradient-to-br from-white/6 to-[#88C125]/8'}`}>
+                                    <div className="flex items-center gap-3">
+                                      <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[#88C125]/15 text-[#88C125]"><Users className="h-5 w-5" /></span>
+                                      <div><p className={`text-[9px] font-bold uppercase tracking-[0.24em] ${isLightMode ? 'text-zinc-500' : 'text-white/40'}`}>Participantes</p><p className={`mt-1 text-sm font-black ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>Time da iniciativa</p></div>
+                                    </div>
+                                    <div className="mt-4 grid gap-2">
+                                      {displayValue(item.participantesIniciativa).split('\n').map((participant) => <p key={participant} className={`rounded-xl px-3 py-2 text-sm font-semibold ${isLightMode ? 'bg-white text-zinc-700 shadow-sm' : 'bg-black/15 text-white/75'}`}>{participant}</p>)}
+                                    </div>
+                                  </div>
+                                  <div className={`rounded-[22px] border p-5 ${isLightMode ? 'border-zinc-200 bg-gradient-to-br from-white to-[#EEC137]/5' : 'border-white/8 bg-gradient-to-br from-white/6 to-[#EEC137]/8'}`}>
+                                    <div className="flex items-center gap-3">
+                                      <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[#EEC137]/15 text-[#c49500] dark:text-[#EEC137]"><UserRoundCheck className="h-5 w-5" /></span>
+                                      <div><p className={`text-[9px] font-bold uppercase tracking-[0.24em] ${isLightMode ? 'text-zinc-500' : 'text-white/40'}`}>Responsáveis</p><p className={`mt-1 text-sm font-black ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>Pontos focais</p></div>
+                                    </div>
+                                    <div className="mt-4 flex flex-wrap gap-2">
+                                      {displayValue(item.responsaveis).split(',').map((person) => <span key={person} className={`rounded-full border px-3 py-2 text-sm font-semibold ${isLightMode ? 'border-zinc-200 bg-white text-zinc-700 shadow-sm' : 'border-white/10 bg-black/15 text-white/75'}`}>{person.trim()}</span>)}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="grid gap-3 xl:grid-cols-2">
+                                  <div className={`rounded-[22px] border border-l-4 border-l-[#88C125] p-4 ${isLightMode ? 'border-zinc-200 bg-[#88C125]/5' : 'border-white/8 bg-[#88C125]/8'}`}>
+                                    <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[#88C125]">Roadmap de ações</p>
+                                    <p className={`mt-3 whitespace-pre-wrap text-sm leading-7 ${isLightMode ? 'text-zinc-700' : 'text-white/76'}`}>{displayValue(item.roadmapAcoes, 'Sem ações registradas.')}</p>
+                                  </div>
+                                  <div className={`rounded-[22px] border border-l-4 border-l-[#EEC137] p-4 ${isLightMode ? 'border-zinc-200 bg-[#EEC137]/5' : 'border-white/8 bg-[#EEC137]/8'}`}>
+                                    <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[#c49500] dark:text-[#EEC137]">Indicadores de sucesso</p>
+                                    <p className={`mt-3 whitespace-pre-wrap text-sm leading-7 ${isLightMode ? 'text-zinc-700' : 'text-white/76'}`}>{displayValue(item.indicadoresSucesso, 'Sem indicador registrado.')}</p>
+                                  </div>
+                                </div>
+
+                                <div className={`flex flex-wrap items-center justify-between gap-4 rounded-[20px] border px-4 py-3 ${isLightMode ? 'border-zinc-200 bg-zinc-50' : 'border-white/8 bg-black/15'}`}>
+                                  <div className="flex items-center gap-3">
+                                    <span className={`grid h-9 w-9 place-items-center rounded-xl ${tone}`}><ShieldCheck className="h-4 w-4" /></span>
+                                    <div><p className={`text-[9px] font-bold uppercase tracking-[0.22em] ${isLightMode ? 'text-zinc-500' : 'text-white/40'}`}>Situação atual</p><p className={`mt-0.5 text-sm font-black ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>{displayValue(status)}</p></div>
+                                  </div>
+                                  <div className="flex items-center gap-3 text-right">
+                                    <div><p className={`text-[9px] font-bold uppercase tracking-[0.22em] ${isLightMode ? 'text-zinc-500' : 'text-white/40'}`}>Última atualização</p><p className={`mt-0.5 text-sm font-black ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>{displayValue(getKrUpdatedAt(item))}</p></div>
+                                    <span className={`grid h-9 w-9 place-items-center rounded-xl ${isLightMode ? 'bg-white text-zinc-500 shadow-sm' : 'bg-white/8 text-white/55'}`}><CalendarClock className="h-4 w-4" /></span>
                                   </div>
                                 </div>
                               </div>

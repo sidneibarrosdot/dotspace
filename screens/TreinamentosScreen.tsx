@@ -89,7 +89,7 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
   const [shareFeedback, setShareFeedback] = useState('');
   const [pendingHomeTargetId, setPendingHomeTargetId] = useState<string>('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const didRunInitialFilterResetRef = useRef(false);
   const filtersRef = useRef<HTMLElement | null>(null);
   const { interactions, getState, incrementViews, toggleLike, toggleFavorite, registerShare } = useLocalCardInteractions('treinamentos');
@@ -565,7 +565,7 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                                 {item.Assunto_geral || 'Descrição não informada.'}
                               </p>
                               <div className={`mt-4 grid gap-3 border-t pt-4 sm:grid-cols-2 ${isLightMode ? 'border-zinc-200' : 'border-white/10'}`}>
-                                <div><p className={`text-[10px] font-semibold uppercase tracking-[0.2em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Categoria</p><p className="mt-1 text-sm font-semibold">{item.Cliente || item.Time || 'Treinamento'}</p></div>
+                                <div><p className={`text-[10px] font-semibold uppercase tracking-[0.2em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Categoria</p><p className="mt-1 text-sm font-semibold">{item.Time || item.Cliente || 'Treinamento'}</p></div>
                                 <div><p className={`text-[10px] font-semibold uppercase tracking-[0.2em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Tema</p><p className="mt-1 text-sm font-semibold">{item.Assunto_especifico || 'Não informado'}</p></div>
                                 <div className="sm:col-span-2"><p className={`text-[10px] font-semibold uppercase tracking-[0.2em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Referência do processo</p><p className="mt-1 text-sm font-semibold">{item.Mídias || 'Não informada'}</p></div>
                               </div>
@@ -693,7 +693,7 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                                 </div>
                               </div>
                               <div className={`mt-4 grid gap-3 border-t pt-4 sm:grid-cols-3 ${isLightMode ? 'border-zinc-200' : 'border-white/10'}`}>
-                                <div><p className={`text-[10px] font-semibold uppercase tracking-[0.2em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Categoria</p><p className="mt-1 text-sm font-semibold">{item.Cliente || item.Time || 'Treinamento'}</p></div>
+                                <div><p className={`text-[10px] font-semibold uppercase tracking-[0.2em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Categoria</p><p className="mt-1 text-sm font-semibold">{item.Time || item.Cliente || 'Treinamento'}</p></div>
                                 <div><p className={`text-[10px] font-semibold uppercase tracking-[0.2em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Tema</p><p className="mt-1 text-sm font-semibold">{item.Assunto_especifico || 'Não informado'}</p></div>
                                 <div><p className={`text-[10px] font-semibold uppercase tracking-[0.2em] ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>Referência do processo</p><p className="mt-1 text-sm font-semibold">{item.Mídias || 'Não informada'}</p></div>
                               </div>

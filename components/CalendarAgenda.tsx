@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, CalendarRange, ChevronLeft, ChevronRight, ExternalLink, RefreshCcw, Slack } from 'lucide-react';
+import { CalendarDays, CalendarRange, ChevronLeft, ChevronRight, ExternalLink, RefreshCcw, Slack, Wrench } from 'lucide-react';
 
 type CalendarEvent = {
   id: string;
@@ -14,6 +14,7 @@ type CalendarEvent = {
 };
 
 type ViewMode = 'lista' | 'calendario';
+const CALENDAR_IN_DEVELOPMENT = true;
 
 const MOCK_EVENTS: CalendarEvent[] = [
   {
@@ -199,8 +200,20 @@ const CalendarAgenda: React.FC = () => {
   }, [events, currentMonth]);
 
   const selectedEvents = eventsByDay[selectedDay] || [];
+
   return (
-    <article className="rounded-[30px] border border-zinc-200/80 bg-white p-6 shadow-[0_25px_60px_rgba(15,23,42,0.08)] dark:border-zinc-700/70 dark:bg-[#1b1c20] dark:shadow-[0_25px_60px_rgba(0,0,0,0.3)]">
+    <article className={`relative overflow-hidden rounded-[30px] border border-zinc-200/80 bg-white p-6 shadow-[0_25px_60px_rgba(15,23,42,0.08)] dark:border-zinc-700/70 dark:bg-[#1b1c20] dark:shadow-[0_25px_60px_rgba(0,0,0,0.3)] ${CALENDAR_IN_DEVELOPMENT ? '[&>*:not(.calendar-overlay)]:pointer-events-none [&>*:not(.calendar-overlay)]:blur-[3px] [&>*:not(.calendar-overlay)]:select-none' : ''}`}>
+      {CALENDAR_IN_DEVELOPMENT && (
+        <div className="calendar-overlay absolute inset-0 z-30 grid place-items-center bg-white/20 p-6 backdrop-blur-[1px] dark:bg-black/20">
+          <div className="rounded-[24px] border border-[#EEC137]/40 bg-white/95 px-7 py-5 text-center shadow-xl dark:bg-[#202126]/95">
+            <span className="mx-auto grid h-11 w-11 place-items-center rounded-2xl bg-[#EEC137]/15 text-[#c49500] dark:text-[#EEC137]">
+              <Wrench className="h-5 w-5" />
+            </span>
+            <p className="mt-3 text-xs font-black uppercase tracking-[0.22em] text-[#9a7410] dark:text-[#ffe58a]">Em desenvolvimento</p>
+            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">A agenda será disponibilizada em uma próxima etapa.</p>
+          </div>
+        </div>
+      )}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-[280px] flex-1">
           <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[#88C125]">Agenda</p>

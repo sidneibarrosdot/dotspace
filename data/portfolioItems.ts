@@ -1,4 +1,9 @@
 import type { PortfolioItem } from '../types';
+import agendaCover from '../assets/home-cards/agenda.png';
+import forumCover from '../assets/home-cards/forum.png';
+import okrCover from '../assets/home-cards/okrs.png';
+import processCover from '../assets/home-cards/processos.png';
+import trainingCover from '../assets/home-cards/treinamentos.png';
 
 export const portfolioItems: PortfolioItem[] = [
   {
@@ -7,7 +12,7 @@ export const portfolioItems: PortfolioItem[] = [
     Cliente: 'Processos',
     Time: 'Time Aurora',
     Data: '2026-06-01',
-    Imagem_capa: 'https://picsum.photos/seed/mock-home-processo/800/600',
+    Imagem_capa: processCover,
     Link_PMV: 'https://example.com/home/processo',
     Assunto_geral: 'Exemplo visual de processo publicado no hub.',
     Assunto_especifico: 'Fluxo operacional',
@@ -24,7 +29,7 @@ export const portfolioItems: PortfolioItem[] = [
     Cliente: 'Treinamentos',
     Time: 'Time Prisma',
     Data: '2026-05-28',
-    Imagem_capa: 'https://picsum.photos/seed/mock-home-training/800/600',
+    Imagem_capa: trainingCover,
     Link_PMV: 'https://example.com/home/treinamento',
     Assunto_geral: 'Exemplo visual de treinamento em destaque.',
     Assunto_especifico: 'Capacitação interna',
@@ -41,7 +46,7 @@ export const portfolioItems: PortfolioItem[] = [
     Cliente: 'Banco de OKR\'s',
     Time: 'Time Atlas',
     Data: '2026-05-24',
-    Imagem_capa: 'https://picsum.photos/seed/mock-home-okr/800/600',
+    Imagem_capa: okrCover,
     Link_PMV: 'https://example.com/home/okr',
     Assunto_geral: 'Exemplo visual de objetivo acompanhado no painel.',
     Assunto_especifico: 'Indicadores e evolução',
@@ -58,7 +63,7 @@ export const portfolioItems: PortfolioItem[] = [
     Cliente: 'Fórum',
     Time: 'Time Nexo',
     Data: '2026-05-22',
-    Imagem_capa: 'https://picsum.photos/seed/mock-home-forum/800/600',
+    Imagem_capa: forumCover,
     Link_PMV: 'https://example.com/home/forum',
     Assunto_geral: 'Exemplo visual de discussão recente.',
     Assunto_especifico: 'Troca de ideias',
@@ -75,7 +80,7 @@ export const portfolioItems: PortfolioItem[] = [
     Cliente: 'Agenda',
     Time: 'Time Lumen',
     Data: '2026-05-20',
-    Imagem_capa: 'https://picsum.photos/seed/mock-home-calendar/800/600',
+    Imagem_capa: agendaCover,
     Link_PMV: 'https://example.com/home/agenda',
     Assunto_geral: 'Exemplo visual de evento conectado ao hub.',
     Assunto_especifico: 'Calendário',

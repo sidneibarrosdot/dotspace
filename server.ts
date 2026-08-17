@@ -104,7 +104,7 @@ const commitInChunks = async (
 async function startServer() {
   const app = express();
   const serverEnv = loadEnv(process.env.NODE_ENV || 'development', process.cwd(), '');
-  const PORT = process.env.PORT ? Number(process.env.PORT) : 3002;
+  const PORT = process.env.PORT ? Number(process.env.PORT) : 3003;
 
   app.use(express.json({ limit: '10mb' }));
 
@@ -358,7 +358,10 @@ async function startServer() {
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: { port: Number(process.env.HMR_PORT) || PORT + 10000 },
+      },
       appType: "spa",
     });
     app.use(vite.middlewares);

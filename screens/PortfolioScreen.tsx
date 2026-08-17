@@ -36,6 +36,7 @@ import { processosItems } from '../data/processosItems';
 import { krsItems } from '../data/krsItems';
 import { treinamentosItems } from '../data/treinamentosItems';
 import { portfolioItems as localPortfolioItems } from '../data/portfolioItems';
+import homeAppEcosystem from '../assets/home-app-ecosystem.png';
 import { recordLocalCardInteractionEvent } from '../hooks/useLocalCardInteractions';
 import { db } from '../firebase';
 import { addDoc, collection, query, onSnapshot, doc, updateDoc, increment, getDoc, Timestamp } from 'firebase/firestore';
@@ -1300,8 +1301,8 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
 
   const featuredItem = useMemo(() => homeHubItems[0] || null, [homeHubItems]);
   const recentItems = useMemo(
-    () => homeHubItems.slice(0, 6),
-    [homeHubItems]
+    () => homeHubItems.filter((item) => item.id !== featuredItem?.id).slice(0, 6),
+    [featuredItem, homeHubItems]
   );
 
   const focusLinks = useMemo(
@@ -1506,34 +1507,8 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
                   </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
-                  {[
-                    { label: 'Processos', value: processosItems.length, accent: 'bg-[#88C125]' },
-                    { label: 'Treinamentos', value: portfolioItems.length, accent: 'bg-[#4CD07D]' },
-                    { label: "Banco de OKR's", value: krsItems.length, accent: 'bg-[#F78E43]' },
-                    {
-                      label: 'Fórum',
-                      value: 5,
-                      accent: 'bg-[#EEC137]'
-                    },
-                  ].map((item) => (
-                    <div
-                      key={item.label}
-                      className={`rounded-3xl border p-3 backdrop-blur-sm sm:p-4 ${
-                        isLightMode
-                          ? 'border-zinc-200 bg-white/80 shadow-sm'
-                          : 'border-white/10 bg-white/8'
-                      }`}
-                    >
-                      <div className={`mb-2 h-1.5 w-12 rounded-full ${item.accent}`} />
-                      <p className={`text-[10px] font-semibold uppercase tracking-[0.32em] sm:text-xs ${isLightMode ? 'text-zinc-500' : 'text-white/45'}`}>
-                        {item.label}
-                      </p>
-                      <p className={`mt-1 text-2xl font-bold leading-none sm:text-[2rem] ${isLightMode ? 'text-zinc-900' : 'text-white'}`}>
-                        {item.value}
-                      </p>
-                    </div>
-                  ))}
+                <div className={`group relative min-h-[220px] overflow-hidden rounded-[28px] border lg:-my-10 lg:-mr-8 lg:min-h-[calc(100%+5rem)] lg:rounded-none lg:rounded-r-[33px] lg:border-y-0 lg:border-r-0 ${isLightMode ? 'border-zinc-200 bg-zinc-100 shadow-sm' : 'border-white/10 bg-black/20'}`}>
+                  <img src={homeAppEcosystem} alt="Ecossistema integrado do DOT Space" className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]" />
                 </div>
               </div>
             </section>

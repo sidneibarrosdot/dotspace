@@ -26,6 +26,7 @@ export type Theme = 'light' | 'dark';
 const LOCAL_SESSION_KEY = 'dot-space.local-session';
 const LOCAL_APP_SETTINGS_KEY = 'dot-space.app-settings';
 const ADMIN_ACCESS_KEY = 'dot-space.admin-access-granted';
+const THEME_PREFERENCE_KEY = 'dot-space.theme-preference-v2';
 const ADMIN_ACCESS_PASSWORD = import.meta.env.VITE_ADMIN_ACCESS_PASSWORD?.trim() || 'dotspace-admin';
 const GCP_LOGIN_ENABLED = false;
 const DEVELOPMENT_VIEW_KEYS: Partial<Record<View, DevelopmentLockKey>> = {
@@ -52,8 +53,8 @@ const loadLocalAppSettings = (): AppSettings => {
     return {
       ...DEFAULT_APP_SETTINGS,
       ...saved,
-      developmentLockedSections: Array.from(new Set([...validLocks, 'forum'])),
-      hiddenHomeSections,
+      developmentLockedSections: Array.from(new Set([...validLocks, 'processos', 'forum'])),
+      hiddenHomeSections: hiddenHomeSections.filter((section) => section !== 'calendar'),
       environment: 'production',
     };
   } catch {
@@ -180,7 +181,7 @@ const App: React.FC = () => {
   });
   const [authLoading, setAuthLoading] = useState(true);
   const [theme, setTheme] = useState<Theme>(() => {
-    const savedTheme = localStorage.getItem('portfolio-theme') as Theme;
+    const savedTheme = localStorage.getItem(THEME_PREFERENCE_KEY) as Theme;
     return savedTheme || 'dark';
   });
   const [appSettings, setAppSettings] = useState<AppSettings>(() =>
@@ -225,7 +226,7 @@ const App: React.FC = () => {
     } else {
       root.classList.remove('dark');
     }
-    localStorage.setItem('portfolio-theme', theme);
+    localStorage.setItem(THEME_PREFERENCE_KEY, theme);
   }, [theme, currentView]);
 
   useEffect(() => {

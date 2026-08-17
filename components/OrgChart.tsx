@@ -5,18 +5,44 @@ type Person = { name: string; slack?: string };
 type Area = { name: string; people: Person[] };
 type Team = { id: string; name: string; coordination: Person; clients: string; projectLead: Person; areas: Area[] };
 
-const seed: Team[] = [{
-  id: 'natiruts-innovation', name: 'Natiruts Innovation', clients: 'Senar FIC (Senar Nacional)',
-  coordination: { name: 'Paula Faraco', slack: 'https://dot-digital-group.slack.com/team/UUQ3DEAGH' },
-  projectLead: { name: 'Lucas Millan', slack: 'https://dot-digital-group.slack.com/team/U07H3LSN4RY' },
-  areas: [
-    { name: 'DIs', people: [
-      ['Luciane Rodrigues', 'U0261JA2W9X'], ['Pupella Cardoso', 'U01H2GQP05C'], ['Andréia Drula', 'U01QTUHQNGK'], ['Nathália Gago', 'U08RRHKMDA8'],
-    ].map(([name, id]) => ({ name, slack: `https://dot-digital-group.slack.com/team/${id}` })) },
-    { name: 'DMs', people: [['Tiago Zanchin', 'U03JKUBNR43'], ['Gabriel Jacober', 'U01K6GRG24D']].map(([name, id]) => ({ name, slack: `https://dot-digital-group.slack.com/team/${id}` })) },
-    { name: 'Front', people: [{ name: 'Nathy Santos', slack: 'https://dot-digital-group.slack.com/team/U016N9G72TH' }] },
-  ],
-}];
+const seed: Team[] = [
+  {
+    id: 'time-modelo', name: 'Time Modelo', clients: 'Cliente Exemplo',
+    coordination: { name: 'Pessoa Mock 01' }, projectLead: { name: 'Pessoa Mock 02' },
+    areas: [
+      { name: 'Design Instrucional', people: ['03', '04', '05', '06'].map(id => ({ name: `Pessoa Mock ${id}` })) },
+      { name: 'Design Multimídia', people: ['07', '08'].map(id => ({ name: `Pessoa Mock ${id}` })) },
+      { name: 'Front End', people: [{ name: 'Pessoa Mock 09' }] },
+    ],
+  },
+  {
+    id: 'time-horizonte', name: 'Time Horizonte', clients: 'Cliente Modelo A',
+    coordination: { name: 'Pessoa Mock 10' }, projectLead: { name: 'Pessoa Mock 11' },
+    areas: [
+      { name: 'Conteúdo', people: ['12', '13', '14'].map(id => ({ name: `Pessoa Mock ${id}` })) },
+      { name: 'Audiovisual', people: ['15', '16'].map(id => ({ name: `Pessoa Mock ${id}` })) },
+      { name: 'Qualidade', people: [{ name: 'Pessoa Mock 17' }] },
+    ],
+  },
+  {
+    id: 'time-orbita', name: 'Time Órbita', clients: 'Cliente Modelo B',
+    coordination: { name: 'Pessoa Mock 18' }, projectLead: { name: 'Pessoa Mock 19' },
+    areas: [
+      { name: 'Produto', people: ['20', '21'].map(id => ({ name: `Pessoa Mock ${id}` })) },
+      { name: 'Dados', people: ['22', '23'].map(id => ({ name: `Pessoa Mock ${id}` })) },
+      { name: 'Desenvolvimento', people: ['24', '25', '26'].map(id => ({ name: `Pessoa Mock ${id}` })) },
+      { name: 'Operações', people: [{ name: 'Pessoa Mock 27' }] },
+    ],
+  },
+  {
+    id: 'time-nexo', name: 'Time Nexo', clients: 'Cliente Modelo C',
+    coordination: { name: 'Pessoa Mock 28' }, projectLead: { name: 'Pessoa Mock 29' },
+    areas: [
+      { name: 'Projetos', people: ['30', '31'].map(id => ({ name: `Pessoa Mock ${id}` })) },
+      { name: 'Experiência', people: ['32', '33', '34'].map(id => ({ name: `Pessoa Mock ${id}` })) },
+    ],
+  },
+];
 
 const PersonLink = ({ person }: { person: Person }) => person.slack
   ? <a href={person.slack} target="_blank" rel="noreferrer" className="font-semibold hover:text-[#88C125]">{person.name}</a>

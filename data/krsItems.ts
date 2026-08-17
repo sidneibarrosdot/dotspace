@@ -1,8 +1,17 @@
 import type { PortfolioItem } from '../types';
+import okrCover from '../assets/home-cards/okrs.png';
 
 export interface KrInventoryEntry {
   id: string;
   sourceIndex: number;
+  aposta: string;
+  projetoEstrategico: string;
+  canalSlack: string;
+  iniciativa: string;
+  participantesIniciativa: string;
+  roadmapAcoes: string;
+  indicadoresSucesso: string;
+  responsaveis: string;
   metaArea: string;
   objetivo: string;
   keyResult: string;
@@ -26,6 +35,14 @@ export interface KrInventoryEntry {
 
 export interface KRsItem extends PortfolioItem {
   sourceIndex: number;
+  aposta: string;
+  projetoEstrategico: string;
+  canalSlack: string;
+  iniciativa: string;
+  participantesIniciativa: string;
+  roadmapAcoes: string;
+  indicadoresSucesso: string;
+  responsaveis: string;
   metaArea: string;
   keyResult: string;
   responsavelKR: string;
@@ -83,7 +100,15 @@ const buildItem = (
   return {
     id: entry.id,
     sourceIndex: entry.sourceIndex,
-    Imagem_capa: '',
+    aposta: entry.aposta,
+    projetoEstrategico: entry.projetoEstrategico,
+    canalSlack: entry.canalSlack,
+    iniciativa: entry.iniciativa,
+    participantesIniciativa: entry.participantesIniciativa,
+    roadmapAcoes: entry.roadmapAcoes,
+    indicadoresSucesso: entry.indicadoresSucesso,
+    responsaveis: entry.responsaveis,
+    Imagem_capa: okrCover,
     Time: entry.timeSquad,
     Cliente: entry.metaArea,
     Data: entry.periodo,
@@ -136,121 +161,89 @@ const buildItem = (
   };
 };
 
+const COMMON_OBJECTIVE = 'Fortalecer ritos e métricas para garantir decisões rápidas e uma operação previsível, escalável e eficiente.';
+const COMMON_PARTICIPANTS = 'Coordenação: Pessoa Mock 01\nLiderança: Pessoa Mock 02';
+
 const entries = [
   buildEntry(
     {
       id: 'OKR-2026-MOCK-001',
-      metaArea: 'Lead Time',
-      objetivo: 'Acelerar o ciclo de entrega sem perder qualidade operacional.',
-      keyResult: 'Reduzir o tempo médio de publicação de materiais críticos.',
-      responsavelKR: 'Pessoa Mock 01',
-      funcao: 'Gestão de projetos',
-      timeSquad: 'Time Aurora',
-      periodo: 'Q1 2026',
-      valorBase: '10 dias',
-      valorAlvo: '6 dias',
-      valorAtual: '7 dias',
-      evolucao: '70%',
-      status: 'No prazo',
-      sinergia: 'Sim - Alimenta outro time',
-      frenteParceira: 'Frente Alpha',
-      planoAcao: 'Mapear gargalos, revisar checkpoints e automatizar alertas de pendência.',
+      aposta: 'Maturidade Digital da Operação',
+      objetivo: COMMON_OBJECTIVE,
+      projetoEstrategico: 'Gestão Ágil',
+      canalSlack: '#canal-exemplo-gestao',
+      iniciativa: 'Hub de Conhecimento',
+      participantesIniciativa: COMMON_PARTICIPANTS,
+      roadmapAcoes: 'Implementar o hub de treinamentos e organizar conteúdos prioritários.',
+      indicadoresSucesso: 'Garantir que 80% dos conteúdos prioritários estejam atualizados e disponíveis no hub.',
+      responsaveis: 'Pessoa Mock 03, Pessoa Mock 04',
+      metaArea: 'Maturidade Digital',
+      keyResult: 'Hub de Conhecimento',
+      responsavelKR: 'Pessoa Mock 03, Pessoa Mock 04',
+      funcao: 'Gestão Ágil',
+      timeSquad: 'Participação multidisciplinar',
+      periodo: 'Q3 2026',
+      valorBase: '', valorAlvo: '', valorAtual: '', evolucao: '',
+      status: 'Em andamento', sinergia: '', frenteParceira: '',
+      planoAcao: 'Implementar o hub de treinamentos e organizar conteúdos prioritários.',
       ultimaAtualizacao: '2026-06-01',
-      observacoes: 'Indicador fictício para validação visual.',
+      observacoes: 'Garantir que 80% dos conteúdos prioritários estejam atualizados e disponíveis no hub.',
     },
     1,
   ),
   buildEntry(
     {
       id: 'OKR-2026-MOCK-002',
-      metaArea: 'Redução de Custo',
-      objetivo: 'Diminuir retrabalho em processos recorrentes.',
-      keyResult: 'Reduzir horas gastas em ajustes manuais de documentação.',
-      responsavelKR: 'Pessoa Mock 02',
-      funcao: 'Operação',
-      timeSquad: 'Time Prisma',
-      periodo: 'Q2 2026',
-      valorBase: '40 horas',
-      valorAlvo: '24 horas',
-      valorAtual: '32 horas',
-      evolucao: '45%',
-      status: 'Pendente',
-      sinergia: 'A validar',
-      frenteParceira: 'Frente Beta',
-      planoAcao: 'Criar checklist preventivo e revisar templates usados em massa.',
+      aposta: 'Maturidade Digital da Operação', objetivo: COMMON_OBJECTIVE,
+      projetoEstrategico: 'Gestão Ágil', canalSlack: '#canal-exemplo-gestao', iniciativa: 'Assistente de Gestão',
+      participantesIniciativa: `${COMMON_PARTICIPANTS}\nResponsável: Pessoa Mock 05`,
+      roadmapAcoes: 'Atualizar a base de conhecimento.\nColetar feedbacks das equipes.\nImplementar melhorias na governança.',
+      indicadoresSucesso: 'Alcançar satisfação igual ou superior a 85% com a utilidade das orientações disponibilizadas.',
+      responsaveis: 'Pessoa Mock 05, Pessoa Mock 06',
+      metaArea: 'Maturidade Digital', keyResult: 'Assistente de Gestão', responsavelKR: 'Pessoa Mock 05, Pessoa Mock 06',
+      funcao: 'Gestão Ágil', timeSquad: 'Participação multidisciplinar', periodo: 'Q3 2026',
+      valorBase: '', valorAlvo: '', valorAtual: '', evolucao: '', status: 'Em andamento', sinergia: '', frenteParceira: '',
+      planoAcao: 'Atualizar a base de conhecimento, coletar feedbacks e implementar melhorias.',
       ultimaAtualizacao: '2026-05-28',
-      observacoes: 'Aguardando validação do processo de medição.',
+      observacoes: 'Alcançar satisfação igual ou superior a 85% com a utilidade das orientações disponibilizadas.',
     },
     2,
   ),
   buildEntry(
     {
       id: 'OKR-2026-MOCK-003',
-      metaArea: 'Aumento de Receita',
-      objetivo: 'Apoiar novas oportunidades a partir de materiais reutilizáveis.',
-      keyResult: 'Criar biblioteca de propostas reaproveitáveis para novos projetos.',
-      responsavelKR: 'Pessoa Mock 03',
-      funcao: 'Produto',
-      timeSquad: 'Time Atlas',
-      periodo: 'Q2 2026',
-      valorBase: '2 modelos',
-      valorAlvo: '8 modelos',
-      valorAtual: '4 modelos',
-      evolucao: '35%',
-      status: 'A iniciar',
-      sinergia: 'Sim - Alimenta outro time',
-      frenteParceira: 'Frente Gama',
-      planoAcao: 'Selecionar casos, transformar em modelos e publicar no hub.',
+      aposta: 'Maturidade Digital da Operação', objetivo: COMMON_OBJECTIVE,
+      projetoEstrategico: 'Gestão Ágil', canalSlack: '#canal-exemplo-gestao', iniciativa: 'Central de Rituais',
+      participantesIniciativa: `${COMMON_PARTICIPANTS}\nResponsável: Pessoa Mock 07`,
+      roadmapAcoes: 'Mapear rituais existentes.\nDefinir o modelo de governança.\nCapacitar usuários-chave.',
+      indicadoresSucesso: 'Garantir utilização recorrente da central em 90% dos rituais de acompanhamento.',
+      responsaveis: 'Pessoa Mock 07, Pessoa Mock 08',
+      metaArea: 'Maturidade Digital', keyResult: 'Central de Rituais', responsavelKR: 'Pessoa Mock 07, Pessoa Mock 08',
+      funcao: 'Gestão Ágil', timeSquad: 'Participação multidisciplinar', periodo: 'Q3 2026',
+      valorBase: '', valorAlvo: '', valorAtual: '', evolucao: '', status: 'Bloqueado', sinergia: '', frenteParceira: '',
+      planoAcao: 'Mapear rituais, definir governança e capacitar usuários-chave.',
       ultimaAtualizacao: '2026-05-24',
-      observacoes: 'Base mockada para simular acompanhamento.',
+      observacoes: 'Garantir utilização recorrente da central em 90% dos rituais de acompanhamento.',
     },
     3,
   ),
   buildEntry(
     {
       id: 'OKR-2026-MOCK-004',
-      metaArea: 'Satisfação do Cliente',
-      objetivo: 'Melhorar a clareza de entregas acompanhadas pelo cliente.',
-      keyResult: 'Aumentar a percepção de clareza nos materiais de status report.',
-      responsavelKR: 'Pessoa Mock 04',
-      funcao: 'Design instrucional',
-      timeSquad: 'Time Nexo',
-      periodo: 'Q3 2026',
-      valorBase: '72%',
-      valorAlvo: '90%',
-      valorAtual: '90%',
-      evolucao: '100%',
-      status: 'Concluído',
-      sinergia: 'Não',
-      frenteParceira: 'Frente Delta',
-      planoAcao: 'Padronizar status reports e revisar linguagem dos resumos executivos.',
+      aposta: 'Maturidade Digital da Operação', objetivo: COMMON_OBJECTIVE,
+      projetoEstrategico: 'Gestão Ágil', canalSlack: '#canal-exemplo-gestao', iniciativa: 'Relatórios Integrados',
+      participantesIniciativa: `${COMMON_PARTICIPANTS}\nResponsável: Pessoa Mock 09`,
+      roadmapAcoes: 'Agrupar projetos relacionados.\nPadronizar histórias e subtarefas.\nPermitir edição antes da geração do relatório.',
+      indicadoresSucesso: 'Garantir o uso dos relatórios por 100% das lideranças dos projetos elegíveis.',
+      responsaveis: 'Pessoa Mock 09',
+      metaArea: 'Maturidade Digital', keyResult: 'Relatórios Integrados', responsavelKR: 'Pessoa Mock 09',
+      funcao: 'Gestão Ágil', timeSquad: 'Participação multidisciplinar', periodo: 'Q3 2026',
+      valorBase: '', valorAlvo: '', valorAtual: '', evolucao: '', status: 'Concluído', sinergia: '', frenteParceira: '',
+      planoAcao: 'Agrupar projetos, padronizar registros e permitir revisão antes da geração.',
       ultimaAtualizacao: '2026-05-19',
-      observacoes: 'Exemplo concluído para validar distribuição por status.',
+      observacoes: 'Garantir o uso dos relatórios por 100% das lideranças dos projetos elegíveis.',
     },
     4,
-  ),
-  buildEntry(
-    {
-      id: 'OKR-2026-MOCK-005',
-      metaArea: 'Lead Time',
-      objetivo: 'Reduzir espera entre aprovação e disponibilização final.',
-      keyResult: 'Automatizar alertas de pendências em etapas críticas.',
-      responsavelKR: 'Pessoa Mock 05',
-      funcao: 'Dados',
-      timeSquad: 'Time Lumen',
-      periodo: 'Q2 2026',
-      valorBase: '5 alertas manuais',
-      valorAlvo: '1 alerta manual',
-      valorAtual: '3 alertas manuais',
-      evolucao: '50%',
-      status: 'Misto (2)',
-      sinergia: 'Sim - Alimenta outro time',
-      frenteParceira: 'Frente Épsilon',
-      planoAcao: 'Integrar planilha mockada ao painel e disparar alertas de atualização.',
-      ultimaAtualizacao: '2026-05-15',
-      observacoes: 'Status misto proposital para validar UI.',
-    },
-    5,
   ),
 ];
 
@@ -259,5 +252,4 @@ export const krsItems: KRsItem[] = [
   buildItem(entries[1]),
   buildItem(entries[2]),
   buildItem(entries[3]),
-  buildItem(entries[4]),
 ];

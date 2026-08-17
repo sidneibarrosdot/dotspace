@@ -7,7 +7,7 @@ const APP_SETTINGS_DOC_ID = 'appSettings';
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   manualInteractionsEnabled: true,
-  developmentLockedSections: ['forum'],
+  developmentLockedSections: ['processos', 'forum'],
   hiddenHomeSections: [],
   environment: 'production',
 };
@@ -39,8 +39,8 @@ const normalizeAppSettings = (data: Partial<AppSettings> | undefined | null): Ap
 
   return {
     manualInteractionsEnabled: data?.manualInteractionsEnabled ?? DEFAULT_APP_SETTINGS.manualInteractionsEnabled,
-    developmentLockedSections: Array.from(new Set([...savedLocks, ...migratedLegacyLock, 'forum'])),
-    hiddenHomeSections,
+    developmentLockedSections: Array.from(new Set([...savedLocks, ...migratedLegacyLock, 'processos', 'forum'])),
+    hiddenHomeSections: hiddenHomeSections.filter((section) => section !== 'calendar'),
     environment: DEFAULT_APP_SETTINGS.environment,
     updatedAt: data?.updatedAt,
     updatedBy: data?.updatedBy,

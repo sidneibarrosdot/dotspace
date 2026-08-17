@@ -1,11 +1,16 @@
 import type { PortfolioItem } from '../types';
+import processCover from '../assets/home-cards/processos.png';
+import trainingCover from '../assets/home-cards/treinamentos.png';
+import okrCover from '../assets/home-cards/okrs.png';
+import forumCover from '../assets/home-cards/forum.png';
+import agendaCover from '../assets/home-cards/agenda.png';
 
 const processImages = [
-  'https://picsum.photos/seed/mock-process-briefing/900/700',
-  'https://picsum.photos/seed/mock-process-governance/900/700',
-  'https://picsum.photos/seed/mock-process-handoff/900/700',
-  'https://picsum.photos/seed/mock-process-quality/900/700',
-  'https://picsum.photos/seed/mock-process-access/900/700',
+  processCover,
+  forumCover,
+  trainingCover,
+  okrCover,
+  agendaCover,
 ];
 
 export const processosItems: PortfolioItem[] = [
