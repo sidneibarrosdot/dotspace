@@ -11,20 +11,21 @@ interface BrandLogoProps {
 }
 
 const BrandLogo: React.FC<BrandLogoProps> = ({ theme, className, variant = 'compact' }) => {
-  const version = '2026-05-19-5';
-  const planetsSrc = `${theme === 'dark' ? planetsDark : planetsLight}?v=${version}`;
-  const wordmarkSrc = `${theme === 'dark' ? wordmarkDark : wordmarkLight}?v=${version}`;
+  const version = '2026-08-17-planets-5';
+  const withVersion = (src: string) => (src.startsWith('data:') ? src : `${src}?v=${version}`);
+  const planetsSrc = withVersion(theme === 'dark' ? planetsDark : planetsLight);
+  const wordmarkSrc = withVersion(theme === 'dark' ? wordmarkDark : wordmarkLight);
 
   if (variant === 'login') {
     return (
       <div
-        className={`inline-flex items-center gap-1.5 overflow-visible ${className ?? ''}`}
+        className={`inline-flex items-center gap-0.5 overflow-visible ${className ?? ''}`}
       >
         <div
           className="relative shrink-0"
           style={{
-            width: 'var(--brand-planet, clamp(52px, 7vw, 86px))',
-            height: 'var(--brand-planet, clamp(52px, 7vw, 86px))',
+            width: 'calc(var(--brand-planet, clamp(52px, 7vw, 86px)) * 1.38)',
+            height: 'calc(var(--brand-planet, clamp(52px, 7vw, 86px)) * 1.24)',
           }}
         >
           <img
@@ -55,7 +56,7 @@ const BrandLogo: React.FC<BrandLogoProps> = ({ theme, className, variant = 'comp
 
   return (
     <div className={`inline-flex w-full items-center gap-[0.8em] overflow-visible ${className ?? ''}`}>
-      <div className="relative h-full w-[2.7em] shrink-0">
+      <div className="relative h-full w-[3em] shrink-0">
         <img
           src={planetsSrc}
           alt=""
