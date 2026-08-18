@@ -1,5 +1,6 @@
 import React from 'react';
 import type { User } from 'firebase/auth';
+import type { SystemSectionKey } from '../types';
 import { Bot, BookMarked, BookOpen, Building2, Home, LayoutGrid, MessageSquareMore } from 'lucide-react';
 import MobileFooterNav from '../components/MobileFooterNav';
 import OrgChart from '../components/OrgChart';
@@ -17,24 +18,25 @@ interface OrganogramaScreenProps {
   onLogout: () => void;
   theme: 'light' | 'dark';
   toggleTheme: () => void;
+  disabledSystemSections: SystemSectionKey[];
   offlineMode?: boolean;
 }
 
 const OrganogramaScreen: React.FC<OrganogramaScreenProps> = ({
   user, isLoggedIn, onNavigateToPortfolio, onNavigateToProcessos, onNavigateToTreinamentos,
   onNavigateToKRs, onNavigateToAgentes, onNavigateToForum, onNavigateToAdmin, onLogout,
-  theme, toggleTheme, offlineMode = false,
+  theme, toggleTheme, disabledSystemSections, offlineMode = false,
 }) => {
   const light = theme === 'light';
   const items = [
     { label: 'Home', icon: Home, action: onNavigateToPortfolio },
-    { label: 'Processos', icon: LayoutGrid, action: onNavigateToProcessos },
-    { label: 'Treinamentos', icon: BookOpen, action: onNavigateToTreinamentos },
-    { label: "Banco de OKR's", icon: BookMarked, action: onNavigateToKRs },
-    { label: 'Agentes de IA', icon: Bot, action: onNavigateToAgentes },
-    { label: 'Organograma', icon: Building2, active: true },
-    { label: 'Fórum', icon: MessageSquareMore, action: onNavigateToForum },
-  ];
+    { label: 'Processos', icon: LayoutGrid, action: onNavigateToProcessos, section: 'processos' as SystemSectionKey },
+    { label: 'Treinamentos', icon: BookOpen, action: onNavigateToTreinamentos, section: 'treinamentos' as SystemSectionKey },
+    { label: "Banco de OKR's", icon: BookMarked, action: onNavigateToKRs, section: 'krs' as SystemSectionKey },
+    { label: 'Agentes de IA', icon: Bot, action: onNavigateToAgentes, section: 'agentes' as SystemSectionKey },
+    { label: 'Organograma', icon: Building2, active: true, section: 'organograma' as SystemSectionKey },
+    { label: 'Fórum', icon: MessageSquareMore, action: onNavigateToForum, section: 'forum' as SystemSectionKey },
+  ].filter((item) => !item.section || !disabledSystemSections.includes(item.section));
 
   return <div className={light ? 'min-h-screen bg-gray-100 text-zinc-900' : 'min-h-screen bg-[#0d0e10] text-white'}>
     <main className="container mx-auto px-4 py-6 pb-44 sm:px-6 sm:py-8 lg:px-8">

@@ -28,6 +28,7 @@ import {
   Tag,
 } from 'lucide-react';
 import type { User } from 'firebase/auth';
+import type { SystemSectionKey } from '../types';
 
 type SortMode = 'recentes' | 'mais-replies' | 'mais-views';
 type SubjectType = 'Processo' | 'Treinamento' | 'KR';
@@ -62,6 +63,7 @@ interface ForumScreenProps {
   onLogout: () => void;
   theme: 'light' | 'dark';
   toggleTheme: () => void;
+  disabledSystemSections: SystemSectionKey[];
   offlineMode?: boolean;
 }
 
@@ -144,6 +146,7 @@ const ForumScreen: React.FC<ForumScreenProps> = ({
   onLogout,
   theme,
   toggleTheme,
+  disabledSystemSections,
   offlineMode = false,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -506,13 +509,13 @@ const ForumScreen: React.FC<ForumScreenProps> = ({
 
   const menuItems = [
     { label: 'Home', icon: Home, action: onNavigateToPortfolio },
-    { label: 'Processos', icon: LayoutGrid, action: onNavigateToProcessos },
-    { label: 'Treinamentos', icon: BookOpen, action: onNavigateToTreinamentos },
-    { label: "Banco de OKR's", icon: BookMarked, action: onNavigateToKRs },
-    { label: 'Agentes de IA', icon: Bot, action: onNavigateToAgentes },
-    { label: 'Organograma', icon: Building2, action: onNavigateToOrganograma },
-    { label: 'Fórum', icon: MessageSquareMore, action: undefined, active: true },
-  ];
+    { label: 'Processos', icon: LayoutGrid, action: onNavigateToProcessos, section: 'processos' as SystemSectionKey },
+    { label: 'Treinamentos', icon: BookOpen, action: onNavigateToTreinamentos, section: 'treinamentos' as SystemSectionKey },
+    { label: "Banco de OKR's", icon: BookMarked, action: onNavigateToKRs, section: 'krs' as SystemSectionKey },
+    { label: 'Agentes de IA', icon: Bot, action: onNavigateToAgentes, section: 'agentes' as SystemSectionKey },
+    { label: 'Organograma', icon: Building2, action: onNavigateToOrganograma, section: 'organograma' as SystemSectionKey },
+    { label: 'Fórum', icon: MessageSquareMore, action: undefined, active: true, section: 'forum' as SystemSectionKey },
+  ].filter((item) => !item.section || !disabledSystemSections.includes(item.section));
 
   const MetaBlock: React.FC<{ label: string; value: string; accent?: string; theme: 'light' | 'dark' }> = ({
     label,

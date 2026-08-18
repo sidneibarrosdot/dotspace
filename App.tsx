@@ -17,7 +17,7 @@ import { auth, firebaseReady } from './firebase';
 import { logAudit } from './services/auditService';
 import { scrollToAppTop } from './utils/scrollHost';
 import { DEFAULT_APP_SETTINGS, subscribeToAppSettings, updateAppSettings } from './services/appSettingsService';
-import type { AppSettings, DevelopmentLockKey, HomeSectionKey } from './types';
+import type { AppSettings, DevelopmentLockKey, HomeSectionKey, SystemSectionKey } from './types';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 
 export type View = 'portfolio' | 'processos' | 'treinamentos' | 'agentes' | 'organograma' | 'krs' | 'forum' | 'login' | 'admin';
@@ -32,16 +32,27 @@ const GCP_LOGIN_ENABLED = false;
 const DEVELOPMENT_VIEW_KEYS: Partial<Record<View, DevelopmentLockKey>> = {
   processos: 'processos',
   treinamentos: 'treinamentos',
+  agentes: 'agentes',
+  organograma: 'organograma',
   krs: 'krs',
   forum: 'forum',
 };
+const SYSTEM_VIEW_KEYS: Partial<Record<View, SystemSectionKey>> = {
+  processos: 'processos',
+  treinamentos: 'treinamentos',
+  agentes: 'agentes',
+  organograma: 'organograma',
+  krs: 'krs',
+  forum: 'forum',
+};
+const VALID_STORED_VIEWS: View[] = ['portfolio', 'processos', 'treinamentos', 'agentes', 'organograma', 'krs', 'forum', 'admin'];
 
 const loadLocalAppSettings = (): AppSettings => {
   try {
     const saved = JSON.parse(window.localStorage.getItem(LOCAL_APP_SETTINGS_KEY) || '{}') as Partial<AppSettings>;
     const validLocks = Array.isArray(saved.developmentLockedSections)
       ? saved.developmentLockedSections.filter((key): key is DevelopmentLockKey =>
-          ['processos', 'treinamentos', 'krs', 'forum'].includes(key as DevelopmentLockKey),
+          ['processos', 'treinamentos', 'agentes', 'krs', 'organograma', 'forum'].includes(key as DevelopmentLockKey),
         )
       : [];
     const hiddenHomeSections = Array.isArray(saved.hiddenHomeSections)
@@ -49,12 +60,18 @@ const loadLocalAppSettings = (): AppSettings => {
           ['hero', 'updates', 'featured', 'aiHub', 'calendar'].includes(key as HomeSectionKey),
         )
       : [];
+    const disabledSystemSections = Array.isArray(saved.disabledSystemSections)
+      ? saved.disabledSystemSections.filter((key): key is SystemSectionKey =>
+          ['processos', 'treinamentos', 'agentes', 'krs', 'organograma', 'forum'].includes(key as SystemSectionKey),
+        )
+      : DEFAULT_APP_SETTINGS.disabledSystemSections;
 
     return {
       ...DEFAULT_APP_SETTINGS,
       ...saved,
       developmentLockedSections: Array.from(new Set([...validLocks, 'processos', 'forum'])),
       hiddenHomeSections: hiddenHomeSections.filter((section) => section !== 'calendar'),
+      disabledSystemSections,
       environment: 'production',
     };
   } catch {
@@ -173,7 +190,7 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>(() => {
     try {
       const saved = window.localStorage.getItem('dot-space.current-view') as View | null;
-      if (saved && ['portfolio', 'processos', 'treinamentos', 'krs', 'forum', 'admin'].includes(saved)) {
+      if (saved && VALID_STORED_VIEWS.includes(saved)) {
         return saved;
       }
     } catch {}
@@ -208,7 +225,7 @@ const App: React.FC = () => {
         let targetView: View = 'portfolio';
         try {
           const savedView = window.localStorage.getItem('dot-space.current-view') as View | null;
-          if (savedView && savedView !== 'login') {
+          if (savedView && VALID_STORED_VIEWS.includes(savedView)) {
             targetView = savedView;
           }
         } catch {}
@@ -244,7 +261,7 @@ const App: React.FC = () => {
         setUser(savedUser);
         try {
           const savedView = window.localStorage.getItem('dot-space.current-view') as View | null;
-          if (savedView && savedView !== 'login') {
+          if (savedView && VALID_STORED_VIEWS.includes(savedView)) {
             setCurrentView(savedView);
           } else {
             setCurrentView('portfolio');
@@ -271,7 +288,7 @@ const App: React.FC = () => {
           setUser(currentUser);
           try {
             const savedView = window.localStorage.getItem('dot-space.current-view') as View | null;
-            if (savedView && savedView !== 'login') {
+            if (savedView && VALID_STORED_VIEWS.includes(savedView)) {
               setCurrentView(savedView);
             } else {
               setCurrentView('portfolio');
@@ -352,6 +369,14 @@ const App: React.FC = () => {
     await handleUpdateAppSettings({ hiddenHomeSections });
   };
 
+  const handleToggleSystemSection = async (section: SystemSectionKey, enabled: boolean) => {
+    const disabledSystemSections = enabled
+      ? appSettings.disabledSystemSections.filter((item) => item !== section)
+      : Array.from(new Set([...appSettings.disabledSystemSections, section]));
+
+    await handleUpdateAppSettings({ disabledSystemSections });
+  };
+
   const handleLocalLogin = (email: string, displayName: string) => {
     const nextUser = createLocalUser(email, displayName);
     window.localStorage.setItem(
@@ -391,6 +416,13 @@ const App: React.FC = () => {
     setCurrentView(view);
   };
 
+  const isSystemSectionEnabled = (section: SystemSectionKey) =>
+    !appSettings.disabledSystemSections.includes(section);
+
+  const navigateToSystemSection = (view: View, section: SystemSectionKey) => {
+    navigateTo(isSystemSectionEnabled(section) ? view : 'portfolio');
+  };
+
   useEffect(() => {
     scrollToAppTop();
   }, [currentView]);
@@ -420,22 +452,27 @@ const App: React.FC = () => {
 
     const commonProps = {
       onNavigateToPortfolio: () => navigateTo('portfolio' as View),
-      onNavigateToProcessos: () => navigateTo('processos' as View),
-      onNavigateToTreinamentos: () => navigateTo('treinamentos' as View),
-      onNavigateToAgentes: () => navigateTo('agentes' as View),
-      onNavigateToOrganograma: () => navigateTo('organograma' as View),
-      onNavigateToKRs: () => navigateTo('krs' as View),
-      onNavigateToForum: () => navigateTo('forum' as View),
+      onNavigateToProcessos: () => navigateToSystemSection('processos', 'processos'),
+      onNavigateToTreinamentos: () => navigateToSystemSection('treinamentos', 'treinamentos'),
+      onNavigateToAgentes: () => navigateToSystemSection('agentes', 'agentes'),
+      onNavigateToOrganograma: () => navigateToSystemSection('organograma', 'organograma'),
+      onNavigateToKRs: () => navigateToSystemSection('krs', 'krs'),
+      onNavigateToForum: () => navigateToSystemSection('forum', 'forum'),
       onNavigateToAdmin: () => navigateTo('admin' as View),
       onLogout: handleLogout,
       theme,
       toggleTheme,
       isLoggedIn: true,
       user,
+      disabledSystemSections: appSettings.disabledSystemSections,
     };
 
+    const disabledCurrentSection = SYSTEM_VIEW_KEYS[currentView];
+    const viewToRender: View =
+      disabledCurrentSection && !isSystemSectionEnabled(disabledCurrentSection) ? 'portfolio' : currentView;
+
     if (!firebaseReady) {
-      switch (currentView) {
+      switch (viewToRender) {
         case 'admin':
           if (!adminAccessGranted) {
             return (
@@ -472,6 +509,8 @@ const App: React.FC = () => {
               onToggleDevelopmentLock={handleToggleDevelopmentLock}
               hiddenHomeSections={appSettings.hiddenHomeSections}
               onToggleHomeSection={handleToggleHomeSection}
+              disabledSystemSections={appSettings.disabledSystemSections}
+              onToggleSystemSection={handleToggleSystemSection}
               offlineMode
             />
           );
@@ -498,7 +537,7 @@ const App: React.FC = () => {
       }
     }
 
-    switch (currentView) {
+    switch (viewToRender) {
       case 'admin':
         if (!adminAccessGranted) {
           return (
@@ -535,6 +574,8 @@ const App: React.FC = () => {
             onToggleDevelopmentLock={handleToggleDevelopmentLock}
             hiddenHomeSections={appSettings.hiddenHomeSections}
             onToggleHomeSection={handleToggleHomeSection}
+            disabledSystemSections={appSettings.disabledSystemSections}
+            onToggleSystemSection={handleToggleSystemSection}
           />
         );
       case 'processos':

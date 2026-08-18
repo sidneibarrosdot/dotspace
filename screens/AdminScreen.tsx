@@ -4,7 +4,7 @@ import DotLogo from '../components/DotLogo';
 import { db, auth } from '../firebase';
 import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, writeBatch, doc, onSnapshot } from 'firebase/firestore';
 import { User } from 'firebase/auth';
-import type { DevelopmentLockKey, HomeSectionKey, PortfolioItem } from '../types';
+import type { DevelopmentLockKey, HomeSectionKey, PortfolioItem, SystemSectionKey } from '../types';
 import { portfolioItems as localPortfolioItems } from '../data/portfolioItems';
 import { processosItems } from '../data/processosItems';
 import { treinamentosItems } from '../data/treinamentosItems';
@@ -92,6 +92,8 @@ interface AdminScreenProps {
   onToggleDevelopmentLock: (section: DevelopmentLockKey, locked: boolean) => Promise<void> | void;
   hiddenHomeSections: HomeSectionKey[];
   onToggleHomeSection: (section: HomeSectionKey, visible: boolean) => Promise<void> | void;
+  disabledSystemSections: SystemSectionKey[];
+  onToggleSystemSection: (section: SystemSectionKey, enabled: boolean) => Promise<void> | void;
   offlineMode?: boolean;
 }
 
@@ -102,7 +104,9 @@ const DEVELOPMENT_LOCK_OPTIONS: Array<{
 }> = [
   { key: 'processos', label: 'Processos', description: 'Fluxos, documentos e cards de processos.' },
   { key: 'treinamentos', label: 'Treinamentos', description: 'Conteúdos e trilhas de aprendizagem.' },
+  { key: 'agentes', label: 'Agentes de IA', description: 'Assistentes, prompts e automações internas.' },
   { key: 'krs', label: "Banco de OKR's", description: 'Objetivos, resultados-chave e acompanhamento.' },
+  { key: 'organograma', label: 'Organograma', description: 'Times, lideranças, subáreas e colaboradores.' },
   { key: 'forum', label: 'Fórum', description: 'Discussões, respostas e alinhamentos do time.' },
 ];
 
@@ -116,6 +120,19 @@ const HOME_SECTION_OPTIONS: Array<{
   { key: 'featured', label: 'Destaque da casa', description: 'Card do conteúdo acessado em destaque.' },
   { key: 'aiHub', label: 'Hub de Inteligência Artificial', description: 'Bloco de IA em alta e conteúdos em foco.' },
   { key: 'calendar', label: 'Calendário', description: 'Agenda de treinamentos e eventos.' },
+];
+
+const SYSTEM_SECTION_OPTIONS: Array<{
+  key: SystemSectionKey;
+  label: string;
+  description: string;
+}> = [
+  { key: 'processos', label: 'Processos', description: 'Fluxos, documentos e cards de processos.' },
+  { key: 'treinamentos', label: 'Treinamentos', description: 'Conteúdos e trilhas de aprendizagem.' },
+  { key: 'agentes', label: 'Agentes de IA', description: 'Assistentes, prompts e automações internas.' },
+  { key: 'krs', label: "Banco de OKR's", description: 'Objetivos, resultados-chave e acompanhamento.' },
+  { key: 'organograma', label: 'Organograma', description: 'Times, lideranças, subáreas e colaboradores.' },
+  { key: 'forum', label: 'Fórum', description: 'Discussões, respostas e alinhamentos do time.' },
 ];
 
 interface UploadLog {
@@ -349,6 +366,8 @@ const AdminScreen: React.FC<AdminScreenProps> = ({
   onToggleDevelopmentLock,
   hiddenHomeSections,
   onToggleHomeSection,
+  disabledSystemSections,
+  onToggleSystemSection,
   offlineMode = false,
 }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -1130,6 +1149,74 @@ const AdminScreen: React.FC<AdminScreenProps> = ({
     </section>
   );
 
+  const renderSystemSectionControls = () => (
+    <section className="rounded-2xl border border-emerald-200 bg-white p-6 shadow-sm dark:border-emerald-900/50 dark:bg-zinc-800">
+      <div>
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-400">
+          Seções do sistema
+        </p>
+        <h2 className="mt-2 text-xl font-bold text-zinc-900 dark:text-white">Áreas ativas</h2>
+        <p className="mt-1 max-w-2xl text-sm text-gray-600 dark:text-gray-400">
+          Desative áreas inteiras para ocultar a navegação e impedir acesso direto.
+        </p>
+      </div>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        {SYSTEM_SECTION_OPTIONS.map((option) => {
+          const isEnabled = !disabledSystemSections.includes(option.key);
+
+          return (
+            <button
+              key={option.key}
+              type="button"
+              role="switch"
+              aria-checked={isEnabled}
+              aria-label={`Seção ativa: ${option.label}`}
+              onClick={async () => {
+                setIsSavingSettings(true);
+                try {
+                  await onToggleSystemSection(option.key, !isEnabled);
+                  setMessage(`${option.label} ${isEnabled ? 'desativado' : 'ativado'} no sistema.`);
+                  setUploadStatus('success');
+                } catch (error) {
+                  console.error('Error updating system section availability:', error);
+                  setMessage(`Não foi possível atualizar ${option.label}.`);
+                  setUploadStatus('error');
+                } finally {
+                  setIsSavingSettings(false);
+                }
+              }}
+              disabled={isSavingSettings}
+              className={`group flex w-full items-center justify-between gap-4 rounded-2xl border px-4 py-3 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:ring-offset-2 disabled:cursor-wait disabled:opacity-60 dark:focus:ring-offset-zinc-800 ${
+                isEnabled
+                  ? 'border-emerald-300 bg-emerald-50 dark:border-emerald-700/60 dark:bg-emerald-950/20'
+                  : 'border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-gray-100 dark:border-zinc-700 dark:bg-zinc-900/60 dark:hover:border-zinc-600 dark:hover:bg-zinc-900'
+              }`}
+            >
+              <div className="min-w-0">
+                <p className="font-bold text-zinc-900 dark:text-white">{option.label}</p>
+                <p className="mt-0.5 text-xs leading-relaxed text-gray-500 dark:text-gray-400">{option.description}</p>
+              </div>
+              <span
+                aria-hidden="true"
+                className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
+                  isEnabled ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-600'
+                }`}
+              >
+                <span
+                  aria-hidden="true"
+                  className={`absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+                    isEnabled ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+
   const renderHomeVisibilityControls = () => (
     <section className="rounded-2xl border border-sky-200 bg-white p-6 shadow-sm dark:border-sky-900/50 dark:bg-zinc-800">
       <div>
@@ -1244,6 +1331,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({
                 {renderStat('Itens em revisão', monitoredAreas.reduce((acc, item) => acc + item.review, 0))}
               </div>
 
+              {renderSystemSectionControls()}
               {renderDevelopmentLockControls()}
               {renderHomeVisibilityControls()}
 
@@ -1591,6 +1679,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({
                 </div>
               </div>
 
+              {renderSystemSectionControls()}
               {renderDevelopmentLockControls()}
               {renderHomeVisibilityControls()}
 

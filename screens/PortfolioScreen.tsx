@@ -31,7 +31,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import type { HomeSectionKey, PortfolioItem } from '../types';
+import type { HomeSectionKey, PortfolioItem, SystemSectionKey } from '../types';
 import { processosItems } from '../data/processosItems';
 import { krsItems } from '../data/krsItems';
 import { treinamentosItems } from '../data/treinamentosItems';
@@ -361,6 +361,7 @@ interface PortfolioScreenProps {
     toggleTheme: () => void;
     manualInteractionsEnabled: boolean;
     hiddenHomeSections: HomeSectionKey[];
+    disabledSystemSections: SystemSectionKey[];
     offlineMode?: boolean;
 }
 
@@ -388,9 +389,10 @@ const normalizeCount = (value: unknown) => {
   return Number.isFinite(nextValue) && nextValue > 0 ? nextValue : 0;
 };
 
-const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onNavigateToAdmin, onNavigateToProcessos, onNavigateToTreinamentos, onNavigateToAgentes, onNavigateToOrganograma, onNavigateToKRs, onNavigateToForum, onLogout, theme, toggleTheme, manualInteractionsEnabled, hiddenHomeSections, offlineMode = false }) => {
+const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onNavigateToAdmin, onNavigateToProcessos, onNavigateToTreinamentos, onNavigateToAgentes, onNavigateToOrganograma, onNavigateToKRs, onNavigateToForum, onLogout, theme, toggleTheme, manualInteractionsEnabled, hiddenHomeSections, disabledSystemSections, offlineMode = false }) => {
   const isLightMode = theme === 'light';
   const isHomeSectionVisible = (section: HomeSectionKey) => !hiddenHomeSections.includes(section);
+  const isSystemSectionEnabled = (section: SystemSectionKey) => !disabledSystemSections.includes(section);
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>(offlineMode ? localPortfolioItems : []);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -1444,13 +1446,13 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
               <div className="space-y-2">
                 {[
                   { label: 'Home', icon: Home, action: () => scrollToAppTop(), active: true },
-                  { label: 'Processos', icon: LayoutGrid, action: onNavigateToProcessos, active: false },
-                  { label: 'Treinamentos', icon: BookOpen, action: onNavigateToTreinamentos, active: false },
-                  { label: "Banco de OKR's", icon: BookMarked, action: onNavigateToKRs, active: false },
-                  { label: 'Agentes de IA', icon: Bot, action: onNavigateToAgentes, active: false },
-                  { label: 'Organograma', icon: Building2, action: onNavigateToOrganograma, active: false },
-                  { label: 'Fórum', icon: MessageSquareMore, action: onNavigateToForum, active: false },
-                ].map((item) => {
+                  { label: 'Processos', icon: LayoutGrid, action: onNavigateToProcessos, active: false, section: 'processos' as SystemSectionKey },
+                  { label: 'Treinamentos', icon: BookOpen, action: onNavigateToTreinamentos, active: false, section: 'treinamentos' as SystemSectionKey },
+                  { label: "Banco de OKR's", icon: BookMarked, action: onNavigateToKRs, active: false, section: 'krs' as SystemSectionKey },
+                  { label: 'Agentes de IA', icon: Bot, action: onNavigateToAgentes, active: false, section: 'agentes' as SystemSectionKey },
+                  { label: 'Organograma', icon: Building2, action: onNavigateToOrganograma, active: false, section: 'organograma' as SystemSectionKey },
+                  { label: 'Fórum', icon: MessageSquareMore, action: onNavigateToForum, active: false, section: 'forum' as SystemSectionKey },
+                ].filter((item) => !item.section || isSystemSectionEnabled(item.section)).map((item) => {
                   const Icon = item.icon;
                   const active = item.active;
                   return (
@@ -1694,13 +1696,13 @@ const PortfolioScreen: React.FC<PortfolioScreenProps> = ({ user, isLoggedIn, onN
         theme={theme}
         items={[
           { label: 'Home', icon: Home, onClick: () => scrollToAppTop(), active: true },
-          { label: 'Processos', icon: LayoutGrid, onClick: onNavigateToProcessos },
-          { label: 'Treinamentos', icon: BookOpen, onClick: onNavigateToTreinamentos },
-          { label: "Banco de OKR's", icon: BookMarked, onClick: onNavigateToKRs },
-          { label: 'Agentes de IA', icon: Bot, onClick: onNavigateToAgentes },
-          { label: 'Organograma', icon: Building2, onClick: onNavigateToOrganograma },
-          { label: 'Fórum', icon: MessageSquareMore, onClick: onNavigateToForum },
-        ]}
+          { label: 'Processos', icon: LayoutGrid, onClick: onNavigateToProcessos, section: 'processos' as SystemSectionKey },
+          { label: 'Treinamentos', icon: BookOpen, onClick: onNavigateToTreinamentos, section: 'treinamentos' as SystemSectionKey },
+          { label: "Banco de OKR's", icon: BookMarked, onClick: onNavigateToKRs, section: 'krs' as SystemSectionKey },
+          { label: 'Agentes de IA', icon: Bot, onClick: onNavigateToAgentes, section: 'agentes' as SystemSectionKey },
+          { label: 'Organograma', icon: Building2, onClick: onNavigateToOrganograma, section: 'organograma' as SystemSectionKey },
+          { label: 'Fórum', icon: MessageSquareMore, onClick: onNavigateToForum, section: 'forum' as SystemSectionKey },
+        ].filter((item) => !item.section || isSystemSectionEnabled(item.section))}
       />
 
       {!offlineMode && isLoggedIn && manualInteractionsEnabled && (

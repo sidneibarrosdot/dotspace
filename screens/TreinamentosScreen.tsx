@@ -4,7 +4,7 @@ import Pagination from '../components/Pagination';
 import PageFilterActions from '../components/PageFilterActions';
 import SearchBar from '../components/SearchBar';
 import { useLocalCardInteractions, recordLocalCardInteractionEvent } from '../hooks/useLocalCardInteractions';
-import type { PortfolioItem } from '../types';
+import type { PortfolioItem, SystemSectionKey } from '../types';
 import { treinamentosItems } from '../data/treinamentosItems';
 import { FEEDBACK_COPY_ERROR, FEEDBACK_COPY_SUCCESS, FEEDBACK_TIMEOUT_ERROR, FEEDBACK_TIMEOUT_SUCCESS } from '../constants/feedbackMessages';
 import {
@@ -49,6 +49,7 @@ interface TreinamentosScreenProps {
   onLogout: () => void;
   theme: 'light' | 'dark';
   toggleTheme: () => void;
+  disabledSystemSections: SystemSectionKey[];
   offlineMode?: boolean;
 }
 
@@ -79,6 +80,7 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
   onLogout,
   theme,
   toggleTheme,
+  disabledSystemSections,
   offlineMode = false,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -108,8 +110,8 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
     ? 'relative z-40 space-y-4 rounded-[30px] border border-zinc-200 bg-white p-4 shadow-[0_25px_60px_rgba(15,23,42,0.08)] sm:p-5'
     : 'relative z-40 space-y-4 rounded-[30px] border border-white/10 bg-[#151517] p-4 shadow-[0_25px_60px_rgba(0,0,0,0.2)] sm:p-5';
   const filtersButtonClass = isLightMode
-    ? 'inline-flex h-[52px] w-full items-center justify-between gap-3 rounded-full border border-zinc-200 bg-zinc-50 px-5 text-sm font-semibold text-zinc-800 transition-colors hover:bg-zinc-100 xl:w-56'
-    : 'inline-flex h-[52px] w-full items-center justify-between gap-3 rounded-full border border-white/10 bg-white/6 px-5 text-sm font-semibold text-white/90 transition-colors hover:bg-white/10 xl:w-56';
+    ? 'inline-flex h-[52px] w-full items-center justify-between gap-3 rounded-full border border-zinc-200 bg-zinc-50 px-5 text-sm font-semibold text-zinc-800 transition-colors hover:bg-zinc-100'
+    : 'inline-flex h-[52px] w-full items-center justify-between gap-3 rounded-full border border-white/10 bg-white/6 px-5 text-sm font-semibold text-white/90 transition-colors hover:bg-white/10';
   const filtersMenuClass = isLightMode
     ? 'absolute left-0 top-full z-[90] mt-2 w-full overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl'
     : 'absolute left-0 top-full z-[90] mt-2 w-full overflow-hidden rounded-2xl border border-white/10 bg-[#1b1b20] shadow-2xl';
@@ -288,13 +290,13 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
 
   const menuItems = [
     { label: 'Home', icon: Home, active: false, action: onNavigateToPortfolio },
-    { label: 'Processos', icon: LayoutGrid, active: false, action: onNavigateToProcessos },
-    { label: 'Treinamentos', icon: BookOpen, active: true, action: undefined },
-    { label: "Banco de OKR's", icon: BookMarked, active: false, action: onNavigateToKRs },
-    { label: 'Agentes de IA', icon: Bot, active: false, action: onNavigateToAgentes },
-    { label: 'Organograma', icon: Building2, active: false, action: onNavigateToOrganograma },
-    { label: 'Fórum', icon: MessageSquareMore, active: false, action: onNavigateToForum },
-  ];
+    { label: 'Processos', icon: LayoutGrid, active: false, action: onNavigateToProcessos, section: 'processos' as SystemSectionKey },
+    { label: 'Treinamentos', icon: BookOpen, active: true, action: undefined, section: 'treinamentos' as SystemSectionKey },
+    { label: "Banco de OKR's", icon: BookMarked, active: false, action: onNavigateToKRs, section: 'krs' as SystemSectionKey },
+    { label: 'Agentes de IA', icon: Bot, active: false, action: onNavigateToAgentes, section: 'agentes' as SystemSectionKey },
+    { label: 'Organograma', icon: Building2, active: false, action: onNavigateToOrganograma, section: 'organograma' as SystemSectionKey },
+    { label: 'Fórum', icon: MessageSquareMore, active: false, action: onNavigateToForum, section: 'forum' as SystemSectionKey },
+  ].filter((item) => !item.section || !disabledSystemSections.includes(item.section));
 
   return (
     <div className={pageClass}>
@@ -369,8 +371,8 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                 setOpenMenu(null);
               }}
             >
-              <div className="grid gap-4 xl:grid-cols-[minmax(320px,1fr)_224px_250px] xl:items-center">
-                <div className="xl:pr-4">
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+                <div className="xl:min-w-[320px] xl:flex-1">
                   <SearchBar
                     searchTerm={searchTerm}
                     setSearchTerm={setSearchTerm}
@@ -385,13 +387,13 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                   />
                 </div>
 
-                <div className="relative" data-filter-dropdown>
+                <div className="relative xl:w-[190px] xl:shrink-0" data-filter-dropdown>
                   <button
                     type="button"
                     onClick={() => setOpenMenu(openMenu === 'area' ? null : 'area')}
                     className={filtersButtonClass}
                   >
-                    <span>{areaFilter || 'Categoria'}</span>
+                    <span className="min-w-0 truncate">{areaFilter || 'Categoria'}</span>
                     <ChevronDown className="h-4 w-4" />
                   </button>
                   {openMenu === 'area' && (
@@ -423,13 +425,13 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                   )}
                 </div>
 
-                <div className="relative" data-filter-dropdown>
+                <div className="relative xl:w-[220px] xl:shrink-0" data-filter-dropdown>
                   <button
                     type="button"
                     onClick={() => setOpenMenu(openMenu === 'ordem' ? null : 'ordem')}
                     className={filtersButtonClass}
                   >
-                    <span>{sortMode === 'recentes' ? 'Recentemente atualizado' : sortMode.toUpperCase()}</span>
+                    <span className="min-w-0 truncate">{sortMode === 'recentes' ? 'Recentemente atualizado' : sortMode.toUpperCase()}</span>
                     <Filter className="h-4 w-4" />
                   </button>
                   {openMenu === 'ordem' && (
@@ -528,7 +530,6 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                 <section className={viewMode === 'grid' ? 'grid grid-flow-row-dense items-start gap-4 md:grid-cols-2 xl:grid-cols-3' : 'grid gap-4'}>
                   {paginatedItems.map((item, index) => {
                     const localState = getState(item.id, item.views ?? 0, item.likes ?? 0, Boolean(item.pinned));
-                    const accent = '#F78E43';
 
                     return (
                       <React.Fragment key={item.id}>
@@ -545,9 +546,6 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                                 className="h-full w-full object-cover grayscale transition-transform duration-500 group-hover:scale-105"
                               />
                               <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
-                              <span className="absolute left-4 top-4 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.25em] text-white" style={{ backgroundColor: accent }}>
-                                {item.Time || item.Cliente}
-                              </span>
                             </div>
 
                             <div className={`flex flex-1 flex-col p-5 ${isLightMode ? 'border-t border-zinc-200/70 bg-white' : 'border-t border-white/10 bg-[#17171b]'}`}>
@@ -674,9 +672,6 @@ const TreinamentosScreen: React.FC<TreinamentosScreenProps> = ({
                                 className="h-full w-full object-cover grayscale transition-transform duration-500 group-hover:scale-105"
                               />
                               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent" />
-                              <span className="absolute left-2 top-2 rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-white sm:left-4 sm:top-4 sm:px-3 sm:text-[10px] sm:tracking-[0.25em]" style={{ backgroundColor: accent }}>
-                                {item.Time || item.Cliente}
-                              </span>
                             </div>
 
                             <div className="p-3 sm:p-4 lg:p-5">

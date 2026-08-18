@@ -31,6 +31,7 @@ import {
   Workflow
 } from 'lucide-react';
 import type { User } from 'firebase/auth';
+import type { SystemSectionKey } from '../types';
 import aiHeroImage from '../assets/hero-agentes-ia.png';
 
 type SortMode = 'recentes' | 'a-z' | 'z-a';
@@ -49,6 +50,7 @@ interface AgentesScreenProps {
   onLogout: () => void;
   theme: 'light' | 'dark';
   toggleTheme: () => void;
+  disabledSystemSections: SystemSectionKey[];
   offlineMode?: boolean;
 }
 
@@ -65,6 +67,7 @@ const AgentesScreen: React.FC<AgentesScreenProps> = ({
   onLogout,
   theme,
   toggleTheme,
+  disabledSystemSections,
   offlineMode = false,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -215,13 +218,13 @@ const AgentesScreen: React.FC<AgentesScreenProps> = ({
 
   const menuItems = [
     { label: 'Home', icon: Home, active: false, action: onNavigateToPortfolio },
-    { label: 'Processos', icon: LayoutGrid, active: false, action: onNavigateToProcessos },
-    { label: 'Treinamentos', icon: BookOpen, active: false, action: onNavigateToTreinamentos },
-    { label: "Banco de OKR's", icon: BookMarked, active: false, action: onNavigateToKRs },
-    { label: 'Agentes de IA', icon: Bot, active: true, action: undefined },
-    { label: 'Organograma', icon: Building2, active: false, action: onNavigateToOrganograma },
-    { label: 'Fórum', icon: MessageSquareMore, active: false, action: onNavigateToForum },
-  ];
+    { label: 'Processos', icon: LayoutGrid, active: false, action: onNavigateToProcessos, section: 'processos' as SystemSectionKey },
+    { label: 'Treinamentos', icon: BookOpen, active: false, action: onNavigateToTreinamentos, section: 'treinamentos' as SystemSectionKey },
+    { label: "Banco de OKR's", icon: BookMarked, active: false, action: onNavigateToKRs, section: 'krs' as SystemSectionKey },
+    { label: 'Agentes de IA', icon: Bot, active: true, action: undefined, section: 'agentes' as SystemSectionKey },
+    { label: 'Organograma', icon: Building2, active: false, action: onNavigateToOrganograma, section: 'organograma' as SystemSectionKey },
+    { label: 'Fórum', icon: MessageSquareMore, active: false, action: onNavigateToForum, section: 'forum' as SystemSectionKey },
+  ].filter((item) => !item.section || !disabledSystemSections.includes(item.section));
 
   const mobileFooterItems = menuItems.map(item => ({
     label: item.label,

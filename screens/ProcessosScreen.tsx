@@ -6,7 +6,7 @@ import SearchBar from '../components/SearchBar';
 import { useLocalCardInteractions, recordLocalCardInteractionEvent } from '../hooks/useLocalCardInteractions';
 import { processosItems } from '../data/processosItems';
 import { FEEDBACK_COPY_ERROR, FEEDBACK_COPY_SUCCESS, FEEDBACK_TIMEOUT_ERROR, FEEDBACK_TIMEOUT_SUCCESS } from '../constants/feedbackMessages';
-import type { PortfolioItem } from '../types';
+import type { PortfolioItem, SystemSectionKey } from '../types';
 import { getScrollTop, scrollAppTo } from '../utils/scrollHost';
 import {
   ArrowRight,
@@ -48,6 +48,7 @@ interface ProcessosScreenProps {
   onLogout: () => void;
   theme: 'light' | 'dark';
   toggleTheme: () => void;
+  disabledSystemSections: SystemSectionKey[];
   offlineMode?: boolean;
 }
 
@@ -164,6 +165,7 @@ const ProcessosScreen: React.FC<ProcessosScreenProps> = ({
   onLogout,
   theme,
   toggleTheme,
+  disabledSystemSections,
   offlineMode = false,
 }) => {
   const isLightMode = theme === 'light';
@@ -469,13 +471,13 @@ const ProcessosScreen: React.FC<ProcessosScreenProps> = ({
 
   const menuItems = [
     { label: 'Home', icon: Home, active: false, action: onNavigateToPortfolio },
-    { label: 'Processos', icon: LayoutGrid, active: true, action: undefined },
-    { label: 'Treinamentos', icon: BookOpen, active: false, action: onNavigateToTreinamentos },
-    { label: "Banco de OKR's", icon: BookMarked, active: false, action: onNavigateToKRs },
-    { label: 'Agentes de IA', icon: Bot, active: false, action: onNavigateToAgentes },
-    { label: 'Organograma', icon: Building2, active: false, action: onNavigateToOrganograma },
-    { label: 'Fórum', icon: MessageSquareMore, active: false, action: onNavigateToForum },
-  ];
+    { label: 'Processos', icon: LayoutGrid, active: true, action: undefined, section: 'processos' as SystemSectionKey },
+    { label: 'Treinamentos', icon: BookOpen, active: false, action: onNavigateToTreinamentos, section: 'treinamentos' as SystemSectionKey },
+    { label: "Banco de OKR's", icon: BookMarked, active: false, action: onNavigateToKRs, section: 'krs' as SystemSectionKey },
+    { label: 'Agentes de IA', icon: Bot, active: false, action: onNavigateToAgentes, section: 'agentes' as SystemSectionKey },
+    { label: 'Organograma', icon: Building2, active: false, action: onNavigateToOrganograma, section: 'organograma' as SystemSectionKey },
+    { label: 'Fórum', icon: MessageSquareMore, active: false, action: onNavigateToForum, section: 'forum' as SystemSectionKey },
+  ].filter((item) => !item.section || !disabledSystemSections.includes(item.section));
 
   return (
     <div className={pageClass}>

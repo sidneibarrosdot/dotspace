@@ -12,7 +12,7 @@ interface PageFilterActionsProps {
 const PageFilterActions: React.FC<PageFilterActionsProps> = ({ showFavoritesOnly, onToggleFavorites, onShare, feedback, theme = 'dark' }) => {
   const isLightMode = theme === 'light';
   return (
-    <div className="flex flex-wrap items-center gap-3">
+    <div className="flex flex-wrap items-center gap-3 xl:flex-nowrap xl:shrink-0">
       <button
         type="button"
         onClick={onToggleFavorites}
